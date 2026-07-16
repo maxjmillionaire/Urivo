@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+/*
+ * Urivo Design Tokens — single source: docs/design/design-system.md
+ * 60% Forest Green · 30% Warm Ivory · 10% Champagne Gold
+ */
+@theme {
+  --color-forest-950: #05120b;
+  --color-forest-900: #0b2416;
+  --color-ivory-100: #efead8;
+  --color-ivory-50: #f7f4ea;
+  --color-champagne: #ede0c2;
+  --color-gold-300: #e9d3a0;
+  --color-gold-500: #c69b3c;
+  --color-gold-700: #9c7526;
+  --color-success: #047857;
+  --color-success-dark: #34d399;
+  --color-danger: #b91c1c;
+  --color-danger-dark: #f87171;
+
+  --font-serif: "Playfair Display", "Didot", "Georgia", serif;
+  --font-sans: "Inter", "SF Pro Display", system-ui, sans-serif;
+
+  --ease-urivo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Motion standard: one curve, purposeful durations (UEOS Book VI) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Keyboard focus: always visible, always gold (accessibility standard) */
+:focus-visible {
+  outline: 2px solid var(--color-gold-500);
+  outline-offset: 2px;
+}

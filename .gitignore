@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Environment — never commit secrets
+.env
+.env.*
+!.env.example
+
+# Logs & caches
+*.log
+.turbo/
+.vercel/
+
+# OS noise
+.DS_Store
