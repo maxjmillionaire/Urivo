@@ -40,3 +40,13 @@
   outline: 2px solid var(--color-gold-500);
   outline-offset: 2px;
 }
+
+/* Generation loader shimmer (screens-v1 §5) */
+@keyframes urivo-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}

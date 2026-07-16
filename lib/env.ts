@@ -17,8 +17,10 @@ const serverEnvSchema = z.object({
   ROOT_DOMAIN: z.string().min(1).default("localhost:3000"),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
-  // Server-only admin key — required once webhooks/admin operations land (Phase 2).
+  // Server-only admin key — required for credits, generation, webhooks.
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  // AI provider — required for store generation (Phase 3).
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
+import { getCreditBalance } from "@/lib/credits";
 import { env } from "@/lib/env";
+import { GenerateStorePanel } from "./generate-store-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -21,20 +23,19 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: balance }, { data: stores }] =
-    await Promise.all([
-      supabase
-        .from("profiles")
-        .select("email, full_name, plan")
-        .eq("id", user.id)
-        .single(),
-      supabase.rpc("credit_balance", { p_user_id: user.id }),
-      supabase
-        .from("stores")
-        .select("id, store_name, subdomain, is_active, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false }),
-    ]);
+  const [{ data: profile }, balance, { data: stores }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("email, full_name, plan")
+      .eq("id", user.id)
+      .single(),
+    getCreditBalance(user.id),
+    supabase
+      .from("stores")
+      .select("id, store_name, subdomain, is_active, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false }),
+  ]);
 
   const planLabel =
     profile?.plan === "core" ? "Core" : profile?.plan === "pro" ? "Pro" : "Free";
@@ -54,14 +55,17 @@ export default async function DashboardPage() {
             {profile?.email ?? user.email}
           </p>
         </div>
-        <form action="/auth/signout" method="post">
-          <button
-            type="submit"
-            className="rounded-lg border border-ivory-100/15 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/70 transition-colors duration-200 hover:border-ivory-100/30 hover:text-ivory-100"
-          >
-            Sign out
-          </button>
-        </form>
+        <div className="flex items-center gap-3">
+          <GenerateStorePanel canGenerate={balance >= 10} />
+          <form action="/auth/signout" method="post">
+            <button
+              type="submit"
+              className="rounded-lg border border-ivory-100/15 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/70 transition-colors duration-200 hover:border-ivory-100/30 hover:text-ivory-100"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
       </header>
 
       <section className="mt-10 grid gap-6 sm:grid-cols-2">
