@@ -4,6 +4,8 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCreditBalance, STORE_GENERATION_COST } from "@/lib/credits";
 import { rateLimit } from "@/lib/ratelimit";
+import { captureException } from "@/lib/monitoring";
+import { newRequestId } from "@/lib/logger";
 import {
   generateStore,
   STORE_GENERATOR_MODEL,
@@ -104,6 +106,8 @@ export async function POST(request: NextRequest) {
     return fail(402, "INSUFFICIENT_CREDITS", "You don't have enough credits for a new store.");
   }
 
+  const requestId = newRequestId();
+
   // 5. Generate (AI)
   let generated;
   try {
@@ -117,6 +121,7 @@ export async function POST(request: NextRequest) {
       return fail(422, "AI_REFUSED", "We couldn't design a store from that idea. Try describing it differently.");
     }
     // AI_INVALID_OUTPUT or provider error — credits untouched.
+    captureException(err, { requestId, userId: user.id, route: "generate-store" });
     return fail(502, "AI_FAILED", "Generation hit a snag. Your credits were not used — please try again.");
   }
 
@@ -169,6 +174,7 @@ export async function POST(request: NextRequest) {
     if (msg.includes("stores_subdomain_key") || msg.includes("duplicate key")) {
       return fail(409, "SUBDOMAIN_TAKEN", "That address was just taken. Try another.");
     }
+    captureException(rpcError, { requestId, userId: user.id, route: "generate-store:persist" });
     return fail(500, "INTERNAL", "Could not finish creating your store. Please try again.");
   }
 

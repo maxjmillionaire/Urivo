@@ -63,6 +63,12 @@ export default async function DashboardPage() {
           >
             Billing
           </Link>
+          <Link
+            href="/dashboard/settings"
+            className="rounded-lg border border-ivory-100/15 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/70 transition-colors duration-200 hover:border-ivory-100/30 hover:text-ivory-100"
+          >
+            Settings
+          </Link>
           <form action="/auth/signout" method="post">
             <button
               type="submit"
@@ -99,14 +105,20 @@ export default async function DashboardPage() {
         </h2>
 
         {storeList.length === 0 ? (
-          <div className="mt-6 rounded-2xl border border-ivory-100/10 bg-ivory-100/5 p-10 text-center">
-            <h3 className="font-serif text-2xl font-normal text-ivory-100">
+          <div className="mt-6 rounded-2xl border border-gold-500/20 bg-ivory-100/5 p-12 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-gold-500">
+              Let's build your business
+            </p>
+            <h3 className="mx-auto mt-5 max-w-lg font-serif text-3xl font-normal leading-tight text-ivory-100">
               Your first store is one sentence away.
             </h3>
-            <p className="mx-auto mt-3 max-w-md text-sm font-light leading-relaxed text-ivory-100/60">
-              The AI store generator arrives here next — describe your business
-              and Urivo builds the brand, the catalog and the storefront.
+            <p className="mx-auto mt-4 max-w-md text-sm font-light leading-relaxed text-ivory-100/60">
+              Describe what you want to sell — Urivo designs the brand, writes
+              the catalog and builds a live storefront in under a minute.
             </p>
+            <div className="mt-8 flex justify-center">
+              <GenerateStorePanel canGenerate={balance >= 10} />
+            </div>
           </div>
         ) : (
           <div className="mt-6 overflow-hidden rounded-2xl border border-ivory-100/10">

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { ConsentBanner } from "./consent-banner";
 
 export const metadata: Metadata = {
   title: "Urivo — The AI Commerce Operating System",
@@ -18,6 +19,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-forest-900 font-sans text-ivory-100 antialiased">
         {children}
+        <ConsentBanner />
       </body>
     </html>
   );
