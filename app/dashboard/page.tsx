@@ -138,11 +138,19 @@ export default async function DashboardPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <Link
-                        href={storeUrl(store.subdomain)}
+                        href={`/dashboard/stores/${store.id}`}
                         className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-300 underline-offset-4 hover:underline"
                       >
-                        View live
+                        Manage
                       </Link>
+                      <a
+                        href={storeUrl(store.subdomain)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ml-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/60 underline-offset-4 hover:text-ivory-100 hover:underline"
+                      >
+                        View
+                      </a>
                     </td>
                   </tr>
                 ))}
