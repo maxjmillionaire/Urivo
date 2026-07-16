@@ -5,7 +5,6 @@ import { z } from "zod";
  * missing production secrets).
  *
  * Extend the schema as services are wired in:
- *   Phase 1 → SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
  *   Phase 2 → STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, price IDs
  *   Phase 3 → ANTHROPIC_API_KEY, UPSTASH_REDIS_URL, UPSTASH_REDIS_TOKEN
  *   Phase 5 → RESEND_API_KEY, POSTHOG_KEY, SENTRY_DSN
@@ -16,6 +15,10 @@ const serverEnvSchema = z.object({
     .default("development"),
   APP_URL: z.string().url().default("http://localhost:3000"),
   ROOT_DOMAIN: z.string().min(1).default("localhost:3000"),
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  // Server-only admin key — required once webhooks/admin operations land (Phase 2).
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
