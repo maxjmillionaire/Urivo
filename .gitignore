@@ -17,3 +17,7 @@ out/
 
 # OS noise
 .DS_Store
+
+# TypeScript incremental build info
+tsconfig.tsbuildinfo
+*.tsbuildinfo
