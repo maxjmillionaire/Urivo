@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Urivo">
+  <defs>
+    <linearGradient id="urivo-gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E9D3A0"/>
+      <stop offset="0.5" stop-color="#C69B3C"/>
+      <stop offset="1" stop-color="#9C7526"/>
+    </linearGradient>
+  </defs>
+  <!--
+    Urivo monogram: serif "U" whose right stroke sweeps upward into a growth arrow.
+    Vector recreation of the raster brand master (assets/brand source of truth: founder's export).
+  -->
+  <path fill="url(#urivo-gold)" d="
+    M122 126 H210 V142 H190 V298
+    C190 348 224 374 262 374
+    C300 374 332 350 334 306
+    L334 138
+    L304 148 L342 70 L380 148 L350 138
+    L350 306
+    C350 362 306 394 260 394
+    C208 394 142 366 142 298
+    L142 142 H122 Z"/>
+</svg>
