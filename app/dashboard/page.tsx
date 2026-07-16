@@ -1,7 +1,17 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
+
+function storeUrl(subdomain: string): string {
+  const { ROOT_DOMAIN, NODE_ENV } = env();
+  if (NODE_ENV !== "production" || ROOT_DOMAIN.startsWith("localhost")) {
+    return `/store/${subdomain}`;
+  }
+  return `https://${subdomain}.${ROOT_DOMAIN}`;
+}
 
 export default async function DashboardPage() {
   const supabase = await supabaseServer();
@@ -11,13 +21,24 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: balance }] = await Promise.all([
-    supabase.from("profiles").select("email, full_name, plan").eq("id", user.id).single(),
-    supabase.rpc("credit_balance", { p_user_id: user.id }),
-  ]);
+  const [{ data: profile }, { data: balance }, { data: stores }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("email, full_name, plan")
+        .eq("id", user.id)
+        .single(),
+      supabase.rpc("credit_balance", { p_user_id: user.id }),
+      supabase
+        .from("stores")
+        .select("id, store_name, subdomain, is_active, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+    ]);
 
   const planLabel =
     profile?.plan === "core" ? "Core" : profile?.plan === "pro" ? "Pro" : "Free";
+  const storeList = stores ?? [];
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-6 py-16">
@@ -62,14 +83,69 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="mt-10 rounded-2xl border border-ivory-100/10 bg-ivory-100/5 p-10 text-center">
+      <section className="mt-10">
         <h2 className="font-serif text-2xl font-normal text-ivory-100">
-          Your first store is one sentence away.
+          Your stores
         </h2>
-        <p className="mx-auto mt-3 max-w-md text-sm font-light leading-relaxed text-ivory-100/60">
-          The AI store generator arrives here next — describe your business and
-          Urivo builds the brand, the catalog and the storefront.
-        </p>
+
+        {storeList.length === 0 ? (
+          <div className="mt-6 rounded-2xl border border-ivory-100/10 bg-ivory-100/5 p-10 text-center">
+            <h3 className="font-serif text-2xl font-normal text-ivory-100">
+              Your first store is one sentence away.
+            </h3>
+            <p className="mx-auto mt-3 max-w-md text-sm font-light leading-relaxed text-ivory-100/60">
+              The AI store generator arrives here next — describe your business
+              and Urivo builds the brand, the catalog and the storefront.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-6 overflow-hidden rounded-2xl border border-ivory-100/10">
+            <table className="w-full border-collapse text-left text-sm">
+              <thead>
+                <tr className="bg-ivory-100/5 text-[10px] font-semibold uppercase tracking-[0.2em] text-ivory-100/50">
+                  <th className="px-6 py-4">Store</th>
+                  <th className="px-6 py-4">Address</th>
+                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ivory-100/5">
+                {storeList.map((store) => (
+                  <tr
+                    key={store.id}
+                    className="transition-colors hover:bg-ivory-100/5"
+                  >
+                    <td className="px-6 py-4 font-medium text-ivory-100">
+                      {store.store_name}
+                    </td>
+                    <td className="px-6 py-4 font-mono text-xs text-ivory-100/60">
+                      {store.subdomain}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${
+                          store.is_active
+                            ? "bg-success-dark/10 text-success-dark"
+                            : "bg-ivory-100/10 text-ivory-100/50"
+                        }`}
+                      >
+                        {store.is_active ? "Live" : "Paused"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <Link
+                        href={storeUrl(store.subdomain)}
+                        className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-300 underline-offset-4 hover:underline"
+                      >
+                        View live
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </main>
   );

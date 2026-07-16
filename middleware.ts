@@ -2,18 +2,49 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 /*
- * Session refresh + route protection (spec 6.7: persistent secure login,
- * automatic token refresh). /dashboard requires auth; /login bounces
- * signed-in users to the dashboard.
+ * 1. Multi-tenant subdomain routing: {sub}.ROOT_DOMAIN → /store/{sub}
+ * 2. Session refresh + route protection (spec 6.7)
  */
+
+const SUBDOMAIN_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,61})[a-z0-9]$/;
+
 export async function middleware(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return NextResponse.next();
+  // --- Tenant subdomain rewrite -------------------------------------
+  const rootDomain = (process.env.ROOT_DOMAIN ?? "localhost:3000")
+    .split(":")[0]
+    .toLowerCase();
+  const host = (request.headers.get("host") ?? "")
+    .split(":")[0]
+    .toLowerCase();
+
+  if (
+    host &&
+    host !== rootDomain &&
+    host !== `www.${rootDomain}` &&
+    host.endsWith(`.${rootDomain}`)
+  ) {
+    const subdomain = host.slice(0, -(rootDomain.length + 1));
+    if (subdomain !== "www" && SUBDOMAIN_PATTERN.test(subdomain)) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/store/${subdomain}`;
+      return NextResponse.rewrite(url);
+    }
+    // Malformed subdomain: fall through to the main site untouched.
+  }
+
+  // --- Auth session + protected routes ------------------------------
+  const path = request.nextUrl.pathname;
+  const needsAuthHandling =
+    path.startsWith("/dashboard") || path === "/login";
+  if (!needsAuthHandling) return NextResponse.next();
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey) return NextResponse.next();
 
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(url, key, {
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -34,8 +65,6 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
-
   if (!user && path.startsWith("/dashboard")) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
@@ -54,5 +83,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login"],
+  matcher: [
+    "/((?!_next/static|_next/image|icon.png|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|webp|ico|css|js|map)$).*)",
+  ],
 };
