@@ -14,12 +14,14 @@ specification wins (founder decision, 2026-07-16).
 
 | File | Use |
 |---|---|
-| `assets/brand/urivo-mark.svg` | Product UI, transparent background (nav, auth, loader) |
+| `assets/brand/urivo-mark.svg` | Product UI, transparent background (nav, auth, loader) — founder-approved flat design, 2026-07-16 |
 | `assets/brand/urivo-mark-badge.svg` | App icon, favicon, social avatars |
 | Founder raster exports | Brand master for marketing/media — never scaled up in product UI |
 
-Rules: never recolor the mark outside the gold ramp; never place gold-on-ivory
-at small sizes (contrast); minimum clear space = height of the arrowhead.
+The mark is a flat single-path fill by design (no gradient). Default fill is
+champagne `#EDE0C2` for dark surfaces; recolor to forest-900 `#0B2416` on light
+surfaces via the `fill` attribute or CSS. Never place the champagne mark on ivory
+(contrast); minimum clear space = height of the arrowhead.
 
 ## Color tokens
 
@@ -31,6 +33,7 @@ The 60 / 30 / 10 rule (spec 6.5): 60% Forest Green, 30% Warm Ivory, 10% Champagn
 | `forest-900` | `#0B2416` | Primary brand green — sidebars, hero, buttons-inverse, storefront defaults |
 | `ivory-100` | `#EFEAD8` | Primary canvas (app + marketing background) |
 | `ivory-50` | `#F7F4EA` | Elevated light surfaces |
+| `champagne` | `#EDE0C2` | Logo mark on dark surfaces, premium highlights |
 | `gold-300` | `#E9D3A0` | Gold gradient highlight |
 | `gold-500` | `#C69B3C` | Champagne Gold — CTAs, accents, active states |
 | `gold-700` | `#9C7526` | Gold gradient shadow, pressed states |
