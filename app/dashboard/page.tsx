@@ -57,6 +57,12 @@ export default async function DashboardPage() {
         </div>
         <div className="flex items-center gap-3">
           <GenerateStorePanel canGenerate={balance >= 10} />
+          <Link
+            href="/dashboard/billing"
+            className="rounded-lg border border-ivory-100/15 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/70 transition-colors duration-200 hover:border-ivory-100/30 hover:text-ivory-100"
+          >
+            Billing
+          </Link>
           <form action="/auth/signout" method="post">
             <button
               type="submit"

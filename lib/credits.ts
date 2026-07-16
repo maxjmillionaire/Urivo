@@ -19,3 +19,29 @@ export async function getCreditBalance(userId: string): Promise<number> {
   }
   return typeof data === "number" ? data : 0;
 }
+
+export interface LedgerEntry {
+  id: string;
+  delta: number;
+  reason: string;
+  createdAt: string;
+}
+
+export async function getCreditLedger(
+  userId: string,
+  limit = 20,
+): Promise<LedgerEntry[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("credit_ledger")
+    .select("id, delta, reason, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return data.map((r) => ({
+    id: r.id,
+    delta: r.delta,
+    reason: r.reason,
+    createdAt: r.created_at,
+  }));
+}
