@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCreditBalance, STORE_GENERATION_COST } from "@/lib/credits";
+import { rateLimit } from "@/lib/ratelimit";
 import {
   generateStore,
   STORE_GENERATOR_MODEL,
@@ -46,6 +47,18 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) {
     return fail(401, "UNAUTHORIZED", "Please sign in to generate a store.");
+  }
+
+  // Rate limit: generation is expensive. 5 per minute per user.
+  const limit = await rateLimit(`generate:${user.id}`, 5, 60_000);
+  if (!limit.success) {
+    return NextResponse.json(
+      {
+        error: "RATE_LIMITED",
+        message: "You're generating very quickly. Please wait a moment and try again.",
+      },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
   }
 
   // 2. Validate request

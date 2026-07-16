@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.github
+.env
+.env.*
+*.log
+.claude
+docs
+specifications
+UEOS
+README.md
+*.md
+!next.config.ts

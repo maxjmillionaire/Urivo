@@ -21,6 +21,10 @@ const serverEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   // AI provider — required for store generation (Phase 3).
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  // Upstash Redis — rate limiting across instances (Phase 5). Falls back to
+  // in-memory when unset.
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
