@@ -25,6 +25,12 @@ const serverEnvSchema = z.object({
   // in-memory when unset.
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+  // Resend — transactional email. Suppressed (logged) when unset.
+  RESEND_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM: z.string().min(1).optional(),
+  // Analytics / monitoring — optional; no-op until configured.
+  NEXT_PUBLIC_POSTHOG_KEY: z.string().min(1).optional(),
+  SENTRY_DSN: z.string().min(1).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
