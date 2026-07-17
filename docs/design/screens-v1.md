@@ -1,11 +1,10 @@
 # Urivo V1 — Screen Inventory & Layout Specifications
 
-> **Superseded visual language (2026-07).** This document's colour and type
-> references (forest-900 canvas, ivory type, serif display) describe the retired
-> V1 dark theme. The app now runs on **Design System v2 (light Slate/Gold)** —
-> see `design-system.md`, the single source of truth for visual identity. The
-> *screen inventory, layout, and state requirements below remain valid*; only the
-> palette/typography words are historical.
+> **Note (2026-07).** Colour references in this document have been updated to
+> **Design System v2 (light Slate/Gold)** — see `design-system.md`, the single
+> source of truth for visual identity. Some typography language (serif display)
+> predates v2 and is historical; the screen inventory, layout, and state
+> requirements below remain valid.
 
 Scope: the 6-day launch build. Every screen listed here ships in V1; anything not
 listed (Evolution Engine, creator dashboard, admin panel, i18n) is deliberately
@@ -21,7 +20,7 @@ states** before implementation — engineers never guess (UEOS Book IV, Phase V)
 Purpose: convert cold traffic into Free signups and launch-priced subscriptions.
 
 - **Hero:** display-xl serif headline, one-line subhead, primary CTA ("Start free"),
-  secondary ghost CTA ("See pricing"). Forest-900 canvas, ivory type, mark top-left.
+  secondary ghost CTA ("See pricing"). Canvas, ink type, mark top-left.
 - **Product proof:** looping silent demo of the generation experience (video/animated),
   framed as a glass card. This is the screen-recordable moment pre-Evolution-Engine.
 - **How it works:** 3 steps (Describe → Generate → Sell), micro-caps eyebrows, ✦ bullets.
@@ -35,7 +34,7 @@ Purpose: convert cold traffic into Free signups and launch-priced subscriptions.
 
 Purpose: zero → building in under 30 seconds.
 
-- Centered panel (max 420px) on forest-900; badge mark; "Welcome to Urivo".
+- Centered panel (max 420px) on canvas; badge mark; "Welcome to Urivo".
 - **Continue with Google** (primary, first), divider "or", email + password.
 - Password rules: min 8, 1 upper, 1 lower, 1 number — validated inline while typing,
   strength indicator, never only on submit.
@@ -57,10 +56,10 @@ Purpose: zero → building in under 30 seconds.
 
 Purpose: mission control. Loads < 2s (spec 6.3 §30).
 
-- **Sidebar (256px, forest-900):** mark + wordmark, nav (Console ✦, Stores, Billing,
-  Settings), bottom credit card on forest-950 showing live credit balance + plan badge,
+- **Sidebar (256px, canvas):** mark + wordmark, nav (Console ✦, Stores, Billing,
+  Settings), bottom credit card on slate showing live credit balance + plan badge,
   user email, logout.
-- **Main (ivory):** header "Merchant Workspace" + primary CTA "✦ Generate new store".
+- **Main (canvas):** header "Merchant Workspace" + primary CTA "✦ Generate new store".
 - **Stores table:** brand name, `subdomain.urivo.ai` (mono, links out), status badge,
   actions (Design / Products / View).
 - States: **empty state is the hero** — first-run users see an invitation panel
@@ -72,7 +71,7 @@ Purpose: mission control. Loads < 2s (spec 6.3 §30).
 Purpose: the signature moment. AI acknowledgement < 300ms; progress is honest
 (driven by real job states from the queue, not a fake timer).
 
-- Full-screen overlay: ivory/95 blur; top status line; center serif display headline
+- Full-screen overlay: canvas/95 blur; top status line; center serif display headline
   cycling real pipeline stages (Researching your market → Naming your brand →
   Designing your identity → Writing your catalog → Deploying your store);
   1px gold shimmer progress bar; understated telemetry lines beneath.
@@ -123,9 +122,9 @@ First render < 1.5s (spec 6.3 §30).
 
 ## 10. Legal & compliance (spec 5 §2, 6.4 §46)
 
-- `/impressum`, `/datenschutz`, `/agb` — static, ivory, readable serif/sans mix.
+- `/impressum`, `/datenschutz`, `/agb` — static, canvas, readable serif/sans mix.
   Content: founder-provided. Linked from footer + signup.
-- Cookie/consent banner: PostHog analytics only after consent; forest-900 bar,
+- Cookie/consent banner: PostHog analytics only after consent; canvas bar,
   Accept / Necessary-only. No dark patterns.
 
 ## 11. Transactional emails (Resend, spec 6.9)
