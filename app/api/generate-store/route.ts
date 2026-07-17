@@ -190,6 +190,13 @@ export async function POST(request: NextRequest) {
     subdomain: body.subdomain,
     storeUrl,
     storeName: generated.brand.name,
+    tagline: generated.brand.tagline,
+    palette: {
+      background: generated.brand.background,
+      structure: generated.brand.structure,
+      accent: generated.brand.accent,
+    },
+    products: generated.products.map((p) => ({ title: p.title, priceEUR: p.priceEUR })),
     creditsRemaining: result.credits_remaining,
   });
 }

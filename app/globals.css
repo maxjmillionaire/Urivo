@@ -50,3 +50,152 @@
     transform: translateX(400%);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Generation Cinema — the signature creation sequence (spec 6.6)     */
+/* ------------------------------------------------------------------ */
+
+/* Ambient volumetric glow that slowly breathes behind the whole scene */
+@keyframes urivo-ambient {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1) translateY(0);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.12) translateY(-2%);
+  }
+}
+
+/* Gold motes drifting through depth */
+@keyframes urivo-mote {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  15% {
+    opacity: var(--mote-opacity, 0.5);
+  }
+  85% {
+    opacity: var(--mote-opacity, 0.5);
+  }
+  100% {
+    transform: translate3d(var(--mote-x, 20px), var(--mote-y, -60px), 0);
+    opacity: 0;
+  }
+}
+
+/* The logo mark igniting at the start */
+@keyframes urivo-ignite {
+  0% {
+    opacity: 0;
+    transform: scale(0.7) translateZ(0);
+    filter: blur(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateZ(0);
+    filter: blur(0);
+  }
+}
+
+/* Halo breathing around the mark during research */
+@keyframes urivo-halo {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.15);
+  }
+}
+
+/* Sonar scan rings expanding outward */
+@keyframes urivo-ring {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+/* A candidate card materializing out of depth */
+@keyframes urivo-card-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(var(--cx, 0), var(--cy, 40px), -900px) rotateY(var(--cr, 0deg))
+      scale(0.6);
+    filter: blur(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(var(--cx, 0), var(--cy, 0), var(--cz, 0)) rotateY(var(--cr, 0deg))
+      scale(1);
+    filter: blur(0);
+  }
+}
+
+/* A losing candidate dissolving away — falls back into depth and blurs out */
+@keyframes urivo-card-out {
+  0% {
+    opacity: 1;
+    transform: translate3d(var(--cx, 0), var(--cy, 0), var(--cz, 0)) rotateY(var(--cr, 0deg))
+      scale(1);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--cx, 0), calc(var(--cy, 0px) + 80px), -700px)
+      rotateY(var(--cr, 0deg)) scale(0.7);
+    filter: blur(10px) grayscale(1);
+  }
+}
+
+/* Survivor pulse — a soft gold breath as a card advances a round */
+@keyframes urivo-survive {
+  0%,
+  100% {
+    box-shadow: 0 20px 50px -24px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(198, 155, 60, 0.25);
+  }
+  50% {
+    box-shadow: 0 24px 60px -22px rgba(0, 0, 0, 0.75), 0 0 22px 2px rgba(198, 155, 60, 0.4);
+  }
+}
+
+/* The winning card blooming forward at the reveal */
+@keyframes urivo-bloom {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.94);
+    filter: blur(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* Reveal details rising softly into place, staggered */
+@keyframes urivo-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class*="urivo-anim-"] {
+    animation: none !important;
+  }
+}

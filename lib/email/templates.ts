@@ -1,14 +1,22 @@
 /*
- * Transactional email templates in the Urivo design language (spec 6.9):
- * single 600px column, Forest Green header, Warm Ivory body, Champagne Gold
- * CTA. Email clients require inline styles. Every template returns a plain
- * text alternative alongside the HTML.
+ * Transactional email templates — Urivo's luxury visual language (spec 6.9,
+ * 6.5). Single 600px column, deep forest header with a soft gold hairline,
+ * generous editorial spacing, serif display headings, a gold-gradient CTA with
+ * depth, and the logo mark. Inline styles only (email requirement); every
+ * template returns a plain-text alternative. Copy is unchanged — only the
+ * presentation is elevated.
  */
 
+import { LOGO_DATA_URI } from "./logo";
+
 const FOREST = "#0B2416";
+const FOREST_DEEP = "#05120B";
 const IVORY = "#EFEAD8";
+const IVORY_SOFT = "#F7F4EA";
 const GOLD = "#C69B3C";
-const INK = "#2C3239";
+const GOLD_LIGHT = "#E3C77E";
+const CHAMPAGNE = "#EDE0C2";
+const INK = "#3A413C";
 
 export interface RenderedEmail {
   subject: string;
@@ -25,45 +33,79 @@ interface Block {
 }
 
 function layout({ preheader, heading, paragraphs, cta, footnote }: Block): string {
-  const body = paragraphs
+  const [lead, ...rest] = paragraphs;
+  const leadHtml = lead
+    ? `<p style="margin:0 0 20px;font-size:17px;line-height:1.7;color:${FOREST};font-weight:500;">${lead}</p>`
+    : "";
+  const restHtml = rest
     .map(
       (p) =>
-        `<p style="margin:0 0 18px;font-size:15px;line-height:1.7;color:${INK};">${p}</p>`,
+        `<p style="margin:0 0 18px;font-size:15px;line-height:1.75;color:${INK};">${p}</p>`,
     )
     .join("");
 
+  // Bulletproof CTA: solid gold on a table cell (renders in Outlook/Gmail),
+  // forest text, one soft shadow. Restrained — an invitation, not a game.
   const button = cta
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;">
-         <tr><td style="border-radius:8px;background:${GOLD};">
-           <a href="${cta.url}" style="display:inline-block;padding:14px 28px;font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:${FOREST};text-decoration:none;">${cta.label}</a>
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0 4px;">
+         <tr><td align="center" bgcolor="${GOLD}" style="border-radius:10px;background:${GOLD};box-shadow:0 6px 16px -8px rgba(198,155,60,0.4);">
+           <a href="${cta.url}" style="display:inline-block;padding:15px 32px;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${FOREST};text-decoration:none;">${cta.label}</a>
          </td></tr>
        </table>`
     : "";
 
   const foot = footnote
-    ? `<p style="margin:20px 0 0;font-size:12px;line-height:1.6;color:#8a8f8b;">${footnote}</p>`
+    ? `<p style="margin:28px 0 0;padding-top:22px;border-top:1px solid rgba(11,36,22,0.08);font-size:13px;line-height:1.65;color:#8f938e;">${footnote}</p>`
     : "";
 
+  // Header: logo mark + wordmark on deep forest, with a whisper-thin gold rule.
+  const header = `
+    <tr><td class="u-head" style="background:${FOREST};padding:38px 48px 34px;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+        <td style="vertical-align:middle;padding-right:15px;">
+          <img src="${LOGO_DATA_URI}" width="42" height="42" alt="Urivo" style="display:block;border-radius:11px;width:42px;height:42px;" />
+        </td>
+        <td style="vertical-align:middle;">
+          <span style="font-family:Georgia,'Times New Roman',serif;font-size:21px;color:${IVORY};letter-spacing:4px;">URIVO</span>
+        </td>
+      </tr></table>
+    </td></tr>
+    <tr><td style="height:1px;background:linear-gradient(90deg,rgba(198,155,60,0.55) 0%,rgba(198,155,60,0) 55%);line-height:1px;font-size:0;">&nbsp;</td></tr>`;
+
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Urivo</title></head>
-<body style="margin:0;padding:0;background:#f2efe6;">
-  <span style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</span>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2efe6;padding:32px 16px;">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>Urivo</title>
+  <style>
+    @media only screen and (max-width:620px){
+      .u-card{border-radius:16px !important;}
+      .u-pad{padding:32px 26px !important;}
+      .u-head{padding:30px 26px 26px !important;}
+      .u-foot{padding:22px 26px !important;}
+      .u-h1{font-size:26px !important;}
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:${FOREST_DEEP};-webkit-font-smoothing:antialiased;">
+  <span style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${preheader}</span>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${FOREST_DEEP};padding:44px 16px;">
     <tr><td align="center">
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${IVORY};border-radius:16px;overflow:hidden;">
-        <tr><td style="background:${FOREST};padding:28px 40px;">
-          <span style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${IVORY};letter-spacing:1px;">Urivo</span>
-        </td></tr>
-        <tr><td style="padding:40px;">
-          <h1 style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-weight:normal;font-size:26px;line-height:1.25;color:${FOREST};">${heading}</h1>
-          ${body}
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" class="u-card" style="max-width:600px;width:100%;background:${IVORY_SOFT};border-radius:22px;overflow:hidden;box-shadow:0 40px 90px -35px rgba(0,0,0,0.65);">
+        ${header}
+        <tr><td class="u-pad" style="padding:48px 48px 44px;">
+          <p style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:${GOLD};">Urivo</p>
+          <h1 class="u-h1" style="margin:0 0 26px;font-family:Georgia,'Times New Roman',serif;font-weight:normal;font-size:31px;line-height:1.22;color:${FOREST};letter-spacing:-0.4px;">${heading}</h1>
+          ${leadHtml}
+          ${restHtml}
           ${button}
           ${foot}
         </td></tr>
-        <tr><td style="padding:24px 40px;border-top:1px solid rgba(11,36,22,0.08);">
-          <p style="margin:0;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#8a8f8b;">Urivo — The AI Commerce Operating System</p>
+        <tr><td class="u-foot" style="background:${FOREST};padding:28px 48px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+            <td style="font-family:Arial,Helvetica,sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(239,234,216,0.5);">The AI Commerce<br>Operating System</td>
+            <td align="right" style="font-family:Georgia,serif;font-size:15px;letter-spacing:3px;color:${CHAMPAGNE};">URIVO</td>
+          </tr></table>
         </td></tr>
       </table>
+      <p style="margin:22px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:0.5px;color:rgba(239,234,216,0.32);">Sent with intention · Urivo</p>
     </td></tr>
   </table>
 </body></html>`;
