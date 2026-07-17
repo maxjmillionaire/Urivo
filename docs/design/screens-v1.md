@@ -1,5 +1,12 @@
 # Urivo V1 — Screen Inventory & Layout Specifications
 
+> **Superseded visual language (2026-07).** This document's colour and type
+> references (forest-900 canvas, ivory type, serif display) describe the retired
+> V1 dark theme. The app now runs on **Design System v2 (light Slate/Gold)** —
+> see `design-system.md`, the single source of truth for visual identity. The
+> *screen inventory, layout, and state requirements below remain valid*; only the
+> palette/typography words are historical.
+
 Scope: the 6-day launch build. Every screen listed here ships in V1; anything not
 listed (Evolution Engine, creator dashboard, admin panel, i18n) is deliberately
 post-launch. Visual rules come from `design-system.md`. Spec sources noted per screen.

@@ -23,8 +23,8 @@ export const ProductUpdateSchema = z.object({
 export const StoreUpdateSchema = z.object({
   storeName: z.string().trim().min(2, "Name is too short.").max(80).optional(),
   tagline: z.string().trim().max(120).optional(),
-  background: z.string().regex(HEX, "Use a hex colour like #0B2416.").optional(),
-  structure: z.string().regex(HEX, "Use a hex colour like #0B2416.").optional(),
-  accent: z.string().regex(HEX, "Use a hex colour like #0B2416.").optional(),
+  background: z.string().regex(HEX, "Use a hex colour like #1F293B.").optional(),
+  structure: z.string().regex(HEX, "Use a hex colour like #1F293B.").optional(),
+  accent: z.string().regex(HEX, "Use a hex colour like #1F293B.").optional(),
   isActive: z.boolean().optional(),
 });

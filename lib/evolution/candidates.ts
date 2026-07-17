@@ -20,11 +20,11 @@ export interface Candidate {
 
 const PALETTES: [string, string, string][] = [
   ["#F4F1EA", "#2C3239", "#A68A64"],
-  ["#EFEAD8", "#0B2416", "#C69B3C"],
+  ["#F2EFE9", "#242A33", "#C9A24B"],
   ["#F1ECE4", "#1C1B18", "#B89A5E"],
   ["#F3EBE7", "#3B2E2A", "#B07A5A"],
   ["#ECEEF0", "#263038", "#7C97A8"],
-  ["#EDEDE3", "#33402F", "#8FA07A"],
+  ["#EFEAF2", "#2A2431", "#8A6BA8"],
   ["#F0F1F4", "#1B2A3A", "#9DB4C8"],
   ["#F4EDE4", "#3A2418", "#C0764A"],
 ];

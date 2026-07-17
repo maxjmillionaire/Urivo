@@ -15,11 +15,14 @@ export interface StorefrontTheme {
   bodyFont: string;
 }
 
+// Neutral, brand-agnostic fallback for a merchant storefront. Storefronts use
+// the merchant's own AI-generated palette; this is only the safety default when
+// nothing is supplied — intentionally not the Urivo brand colours.
 const THEME_DEFAULTS: StorefrontTheme = {
   tagline: "",
-  background: "#EFEAD8",
-  structure: "#0B2416",
-  accent: "#C69B3C",
+  background: "#F6F4EF",
+  structure: "#1C1B18",
+  accent: "#9C7C4A",
   headingFont: "'Playfair Display', Georgia, serif",
   bodyFont: "'Inter', system-ui, sans-serif",
 };
