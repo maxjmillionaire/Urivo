@@ -212,6 +212,67 @@
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Keynote Optimization Arena — the lightning selection (spec 6.6)     */
+/* Dark "stage" exception: variants compete, losers strike red and     */
+/* dissolve, winners strike green and advance, down to one champion.   */
+/* ------------------------------------------------------------------ */
+
+/* The live status dot breathing */
+@keyframes urivo-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* A charged light beam sweeping across the field each round */
+@keyframes urivo-beam {
+  0% { transform: translateX(-12%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(112%); opacity: 0; }
+}
+
+/* Jagged bolt flicker at the moment of a strike */
+@keyframes urivo-bolt {
+  0%, 100% { opacity: 0; }
+  6% { opacity: 1; }
+  12% { opacity: 0.25; }
+  18% { opacity: 0.9; }
+  30% { opacity: 0; }
+}
+
+/* A surviving variant strikes green and settles brighter */
+@keyframes urivo-win {
+  0% { box-shadow: 0 16px 40px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(34,197,94,0.3); }
+  35% { box-shadow: 0 16px 40px -20px rgba(0,0,0,0.85), 0 0 34px 6px rgba(34,197,94,0.85), 0 0 0 1px rgba(34,197,94,1); }
+  100% { box-shadow: 0 16px 40px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(34,197,94,0.55); }
+}
+
+/* A losing variant strikes red, then dissolves back into the dark */
+@keyframes urivo-die {
+  0% { box-shadow: 0 16px 40px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(239,68,68,0.35); }
+  22% { box-shadow: 0 16px 40px -20px rgba(0,0,0,0.85), 0 0 30px 6px rgba(239,68,68,0.85), 0 0 0 1px rgba(239,68,68,1); opacity: 1; filter: none; }
+  100% { opacity: 0; filter: grayscale(1) brightness(0.45) blur(5px); box-shadow: 0 0 0 1px rgba(239,68,68,0); }
+}
+
+/* The champion's steady green aura */
+@keyframes urivo-champion {
+  0%, 100% { box-shadow: 0 24px 60px -22px rgba(0,0,0,0.9), 0 0 0 1px rgba(34,197,94,0.6), 0 0 40px -4px rgba(34,197,94,0.35); }
+  50% { box-shadow: 0 24px 60px -22px rgba(0,0,0,0.9), 0 0 0 1px rgba(34,197,94,0.85), 0 0 58px 2px rgba(34,197,94,0.55); }
+}
+
+/* Terminal scanline drift for ambient depth */
+@keyframes urivo-scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+/* Voice-capture waveform bars */
+@keyframes urivo-wave {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   [class*="urivo-anim-"] {
     animation: none !important;
