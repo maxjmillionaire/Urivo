@@ -10,8 +10,11 @@
   --color-brand: #1f293b;
   --color-brand-hover: #18202f;
   --color-brand-soft: #eef1f6;
-  --color-gold: #d4af37;
-  --color-gold-soft: #e6ce85;
+  /* Metallic gold-bronze — rich, alive, with highlight + shadow bands */
+  --color-gold: #e4c069;        /* mid gold (flat use) */
+  --color-gold-soft: #f2dd9c;   /* highlight */
+  --color-gold-hi: #f8ecc0;     /* champagne highlight */
+  --color-gold-deep: #b0842f;   /* bronze shadow */
   --color-gold-tint: #faf5e6;
 
   /* Surfaces & text */
@@ -37,9 +40,36 @@
   --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.12);
   --shadow-lift: 0 2px 4px rgba(15, 23, 42, 0.05), 0 18px 40px -18px rgba(15, 23, 42, 0.18);
 
-  --font-sans: "Inter", "SF Pro Display", system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-geist-sans), "SF Pro Display", system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
 
   --ease-urivo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Metallic gold gradient (surfaces) + text-clip variant used via utilities below */
+  --grad-gold: linear-gradient(135deg, #f8ecc0 0%, #ecce7e 28%, #cfa14a 56%, #b0842f 76%, #e4c069 100%);
+  --grad-gold-soft: linear-gradient(135deg, #f8ecc0 0%, #e8cd80 45%, #cba44f 100%);
+
+  /* ---------------------------------------------------------------- */
+  /* Midnight (v3) — the product's dark slate-navy identity.          */
+  /* Canvas from the logo tile, warm-ivory text, gold accent (the U). */
+  /* ---------------------------------------------------------------- */
+  --color-night: #0b1220;        /* app canvas — deepest */
+  --color-night-2: #0e1626;      /* inset wells */
+  --color-panel: #121c30;        /* cards / panels */
+  --color-panel-2: #1a2540;      /* hover / elevated */
+  --color-hair: #223049;         /* borders */
+  --color-hair-strong: #2c3c5a;
+  --color-ivory: #f4f1e8;        /* primary text (warm ivory) */
+  --color-cloud: #e7ecf3;        /* clean near-white text */
+  --color-mist: #93a3bc;         /* secondary text */
+  --color-mist-dim: #5f6f89;     /* tertiary / captions */
+  --color-navymark: #24324c;     /* logo-tile navy for chips */
+  --color-live: #34d399;         /* LIVE / success on dark */
+  --color-alert: #f87171;        /* error on dark */
+
+  /* Elevation for the dark theme */
+  --shadow-night: 0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 44px -20px rgba(0, 0, 0, 0.7);
+  --shadow-night-lift: 0 2px 6px rgba(0, 0, 0, 0.45), 0 30px 60px -24px rgba(0, 0, 0, 0.8);
 }
 
 /* Motion standard: one curve, purposeful durations (UEOS Book VI) */
@@ -273,8 +303,108 @@
   50% { transform: scaleY(1); }
 }
 
+/* ================================================================== */
+/* Premium finish — metallic gold, glass, depth, motion               */
+/* ================================================================== */
+
+/* Metallic gold fill for primary/premium surfaces (buttons, badges).  */
+.u-gold {
+  background-image: var(--grad-gold);
+  color: #1a1206;
+  box-shadow: inset 0 1px 0 rgba(255, 248, 220, 0.65), 0 8px 22px -10px rgba(224, 192, 105, 0.5);
+  transition: box-shadow 240ms var(--ease-urivo), background-image 240ms var(--ease-urivo),
+    transform 240ms var(--ease-urivo);
+}
+.u-gold:hover {
+  background-image: var(--grad-gold-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 248, 220, 0.75), 0 12px 34px -10px rgba(224, 192, 105, 0.6);
+}
+
+/* Metallic gold text (headlines, key numbers, accents). */
+.u-gold-text {
+  background-image: linear-gradient(120deg, #f8ecc0 0%, #e9cf82 45%, #cfa552 72%, #f2dd9c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Subtle gold hairline (dividers, focus rings under panels). */
+.u-gold-line {
+  background-image: linear-gradient(90deg, rgba(232, 205, 128, 0), rgba(232, 205, 128, 0.6), rgba(232, 205, 128, 0));
+}
+
+/* Frosted glass — only where it improves layering/readability. */
+.u-glass {
+  background: rgba(18, 28, 48, 0.55);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+/* Floating panel — soft depth + a whisper of top highlight. */
+.u-float {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 2px 6px rgba(0, 0, 0, 0.35),
+    0 24px 60px -28px rgba(0, 0, 0, 0.75);
+}
+
+/* Warm gold glow for emphasis (hover on premium items). */
+.u-glow-gold {
+  box-shadow: 0 10px 34px -10px rgba(224, 192, 105, 0.4);
+}
+
+/* Refined hover lift used across interactive cards/buttons. */
+.u-lift {
+  transition: transform 240ms var(--ease-urivo), box-shadow 240ms var(--ease-urivo),
+    border-color 240ms var(--ease-urivo), background-color 200ms var(--ease-urivo);
+}
+.u-lift:hover {
+  transform: translateY(-2px);
+}
+
+/* Focus ring on dark surfaces (accessibility). */
+:focus-visible {
+  outline: 2px solid rgba(232, 205, 128, 0.7);
+  outline-offset: 2px;
+}
+
+/* ---- Branded loading experience ---- */
+
+/* The gold mark breathing + its aura pulsing. */
+@keyframes urivo-mark-breathe {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(232, 205, 128, 0)); }
+  50% { transform: scale(1.04); filter: drop-shadow(0 0 22px rgba(232, 205, 128, 0.45)); }
+}
+
+/* A conic gold sweep circling the mark. */
+@keyframes urivo-orbit {
+  to { transform: rotate(360deg); }
+}
+
+/* Wordmark + tagline rising softly. */
+@keyframes urivo-fade-up {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* A slim gold progress shimmer. */
+@keyframes urivo-loadbar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(320%); }
+}
+
+/* Ambient page-enter for shell content. */
+@keyframes urivo-enter {
+  0% { opacity: 0; transform: translateY(10px) scale(0.995); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.u-enter { animation: urivo-enter 560ms var(--ease-urivo) both; }
+
 @media (prefers-reduced-motion: reduce) {
-  [class*="urivo-anim-"] {
+  [class*="urivo-anim-"],
+  .u-enter,
+  [style*="urivo-"] {
     animation: none !important;
   }
+  .u-lift:hover { transform: none; }
 }
