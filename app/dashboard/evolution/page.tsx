@@ -19,21 +19,24 @@ export default async function EvolutionPage() {
       <div className="mb-10">
         <Link
           href="/dashboard"
-          className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/50 transition-colors hover:text-ivory-100"
+          className="text-sm font-medium text-muted transition-colors hover:text-ink"
         >
           ← Workspace
         </Link>
       </div>
 
       <header>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-gold-500">
-          Evolution Lab
-        </p>
-        <h1 className="mt-3 font-serif text-4xl font-normal tracking-tight text-ivory-100 sm:text-5xl">
+        <div className="flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+            Evolution Lab
+          </p>
+        </div>
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
           Watch intelligence evolve your store.
         </h1>
-        <p className="mt-4 max-w-2xl text-sm font-light leading-relaxed text-ivory-100/60">
-          Urivo doesn't generate one store — it generates a hundred, scores every
+        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted">
+          Urivo doesn&apos;t generate one store — it generates a hundred, scores every
           one, and lets them evolve across generations until only the
           highest-performing storefront remains.
         </p>

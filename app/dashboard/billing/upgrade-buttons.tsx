@@ -46,15 +46,15 @@ export function UpgradeButton({
         type="button"
         onClick={upgrade}
         disabled={busy}
-        className={`w-full rounded-lg px-6 py-3.5 text-[11px] font-semibold uppercase tracking-[0.25em] transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 disabled:opacity-60 ${
+        className={`w-full rounded-md px-6 py-3 text-sm font-semibold transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60 ${
           highlight
-            ? "bg-gold-500 text-forest-900 hover:bg-champagne"
-            : "border border-ivory-100/15 text-ivory-100/80 hover:border-ivory-100/30 hover:text-ivory-100"
+            ? "bg-brand text-white shadow-soft hover:bg-brand-hover"
+            : "border border-line bg-surface text-ink hover:bg-surface-muted"
         }`}
       >
         {busy ? "One moment…" : label}
       </button>
-      {note && <p className="mt-3 text-center text-xs font-light text-gold-300">{note}</p>}
+      {note && <p className="mt-3 text-center text-xs text-muted">{note}</p>}
     </div>
   );
 }

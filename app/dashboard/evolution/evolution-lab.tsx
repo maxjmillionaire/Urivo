@@ -88,14 +88,14 @@ export function EvolutionLab() {
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           disabled={phase === "running"}
-          className="flex-1 rounded-lg border border-ivory-100/15 bg-ivory-100/5 px-4 py-3 text-sm font-light text-ivory-100 placeholder:text-ivory-100/30 focus:border-gold-500 focus:outline-none disabled:opacity-60"
+          className="flex-1 rounded-md border border-line bg-surface px-4 py-3 text-sm text-ink placeholder:text-muted/70 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/15 disabled:opacity-60"
           placeholder="Describe a business to evolve"
         />
         <button
           type="button"
           onClick={start}
           disabled={phase === "running"}
-          className="rounded-lg bg-gold-500 px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.25em] text-forest-900 transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 hover:bg-champagne disabled:translate-y-0 disabled:opacity-60"
+          className="rounded-md bg-brand px-6 py-3 text-sm font-semibold text-white shadow-soft transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 hover:bg-brand-hover disabled:translate-y-0 disabled:opacity-60"
         >
           {phase === "running" ? "Evolving…" : phase === "done" ? "Run again" : "Start evolution"}
         </button>
@@ -105,27 +105,27 @@ export function EvolutionLab() {
       {activeGen && (
         <div className="mt-6 flex flex-wrap items-baseline justify-between gap-4">
           <div>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-gold-500">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
               Generation {activeGen.index}
             </span>
-            <p className="mt-1 text-sm font-light text-ivory-100/70">{activeGen.commentary}</p>
+            <p className="mt-1 text-sm text-muted">{activeGen.commentary}</p>
           </div>
           <div className="text-right">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-ivory-100/40">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
               Best fitness
             </span>
-            <p className="font-serif text-4xl font-light text-gold-300 tabular-nums">
+            <p className="text-4xl font-semibold tracking-tight text-brand tabular-nums">
               {activeGen.best.overall.toFixed(1)}
             </p>
           </div>
         </div>
       )}
 
-      {/* The tree */}
-      <div className="relative mt-6 overflow-hidden rounded-2xl border border-ivory-100/10 bg-forest-950">
+      {/* The tree — an intentional dark "stage" (spec 6.6) where glowing nodes live */}
+      <div className="relative mt-6 overflow-hidden rounded-xl border border-white/5 bg-[#0f172a] shadow-lift">
         {!run && (
           <div className="flex h-[560px] items-center justify-center px-6 text-center">
-            <p className="max-w-md font-serif text-2xl font-normal text-ivory-100/60">
+            <p className="max-w-md text-2xl font-medium leading-snug text-white/70">
               One hundred storefronts enter. Only the strongest survives. Press
               start and watch it evolve.
             </p>
@@ -147,8 +147,8 @@ export function EvolutionLab() {
                     y1={parent.y}
                     x2={p.x}
                     y2={p.y}
-                    stroke={p.survived ? "#C69B3C" : "#EFEAD8"}
-                    strokeOpacity={p.survived ? 0.35 : 0.06}
+                    stroke={p.survived ? "#D4AF37" : "#CBD5E1"}
+                    strokeOpacity={p.survived ? 0.35 : 0.07}
                     strokeWidth={p.survived ? 1.1 : 0.6}
                   />
                 );
@@ -160,11 +160,11 @@ export function EvolutionLab() {
               row.map((p) => {
                 const isWinner = phase === "done" && gi === GEN_SIZES.length - 1;
                 const fill = isWinner
-                  ? "#EDE0C2"
+                  ? "#EBD9A0"
                   : p.survived
-                    ? "#C69B3C"
-                    : "#EFEAD8";
-                const opacity = isWinner ? 1 : p.survived ? 0.92 : 0.16;
+                    ? "#D4AF37"
+                    : "#CBD5E1";
+                const opacity = isWinner ? 1 : p.survived ? 0.92 : 0.18;
                 return (
                   <circle
                     key={p.id}
@@ -176,9 +176,9 @@ export function EvolutionLab() {
                     style={{
                       transition: "r 500ms cubic-bezier(0.16,1,0.3,1), fill-opacity 700ms",
                       filter: isWinner
-                        ? "drop-shadow(0 0 14px rgba(198,155,60,0.9))"
+                        ? "drop-shadow(0 0 14px rgba(212,175,55,0.9))"
                         : p.survived && gi === visibleGen - 1
-                          ? "drop-shadow(0 0 6px rgba(198,155,60,0.5))"
+                          ? "drop-shadow(0 0 6px rgba(212,175,55,0.5))"
                           : "none",
                     }}
                   />
@@ -188,14 +188,17 @@ export function EvolutionLab() {
           </svg>
         )}
 
-        {/* Winner reveal */}
+        {/* Winner reveal — a light result card spotlit on the dark stage */}
         {phase === "done" && run && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-6">
-            <div className="pointer-events-auto rounded-xl border border-gold-500/30 bg-forest-900/90 px-8 py-5 text-center backdrop-blur">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-gold-500">
-                Winner · fitness {run.winner.overall.toFixed(1)}
-              </p>
-              <p className="mt-2 font-serif text-2xl font-normal text-ivory-100">
+            <div className="pointer-events-auto rounded-xl border border-line bg-surface px-8 py-5 text-center shadow-lift">
+              <div className="flex items-center justify-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+                  Winner · fitness {run.winner.overall.toFixed(1)}
+                </p>
+              </div>
+              <p className="mt-2 text-2xl font-semibold tracking-tight text-ink">
                 This becomes your Store v1.0
               </p>
             </div>
@@ -203,7 +206,7 @@ export function EvolutionLab() {
         )}
       </div>
 
-      <p className="mt-4 text-center text-xs font-light text-ivory-100/40">
+      <p className="mt-4 text-center text-xs text-muted">
         Continuous optimization never stops — Urivo keeps running experiments
         after launch to find better conversions.
       </p>

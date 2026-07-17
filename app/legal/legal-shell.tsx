@@ -11,14 +11,14 @@ export function LegalShell({
     <main className="mx-auto min-h-screen w-full max-w-2xl px-6 py-16">
       <Link
         href="/"
-        className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/50 transition-colors hover:text-ivory-100"
+        className="text-sm font-medium text-muted transition-colors hover:text-ink"
       >
         ← Urivo
       </Link>
-      <h1 className="mt-8 font-serif text-4xl font-normal tracking-tight text-ivory-100">
+      <h1 className="mt-8 text-4xl font-semibold tracking-tight text-ink">
         {title}
       </h1>
-      <div className="mt-8 space-y-5 text-sm font-light leading-relaxed text-ivory-100/70 [&_h2]:mt-8 [&_h2]:font-serif [&_h2]:text-xl [&_h2]:text-ivory-100 [&_strong]:text-ivory-100">
+      <div className="mt-8 space-y-5 text-sm leading-relaxed text-muted [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-ink [&_strong]:font-semibold [&_strong]:text-ink">
         {children}
       </div>
     </main>
@@ -28,7 +28,7 @@ export function LegalShell({
 /** Marker for content the founder / legal counsel must supply before launch. */
 export function Placeholder({ note }: { note: string }) {
   return (
-    <p className="rounded-lg border border-gold-500/30 bg-gold-500/10 px-4 py-3 text-gold-300">
+    <p className="rounded-md border border-gold/30 bg-gold-tint px-4 py-3 text-[#8a6d18]">
       To be completed before launch: {note}
     </p>
   );

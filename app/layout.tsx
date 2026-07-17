@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0B2416",
+  themeColor: "#F8FAFC",
 };
 
 export default function RootLayout({
@@ -17,7 +17,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className="bg-forest-900 font-sans text-ivory-100 antialiased">
+      <body className="bg-canvas font-sans text-ink antialiased">
         {children}
         <ConsentBanner />
       </body>

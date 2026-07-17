@@ -50,21 +50,21 @@ export default async function StoreDetailPage({
       <div className="mb-10">
         <Link
           href="/dashboard"
-          className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/50 transition-colors hover:text-ivory-100"
+          className="text-sm font-medium text-muted transition-colors hover:text-ink"
         >
           ← Workspace
         </Link>
       </div>
 
-      <header className="flex flex-col gap-6 border-b border-ivory-100/10 pb-10 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-6 border-b border-line pb-10 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-gold-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
             Storefront
           </p>
-          <h1 className="mt-3 font-serif text-4xl font-normal tracking-tight text-ivory-100">
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-ink">
             {store.store_name}
           </h1>
-          <p className="mt-2 font-mono text-xs text-ivory-100/50">
+          <p className="mt-2 font-mono text-xs text-muted">
             {store.subdomain}.urivo.ai
           </p>
         </div>
@@ -72,7 +72,7 @@ export default async function StoreDetailPage({
           href={storeUrl(store.subdomain)}
           target="_blank"
           rel="noreferrer"
-          className="self-start rounded-lg border border-ivory-100/15 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/70 transition-colors duration-200 hover:border-ivory-100/30 hover:text-ivory-100"
+          className="self-start rounded-md border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-ink transition-colors duration-200 hover:bg-surface-muted"
         >
           View live
         </a>

@@ -40,50 +40,54 @@ export default function UpdatePasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-6 py-16">
-      <div className="w-full max-w-105 text-center">
-        <h1 className="font-serif text-3xl font-normal tracking-tight text-ivory-100">
-          Choose a new password
-        </h1>
-        <p className="mt-2 text-sm font-light text-ivory-100/60">
-          8+ characters with uppercase, lowercase and a number.
-        </p>
-
-        {error && (
-          <p
-            role="alert"
-            className="mt-6 rounded-lg border border-danger-dark/30 bg-danger-dark/10 px-4 py-3 text-sm text-danger-dark"
-          >
-            {error}
+    <main className="flex min-h-screen items-center justify-center bg-canvas px-6 py-16 text-ink">
+      <div className="w-full max-w-105">
+        <div className="text-center">
+          <h1 className="text-3xl font-semibold tracking-tight text-ink">
+            Choose a new password
+          </h1>
+          <p className="mt-2 text-sm text-muted">
+            8+ characters with uppercase, lowercase and a number.
           </p>
-        )}
+        </div>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-5 text-left">
-          <div>
-            <label
-              htmlFor="password"
-              className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/60"
+        <div className="mt-8 rounded-xl border border-line bg-surface p-7 shadow-soft sm:p-8">
+          {error && (
+            <p
+              role="alert"
+              className="mb-6 rounded-md border border-error/20 bg-error/5 px-4 py-3 text-sm text-error"
             >
-              New password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-ivory-100/15 bg-ivory-100/5 px-4 py-3.5 text-sm font-light text-ivory-100 focus:border-gold-500 focus:bg-ivory-100/10 focus:outline-none"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={pending}
-            className="w-full rounded-lg bg-gold-500 px-4 py-3.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-forest-900 transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 hover:bg-champagne disabled:translate-y-0 disabled:opacity-60"
-          >
-            {pending ? "One moment…" : "Save password"}
-          </button>
-        </form>
+              {error}
+            </p>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label
+                htmlFor="password"
+                className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-muted"
+              >
+                New password
+              </label>
+              <input
+                id="password"
+                type="password"
+                required
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-md border border-line bg-surface px-4 py-3 text-sm text-ink focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/15"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={pending}
+              className="w-full rounded-md bg-brand px-4 py-3 text-sm font-semibold text-white shadow-soft transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 hover:bg-brand-hover disabled:translate-y-0 disabled:opacity-60"
+            >
+              {pending ? "One moment…" : "Save password"}
+            </button>
+          </form>
+        </div>
       </div>
     </main>
   );

@@ -27,13 +27,13 @@ export function ConsentBanner() {
     <div
       role="dialog"
       aria-label="Cookie consent"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-ivory-100/10 bg-forest-950/95 backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/95 backdrop-blur"
     >
       <div className="mx-auto flex max-w-4xl flex-col items-start gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm font-light leading-relaxed text-ivory-100/70">
+        <p className="text-sm leading-relaxed text-muted">
           We use necessary cookies to keep you signed in. With your consent we
           also use analytics to improve Urivo.{" "}
-          <Link href="/datenschutz" className="text-gold-300 underline-offset-4 hover:underline">
+          <Link href="/datenschutz" className="font-medium text-brand underline-offset-4 hover:underline">
             Learn more
           </Link>
         </p>
@@ -41,14 +41,14 @@ export function ConsentBanner() {
           <button
             type="button"
             onClick={() => choose("denied")}
-            className="rounded-lg border border-ivory-100/15 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/70 transition-colors hover:border-ivory-100/30 hover:text-ivory-100"
+            className="rounded-md border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-surface-muted"
           >
             Necessary only
           </button>
           <button
             type="button"
             onClick={() => choose("granted")}
-            className="rounded-lg bg-gold-500 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-forest-900 transition-colors hover:bg-champagne"
+            className="rounded-md bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-soft transition-colors hover:bg-brand-hover"
           >
             Accept
           </button>

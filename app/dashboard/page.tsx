@@ -15,6 +15,9 @@ function storeUrl(subdomain: string): string {
   return `https://${subdomain}.${ROOT_DOMAIN}`;
 }
 
+const navLink =
+  "rounded-md border border-line bg-surface px-4 py-2.5 text-sm font-medium text-ink transition-colors duration-200 hover:bg-surface-muted";
+
 export default async function DashboardPage() {
   const supabase = await supabaseServer();
 
@@ -43,43 +46,31 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-6 py-16">
-      <header className="flex flex-col gap-6 border-b border-ivory-100/10 pb-10 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-6 border-b border-line pb-10 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-gold-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
             Merchant workspace
           </p>
-          <h1 className="mt-3 font-serif text-4xl font-normal tracking-tight text-ivory-100">
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-ink">
             Welcome{profile?.full_name ? `, ${profile.full_name}` : ""}
           </h1>
-          <p className="mt-2 text-sm font-light text-ivory-100/60">
+          <p className="mt-2 text-sm text-muted">
             {profile?.email ?? user.email}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <GenerateStorePanel canGenerate={balance >= 10} />
-          <Link
-            href="/dashboard/evolution"
-            className="rounded-lg border border-gold-500/30 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-300 transition-colors duration-200 hover:border-gold-500 hover:text-champagne"
-          >
-            ✦ Evolution Lab
+          <Link href="/dashboard/evolution" className={navLink}>
+            Evolution Lab
           </Link>
-          <Link
-            href="/dashboard/billing"
-            className="rounded-lg border border-ivory-100/15 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/70 transition-colors duration-200 hover:border-ivory-100/30 hover:text-ivory-100"
-          >
+          <Link href="/dashboard/billing" className={navLink}>
             Billing
           </Link>
-          <Link
-            href="/dashboard/settings"
-            className="rounded-lg border border-ivory-100/15 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/70 transition-colors duration-200 hover:border-ivory-100/30 hover:text-ivory-100"
-          >
+          <Link href="/dashboard/settings" className={navLink}>
             Settings
           </Link>
           <form action="/auth/signout" method="post">
-            <button
-              type="submit"
-              className="rounded-lg border border-ivory-100/15 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/70 transition-colors duration-200 hover:border-ivory-100/30 hover:text-ivory-100"
-            >
+            <button type="submit" className={navLink}>
               Sign out
             </button>
           </form>
@@ -87,38 +78,41 @@ export default async function DashboardPage() {
       </header>
 
       <section className="mt-10 grid gap-6 sm:grid-cols-2">
-        <div className="rounded-2xl border border-gold-500/20 bg-forest-950 p-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-ivory-100/40">
-            Credits
-          </p>
-          <p className="mt-3 font-serif text-4xl font-light text-gold-300">
+        <div className="rounded-lg border border-line bg-surface p-6 shadow-soft">
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+              Credits
+            </p>
+          </div>
+          <p className="mt-3 text-4xl font-semibold tracking-tight text-brand tabular-nums">
             {typeof balance === "number" ? balance : "—"}
           </p>
         </div>
-        <div className="rounded-2xl border border-ivory-100/10 bg-ivory-100/5 p-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-ivory-100/40">
+        <div className="rounded-lg border border-line bg-surface p-6 shadow-soft">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
             Plan
           </p>
-          <p className="mt-3 font-serif text-4xl font-light text-ivory-100">
+          <p className="mt-3 text-4xl font-semibold tracking-tight text-ink">
             {planLabel}
           </p>
         </div>
       </section>
 
       <section className="mt-10">
-        <h2 className="font-serif text-2xl font-normal text-ivory-100">
+        <h2 className="text-2xl font-semibold tracking-tight text-ink">
           Your stores
         </h2>
 
         {storeList.length === 0 ? (
-          <div className="mt-6 rounded-2xl border border-gold-500/20 bg-ivory-100/5 p-12 text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-gold-500">
-              Let's build your business
+          <div className="mt-6 rounded-lg border border-line bg-surface p-12 text-center shadow-soft">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+              Let&apos;s build your business
             </p>
-            <h3 className="mx-auto mt-5 max-w-lg font-serif text-3xl font-normal leading-tight text-ivory-100">
+            <h3 className="mx-auto mt-5 max-w-lg text-3xl font-semibold leading-tight tracking-tight text-ink">
               Your first store is one sentence away.
             </h3>
-            <p className="mx-auto mt-4 max-w-md text-sm font-light leading-relaxed text-ivory-100/60">
+            <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-muted">
               Describe what you want to sell — Urivo designs the brand, writes
               the catalog and builds a live storefront in under a minute.
             </p>
@@ -127,34 +121,34 @@ export default async function DashboardPage() {
             </div>
           </div>
         ) : (
-          <div className="mt-6 overflow-hidden rounded-2xl border border-ivory-100/10">
+          <div className="mt-6 overflow-hidden rounded-lg border border-line bg-surface shadow-soft">
             <table className="w-full border-collapse text-left text-sm">
               <thead>
-                <tr className="bg-ivory-100/5 text-[10px] font-semibold uppercase tracking-[0.2em] text-ivory-100/50">
+                <tr className="border-b border-line bg-surface-muted text-xs font-semibold uppercase tracking-[0.1em] text-muted">
                   <th className="px-6 py-4">Store</th>
                   <th className="px-6 py-4">Address</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-ivory-100/5">
+              <tbody className="divide-y divide-line">
                 {storeList.map((store) => (
                   <tr
                     key={store.id}
-                    className="transition-colors hover:bg-ivory-100/5"
+                    className="transition-colors hover:bg-surface-muted"
                   >
-                    <td className="px-6 py-4 font-medium text-ivory-100">
+                    <td className="px-6 py-4 font-medium text-ink">
                       {store.store_name}
                     </td>
-                    <td className="px-6 py-4 font-mono text-xs text-ivory-100/60">
+                    <td className="px-6 py-4 font-mono text-xs text-muted">
                       {store.subdomain}
                     </td>
                     <td className="px-6 py-4">
                       <span
                         className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${
                           store.is_active
-                            ? "bg-success-dark/10 text-success-dark"
-                            : "bg-ivory-100/10 text-ivory-100/50"
+                            ? "bg-success/10 text-[#15803d]"
+                            : "bg-surface-muted text-muted"
                         }`}
                       >
                         {store.is_active ? "Live" : "Paused"}
@@ -163,7 +157,7 @@ export default async function DashboardPage() {
                     <td className="px-6 py-4 text-right">
                       <Link
                         href={`/dashboard/stores/${store.id}`}
-                        className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-300 underline-offset-4 hover:underline"
+                        className="text-sm font-semibold text-brand underline-offset-4 hover:underline"
                       >
                         Manage
                       </Link>
@@ -171,7 +165,7 @@ export default async function DashboardPage() {
                         href={storeUrl(store.subdomain)}
                         target="_blank"
                         rel="noreferrer"
-                        className="ml-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/60 underline-offset-4 hover:text-ivory-100 hover:underline"
+                        className="ml-4 text-sm font-medium text-muted underline-offset-4 hover:text-ink hover:underline"
                       >
                         View
                       </a>

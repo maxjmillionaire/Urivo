@@ -39,19 +39,19 @@ export default async function EmailPreviewPage() {
       <div className="mb-10">
         <Link
           href="/dashboard"
-          className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/50 transition-colors hover:text-ivory-100"
+          className="text-sm font-medium text-muted transition-colors hover:text-ink"
         >
           ← Workspace
         </Link>
       </div>
-      <header className="border-b border-ivory-100/10 pb-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-gold-500">
+      <header className="border-b border-line pb-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
           Internal
         </p>
-        <h1 className="mt-3 font-serif text-4xl font-normal tracking-tight text-ivory-100">
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-ink">
           Email templates
         </h1>
-        <p className="mt-2 text-sm font-light text-ivory-100/60">
+        <p className="mt-2 text-sm text-muted">
           Preview of every transactional email. Sent via Resend once configured.
         </p>
       </header>
@@ -60,13 +60,13 @@ export default async function EmailPreviewPage() {
         {previews.map((p) => (
           <section key={p.name}>
             <div className="mb-3 flex items-baseline justify-between">
-              <h2 className="font-serif text-xl text-ivory-100">{p.name}</h2>
-              <span className="font-mono text-xs text-ivory-100/40">{p.email.subject}</span>
+              <h2 className="text-xl font-semibold text-ink">{p.name}</h2>
+              <span className="font-mono text-xs text-muted">{p.email.subject}</span>
             </div>
             <iframe
               title={p.name}
               srcDoc={p.email.html}
-              className="h-[520px] w-full rounded-xl border border-ivory-100/10 bg-white"
+              className="h-[520px] w-full rounded-xl border border-line bg-white shadow-soft"
             />
           </section>
         ))}

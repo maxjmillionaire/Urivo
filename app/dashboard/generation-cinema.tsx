@@ -15,6 +15,9 @@ import { describeVariant, type Candidate } from "@/lib/evolution/candidates";
  * The competing cards are a deterministic visualization (evolution engine);
  * the final reveal is the real generated store. Pure CSS 3D transforms — no
  * 3D library — so it stays fast and installs nothing. Reduced-motion aware.
+ *
+ * This is the one intentional dark "stage" moment in an otherwise light app
+ * (Design System v2). It uses the deep-brand slate palette with gold accents.
  */
 
 export interface CinemaResult {
@@ -115,14 +118,14 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
   const keep = round < 0 ? KEEP[0] : KEEP[Math.min(round, 5)];
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-forest-950 text-ivory-100" style={{ perspective: "1400px" }}>
+    <div className="fixed inset-0 z-50 overflow-hidden bg-[#0b1220] text-white" style={{ perspective: "1400px" }}>
       {/* Ambient volumetric glow */}
       <div
         aria-hidden
         className="urivo-anim-ambient pointer-events-none absolute left-1/2 top-1/2 h-[120vmax] w-[120vmax] -translate-x-1/2 -translate-y-1/2 rounded-full"
         style={{
           background:
-            "radial-gradient(circle, rgba(198,155,60,0.16) 0%, rgba(198,155,60,0.06) 30%, rgba(5,18,11,0) 62%)",
+            "radial-gradient(circle, rgba(212,175,55,0.16) 0%, rgba(212,175,55,0.05) 30%, rgba(11,18,32,0) 62%)",
           animation: "urivo-ambient 7s ease-in-out infinite",
         }}
       />
@@ -134,7 +137,7 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-6 top-6 z-30 text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/40 transition-colors hover:text-ivory-100"
+          className="absolute right-6 top-6 z-30 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/40 transition-colors hover:text-white"
         >
           Cancel
         </button>
@@ -143,11 +146,11 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
       {/* Error */}
       {error && !revealed && (
         <div className="absolute inset-0 z-40 flex flex-col items-center justify-center px-6 text-center">
-          <p className="max-w-md text-lg font-light text-ivory-100/80">{error}</p>
+          <p className="max-w-md text-lg text-white/80">{error}</p>
           <button
             type="button"
             onClick={onClose}
-            className="mt-8 rounded-lg border border-ivory-100/15 px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.25em] text-ivory-100/80 hover:border-ivory-100/30"
+            className="mt-8 rounded-md border border-white/15 px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.25em] text-white/80 transition-colors hover:border-white/30"
           >
             Back
           </button>
@@ -163,7 +166,7 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
               [0, 1, 2].map((i) => (
                 <span
                   key={i}
-                  className="absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full border border-gold-500/30"
+                  className="absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full border border-gold/30"
                   style={{ animation: `urivo-ring 3.2s cubic-bezier(0.16,1,0.3,1) ${i * 1}s infinite` }}
                 />
               ))}
@@ -177,7 +180,7 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
                 aria-hidden
                 className="absolute inset-0 rounded-2xl"
                 style={{
-                  background: "radial-gradient(circle, rgba(198,155,60,0.5), rgba(198,155,60,0) 70%)",
+                  background: "radial-gradient(circle, rgba(212,175,55,0.5), rgba(212,175,55,0) 70%)",
                   animation: "urivo-halo 2.4s ease-in-out infinite",
                 }}
               />
@@ -226,15 +229,15 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
 
           {/* Status readout */}
           <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col items-center gap-3 pb-14 text-center">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.3em] text-gold-500">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.3em] text-gold">
               {round < 0 ? "Claude Opus is building" : `${remaining} of 100 remain`}
             </span>
-            <h2 className="font-serif text-3xl font-normal tracking-tight text-ivory-100 sm:text-4xl">
+            <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
               {PHASE_TEXT[Math.max(0, Math.min(round, 5))]}
             </h2>
-            <div className="mt-2 h-px w-64 overflow-hidden bg-ivory-100/10">
+            <div className="mt-2 h-px w-64 overflow-hidden bg-white/10">
               <div
-                className="h-full bg-gradient-to-r from-transparent via-gold-500 to-transparent"
+                className="h-full bg-gradient-to-r from-transparent via-gold to-transparent"
                 style={{ width: "40%", animation: "urivo-shimmer 2.2s cubic-bezier(0.16,1,0.3,1) infinite" }}
               />
             </div>
@@ -253,8 +256,8 @@ function CardFace({ candidate, advanced }: { candidate: PlacedCard; advanced: bo
     <div
       className="w-[150px] rounded-xl border p-3.5 backdrop-blur-md"
       style={{
-        background: "rgba(239,234,216,0.06)",
-        borderColor: advanced ? "rgba(198,155,60,0.4)" : "rgba(239,234,216,0.12)",
+        background: "rgba(255,255,255,0.06)",
+        borderColor: advanced ? "rgba(212,175,55,0.4)" : "rgba(255,255,255,0.12)",
         boxShadow: advanced
           ? "0 22px 55px -22px rgba(0,0,0,0.75)"
           : "0 18px 44px -26px rgba(0,0,0,0.7)",
@@ -262,12 +265,12 @@ function CardFace({ candidate, advanced }: { candidate: PlacedCard; advanced: bo
       }}
     >
       <div className="flex items-center justify-between">
-        <span className="font-serif text-sm text-ivory-100">{candidate.name}</span>
-        <span className="text-[9px] font-semibold tabular-nums text-gold-300">
+        <span className="text-sm font-medium text-white">{candidate.name}</span>
+        <span className="text-[9px] font-semibold tabular-nums text-gold-soft">
           {candidate.score.toFixed(0)}
         </span>
       </div>
-      <p className="mt-1 truncate text-[9px] font-light text-ivory-100/50">{candidate.tagline}</p>
+      <p className="mt-1 truncate text-[9px] text-white/50">{candidate.tagline}</p>
       <div className="mt-3 flex gap-1">
         {candidate.palette.map((p, i) => (
           <span key={i} className="h-2.5 flex-1 rounded-full" style={{ backgroundColor: p }} />
@@ -289,27 +292,27 @@ function Reveal({
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center px-6">
       <div
-        className="w-full max-w-md rounded-3xl border border-gold-500/25 p-10 text-center"
+        className="w-full max-w-md rounded-3xl border border-gold/25 p-10 text-center"
         style={{
-          background: "linear-gradient(180deg, rgba(11,36,22,0.9), rgba(5,18,11,0.95))",
-          boxShadow: "0 60px 140px -40px rgba(0,0,0,0.8), 0 0 60px -20px rgba(198,155,60,0.35)",
+          background: "linear-gradient(180deg, rgba(31,41,59,0.92), rgba(11,18,32,0.96))",
+          boxShadow: "0 60px 140px -40px rgba(0,0,0,0.8), 0 0 60px -20px rgba(212,175,55,0.35)",
           animation: "urivo-bloom 900ms cubic-bezier(0.16,1,0.3,1) both",
         }}
       >
         <p
-          className="text-[11px] font-semibold uppercase tracking-[0.3em] text-gold-500"
+          className="text-[11px] font-semibold uppercase tracking-[0.3em] text-gold"
           style={{ animation: "urivo-rise 700ms cubic-bezier(0.16,1,0.3,1) 200ms both" }}
         >
           Your winner
         </p>
         <h2
-          className="mt-5 font-serif text-5xl font-normal tracking-tight text-ivory-100"
+          className="mt-5 text-5xl font-semibold tracking-tight text-white"
           style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 350ms both" }}
         >
           {result.storeName}
         </h2>
         <p
-          className="mt-3 text-sm font-light italic text-ivory-100/60"
+          className="mt-3 text-sm italic text-white/60"
           style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 500ms both" }}
         >
           {result.tagline}
@@ -323,7 +326,7 @@ function Reveal({
           {[result.palette.background, result.palette.structure, result.palette.accent].map((c, i) => (
             <span
               key={i}
-              className="h-9 w-9 rounded-full border border-ivory-100/10"
+              className="h-9 w-9 rounded-full border border-white/10"
               style={{ backgroundColor: c }}
             />
           ))}
@@ -334,11 +337,11 @@ function Reveal({
           {result.products.slice(0, 4).map((p, i) => (
             <div
               key={i}
-              className="flex items-center justify-between rounded-lg border border-ivory-100/10 bg-ivory-100/[0.04] px-4 py-2.5"
+              className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5"
               style={{ animation: `urivo-rise 700ms cubic-bezier(0.16,1,0.3,1) ${800 + i * 120}ms both` }}
             >
-              <span className="text-sm font-light text-ivory-100/85">{p.title}</span>
-              <span className="font-mono text-xs text-gold-300">€{p.priceEUR.toFixed(2)}</span>
+              <span className="text-sm text-white/85">{p.title}</span>
+              <span className="font-mono text-xs text-gold-soft">€{p.priceEUR.toFixed(2)}</span>
             </div>
           ))}
         </div>
@@ -350,14 +353,14 @@ function Reveal({
           <button
             type="button"
             onClick={() => onOpenStore(result.storeUrl)}
-            className="rounded-lg bg-gold-500 px-6 py-3.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-forest-900 transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 hover:bg-champagne"
+            className="rounded-md bg-gold px-6 py-3.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-brand transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 hover:bg-gold-soft"
           >
             Open your store
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ivory-100/50 transition-colors hover:text-ivory-100"
+            className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/50 transition-colors hover:text-white"
           >
             Back to workspace · {result.creditsRemaining} credits left
           </button>
@@ -390,7 +393,7 @@ function Motes() {
       {motes.map((m, i) => (
         <span
           key={i}
-          className="absolute rounded-full bg-gold-300"
+          className="absolute rounded-full bg-gold-soft"
           style={{
             left: m.left,
             top: m.top,
