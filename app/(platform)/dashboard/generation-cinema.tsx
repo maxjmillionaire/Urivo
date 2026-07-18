@@ -379,8 +379,8 @@ function BracketCard({ node, state }: { node: Node; state: CardState }) {
             : "0 10px 24px -14px rgba(0,0,0,0.8)",
         opacity: dead ? 0.32 : 1,
         filter: dead ? "grayscale(0.7)" : "none",
-        transition: "opacity 500ms ease, filter 500ms ease, box-shadow 500ms ease, border-color 500ms ease, left 700ms cubic-bezier(0.16,1,0.3,1), top 700ms cubic-bezier(0.16,1,0.3,1)",
-        animation: "urivo-fade-up 460ms cubic-bezier(0.16,1,0.3,1) both",
+        transition: "opacity 500ms ease, filter 500ms ease, box-shadow 500ms ease, border-color 500ms ease, left 700ms var(--ease-urivo), top 700ms var(--ease-urivo)",
+        animation: "urivo-fade-up 460ms var(--ease-urivo) both",
       }}
     >
       <div className="flex h-full items-stretch">
@@ -455,7 +455,7 @@ function Reveal({
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full"
-        style={{ background: "radial-gradient(circle, rgba(232,205,128,0.32), rgba(34,197,94,0.12) 42%, transparent 68%)", animation: "urivo-burst 1100ms cubic-bezier(0.16,1,0.3,1) 120ms both" }}
+        style={{ background: "radial-gradient(circle, rgba(232,205,128,0.32), rgba(34,197,94,0.12) 42%, transparent 68%)", animation: "urivo-burst 1100ms var(--ease-urivo) 120ms both" }}
       />
       <div
         className="relative w-full max-w-md rounded-2xl border p-9 text-center"
@@ -463,24 +463,24 @@ function Reveal({
           borderColor: "rgba(232,205,128,0.28)",
           background: "linear-gradient(180deg, rgba(18,28,48,0.95), rgba(8,13,22,0.97))",
           boxShadow: "0 60px 140px -40px rgba(0,0,0,0.85), 0 0 80px -18px rgba(232,205,128,0.3)",
-          animation: "urivo-bloom 900ms cubic-bezier(0.16,1,0.3,1) both",
+          animation: "urivo-bloom 900ms var(--ease-urivo) both",
         }}
       >
-        <p className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.28em] text-gold" style={{ animation: "urivo-rise 700ms cubic-bezier(0.16,1,0.3,1) 200ms both" }}>
+        <p className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.28em] text-gold" style={{ animation: "urivo-rise 700ms var(--ease-urivo) 200ms both" }}>
           <span className="h-1.5 w-1.5 rounded-full bg-gold" style={{ boxShadow: "0 0 8px rgba(232,205,128,0.8)" }} /> Champion selected
         </p>
-        <h2 className="mt-5 text-4xl font-semibold tracking-tight text-ivory" style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 340ms both" }}>
+        <h2 className="mt-5 text-4xl font-semibold tracking-tight text-ivory" style={{ animation: "urivo-rise 800ms var(--ease-urivo) 340ms both" }}>
           {result.storeName}
         </h2>
-        <p className="mt-3 text-sm italic text-mist" style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 480ms both" }}>
+        <p className="mt-3 text-sm italic text-mist" style={{ animation: "urivo-rise 800ms var(--ease-urivo) 480ms both" }}>
           {result.tagline}
         </p>
-        <div className="mt-6 flex items-center justify-center gap-6 text-[10px] uppercase tracking-[0.16em] text-mist" style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 600ms both" }}>
+        <div className="mt-6 flex items-center justify-center gap-6 text-[10px] uppercase tracking-[0.16em] text-mist" style={{ animation: "urivo-rise 800ms var(--ease-urivo) 600ms both" }}>
           <span><span className="text-[#34d399]">+3.2%</span> CVR</span>
           <span className="text-mist-dim">·</span>
           <span><span className="text-ivory">95%</span> confidence</span>
         </div>
-        <div className="mt-6 flex justify-center gap-2" style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 700ms both" }}>
+        <div className="mt-6 flex justify-center gap-2" style={{ animation: "urivo-rise 800ms var(--ease-urivo) 700ms both" }}>
           {[result.palette.background, result.palette.structure, result.palette.accent].map((c, i) => (
             <span key={i} className="h-9 w-9 rounded-full border border-white/10" style={{ backgroundColor: c }} />
           ))}
@@ -490,14 +490,14 @@ function Reveal({
             <div
               key={i}
               className="flex items-center justify-between rounded-lg border border-hair bg-white/[0.04] px-4 py-2.5"
-              style={{ animation: `urivo-rise 700ms cubic-bezier(0.16,1,0.3,1) ${820 + i * 120}ms both` }}
+              style={{ animation: `urivo-rise 700ms var(--ease-urivo) ${820 + i * 120}ms both` }}
             >
               <span className="text-sm text-ivory/85">{p.title}</span>
               <span className="text-xs text-[#34d399]">€{p.priceEUR.toFixed(2)}</span>
             </div>
           ))}
         </div>
-        <div className="mt-8 flex flex-col gap-3" style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 1300ms both" }}>
+        <div className="mt-8 flex flex-col gap-3" style={{ animation: "urivo-rise 800ms var(--ease-urivo) 1300ms both" }}>
           <button type="button" onClick={() => onOpenStore(result.storeUrl)} className="u-gold u-lift rounded-lg px-6 py-3.5 text-[11px] font-semibold uppercase tracking-[0.22em]">
             Open your store
           </button>

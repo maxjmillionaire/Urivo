@@ -432,8 +432,11 @@
   transition: transform 240ms var(--ease-urivo), box-shadow 240ms var(--ease-urivo),
     border-color 240ms var(--ease-urivo), background-color 200ms var(--ease-urivo);
 }
-.u-lift:hover {
-  transform: translateY(-2px);
+/* Hover lift only on real pointers — never fire the jump on a touch tap. */
+@media (hover: hover) and (pointer: fine) {
+  .u-lift:hover {
+    transform: translateY(-2px);
+  }
 }
 .u-lift:active {
   transform: translateY(0) scale(0.99);
@@ -446,6 +449,13 @@
 .u-press:active {
   transform: scale(0.96);
 }
+
+/* Ask Urivo: message bubbles + proposed-change card rise in, never pop. */
+@keyframes urivo-msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.u-msg-in { animation: urivo-msg-in 220ms var(--ease-urivo) both; }
 
 /* Focus ring on dark surfaces (accessibility). */
 :focus-visible {
@@ -488,6 +498,7 @@
 @media (prefers-reduced-motion: reduce) {
   [class*="urivo-anim-"],
   .u-enter,
+  .u-msg-in,
   [style*="urivo-"] {
     animation: none !important;
   }

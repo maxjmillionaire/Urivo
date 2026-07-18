@@ -191,7 +191,7 @@ export function AskUrivo({ hasStore, storeId }: { hasStore: boolean; storeId: st
         {hasTranscript ? (
           <div className="space-y-3 pb-2">
             {messages.map((m) => (
-              <div key={m.id}>
+              <div key={m.id} className="u-msg-in">
                 <MessageBubble msg={m} busy={busy} />
                 {m.role === "assistant" && m.edit && (
                   <EditCard
@@ -272,7 +272,7 @@ function EditCard({
   onApply: () => void;
 }) {
   return (
-    <div className="mt-2 rounded-xl border border-gold/25 bg-gold/[0.05] p-3">
+    <div className="u-msg-in mt-2 rounded-xl border border-gold/25 bg-gold/[0.05] p-3">
       <div className="flex items-center gap-1.5">
         <IconSpark className="text-gold" width={12} height={12} />
         <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-soft">Proposed change</span>

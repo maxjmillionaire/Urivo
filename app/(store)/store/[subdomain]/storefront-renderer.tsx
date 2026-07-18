@@ -139,7 +139,6 @@ function scopedCss(ds: StoreDesignSystem): string {
   box-shadow: inset 0 1px 0 ${rgba("#ffffff", 0.4)}, inset 0 -1px 0 ${rgba("#000000", 0.14)}, 0 10px 26px -12px ${rgba(p.accent, 0.5)};
   transition: box-shadow .24s ease, transform .18s ease, filter .24s ease;
 }
-#uv-store .uv-btn:hover{ filter:brightness(1.05) saturate(1.03); box-shadow: inset 0 1px 0 ${rgba("#ffffff", 0.5)}, 0 16px 36px -12px ${rgba(p.accent, 0.55)}; transform:translateY(-1px); }
 #uv-store .uv-btn:active{ transform:translateY(1px) scale(.985); }
 #uv-store .uv-btn-ghost{
   display:inline-flex; align-items:center; gap:.5rem; padding:.9rem 1.7rem; border-radius:var(--btn-radius);
@@ -150,7 +149,6 @@ function scopedCss(ds: StoreDesignSystem): string {
 #uv-store .uv-link{ font-size:.72rem; font-weight:700; letter-spacing:.16em; text-transform:uppercase; border-bottom:2px solid var(--accent); padding-bottom:2px; transition:opacity .2s ease; }
 #uv-store .uv-link:hover{ opacity:.6; }
 #uv-store .uv-card .uv-plane{ transition:transform .6s cubic-bezier(.2,.7,.2,1); }
-#uv-store .uv-card:hover .uv-plane{ transform:scale(1.045); }
 #uv-store .uv-overlay-cta{ opacity:0; transform:translateY(8px); transition:opacity .3s ease, transform .3s ease; }
 #uv-store .uv-card:hover .uv-overlay-cta{ opacity:1; transform:translateY(0); }
 #uv-store .uv-chip{ display:inline-flex; align-items:center; gap:.4rem; padding:.4rem .8rem; border-radius:999px; border:var(--border-w) solid var(--line); font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
@@ -163,7 +161,12 @@ ${lively ? "#uv-store .uv-rise{ animation:uv-rise .7s cubic-bezier(.2,.7,.2,1) b
   #uv-store .uv-hero-split{ grid-template-columns:1fr !important; }
   #uv-store .uv-foot-grid{ grid-template-columns:1fr 1fr !important; }
 }
-@media (prefers-reduced-motion: reduce){ #uv-store *{ animation:none !important; } #uv-store .uv-card:hover .uv-plane{ transform:none; } }
+/* Motion hovers only on real pointers — a touch tap must not trigger the lift/zoom. */
+@media (hover:hover) and (pointer:fine){
+  #uv-store .uv-btn:hover{ filter:brightness(1.05) saturate(1.03); box-shadow: inset 0 1px 0 ${rgba("#ffffff", 0.5)}, 0 16px 36px -12px ${rgba(p.accent, 0.55)}; transform:translateY(-1px); }
+  #uv-store .uv-card:hover .uv-plane{ transform:scale(1.045); }
+}
+@media (prefers-reduced-motion: reduce){ #uv-store *{ animation:none !important; } #uv-store .uv-card .uv-plane{ transform:none; } }
 `;
 }
 

@@ -251,13 +251,13 @@ function LoginForm() {
           {mode === "signin" && (
             <>
               <p>
-                <button type="button" onClick={() => setMode("reset")} className="text-mist underline-offset-4 transition-colors hover:text-ivory hover:underline">
+                <button type="button" onClick={() => setMode("reset")} className="text-mist underline-offset-4 transition-colors hover:text-ivory hover:underline active:opacity-70">
                   Forgot password?
                 </button>
               </p>
               <p>
                 New to Urivo?{" "}
-                <button type="button" onClick={() => setMode("signup")} className="font-semibold text-gold-soft underline-offset-4 hover:underline">
+                <button type="button" onClick={() => setMode("signup")} className="font-semibold text-gold-soft underline-offset-4 transition-opacity hover:underline active:opacity-70">
                   Create account
                 </button>
               </p>
@@ -266,7 +266,7 @@ function LoginForm() {
           {mode !== "signin" && (
             <p>
               Already have an account?{" "}
-              <button type="button" onClick={() => setMode("signin")} className="font-semibold text-gold-soft underline-offset-4 hover:underline">
+              <button type="button" onClick={() => setMode("signin")} className="font-semibold text-gold-soft underline-offset-4 transition-opacity hover:underline active:opacity-70">
                 Sign in
               </button>
             </p>

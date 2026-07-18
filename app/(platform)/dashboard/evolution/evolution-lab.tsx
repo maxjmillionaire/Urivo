@@ -174,7 +174,7 @@ export function EvolutionLab() {
                     fill={fill}
                     fillOpacity={opacity}
                     style={{
-                      transition: "r 500ms cubic-bezier(0.16,1,0.3,1), fill-opacity 700ms",
+                      transition: "r 500ms var(--ease-urivo), fill-opacity 700ms",
                       filter: isWinner
                         ? "drop-shadow(0 0 14px rgba(212,175,55,0.9))"
                         : p.survived && gi === visibleGen - 1

@@ -269,7 +269,7 @@ export function StoreManager({
             <button
               type="button"
               onClick={removeLogo}
-              className="shrink-0 text-sm font-semibold text-alert/80 transition-colors hover:text-alert"
+              className="shrink-0 text-sm font-semibold text-alert/80 transition-colors hover:text-alert active:opacity-60"
             >
               Remove
             </button>
@@ -402,7 +402,7 @@ export function StoreManager({
                           type="button"
                           onClick={() => regenImage(p.id)}
                           disabled={busy}
-                          className="mt-2 text-[11px] font-semibold text-gold-soft transition-colors hover:text-gold disabled:opacity-50"
+                          className="mt-2 text-[11px] font-semibold text-gold-soft transition-colors hover:text-gold active:opacity-60 disabled:opacity-50"
                         >
                           {busy ? "Generating…" : p.imageUrl ? "Regenerate" : "Generate"}
                         </button>
@@ -428,14 +428,14 @@ export function StoreManager({
                         <button
                           type="button"
                           onClick={() => setEditing(p)}
-                          className="text-sm font-semibold text-gold-soft hover:text-gold"
+                          className="text-sm font-semibold text-gold-soft transition-opacity hover:text-gold active:opacity-60"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => deleteProduct(p.id)}
-                          className="ml-4 text-sm font-semibold text-alert/80 hover:text-alert"
+                          className="ml-4 text-sm font-semibold text-alert/80 transition-opacity hover:text-alert active:opacity-60"
                         >
                           Remove
                         </button>
