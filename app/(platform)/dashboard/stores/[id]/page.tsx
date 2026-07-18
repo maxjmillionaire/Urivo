@@ -2,6 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/storefront";
 import { parseLogo } from "@/lib/storefront/design-system";
+import { auditStoreSeo } from "@/lib/seo";
+import { SeoCard } from "./seo-card";
 import { env } from "@/lib/env";
 import { AppShell } from "../../_shell/app-shell";
 import { loadRailStore } from "../../_shell/rail-data";
@@ -88,6 +90,19 @@ export default async function StoreDetailPage({
           accent: theme.accent,
           isActive: store.is_active,
         }}
+      />
+
+      <SeoCard
+        audit={auditStoreSeo({
+          storeName: store.store_name,
+          tagline: theme.tagline,
+          products: (products ?? []).map((p) => ({
+            title: p.title,
+            description: p.description,
+            price_eur: p.price_eur,
+            image_url: p.image_url ?? null,
+          })),
+        })}
       />
     </AppShell>
   );

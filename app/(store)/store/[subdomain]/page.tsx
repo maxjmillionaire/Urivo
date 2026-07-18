@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/storefront";
 import { parseDesignSystem, themeToDesignSystem, parseLogo } from "@/lib/storefront/design-system";
+import { storeJsonLd } from "@/lib/seo";
 import { StorefrontRenderer } from "./storefront-renderer";
 
 export const dynamic = "force-dynamic";
@@ -28,14 +29,48 @@ const loadStore = cache(async (subdomain: string) => {
   return store ?? null;
 });
 
+const loadProducts = cache(async (storeId: string) => {
+  const supabase = await supabaseServer();
+  const { data } = await supabase
+    .from("products")
+    .select("id, title, description, price_eur, image_url, show_logo")
+    .eq("store_id", storeId)
+    .order("position", { ascending: true });
+  return data ?? [];
+});
+
+function storeUrl(subdomain: string): string {
+  const root = (process.env.ROOT_DOMAIN ?? "localhost:3000").toLowerCase();
+  return root.startsWith("localhost") ? `http://localhost:3000/store/${subdomain}` : `https://${subdomain}.${root}`;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { subdomain } = await params;
   const store = await loadStore(subdomain);
   if (!store) return { title: "Store not found" };
   const theme = parseTheme(store.theme_config);
+  const products = await loadProducts(store.id);
+  const description = theme.tagline || store.store_name;
+  const url = storeUrl(subdomain);
+  const ogImage = products.find((p) => p.image_url)?.image_url ?? undefined;
   return {
     title: store.store_name,
-    description: theme.tagline || store.store_name,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "website",
+      siteName: store.store_name,
+      title: store.store_name,
+      description,
+      url,
+      ...(ogImage ? { images: [{ url: ogImage }] } : {}),
+    },
+    twitter: {
+      card: ogImage ? "summary_large_image" : "summary",
+      title: store.store_name,
+      description,
+      ...(ogImage ? { images: [ogImage] } : {}),
+    },
   };
 }
 
@@ -53,12 +88,7 @@ export default async function StorefrontPage({ params }: Props) {
   const store = await loadStore(subdomain);
   if (!store) notFound();
 
-  const supabase = await supabaseServer();
-  const { data: products } = await supabase
-    .from("products")
-    .select("id, title, description, price_eur, image_url, show_logo")
-    .eq("store_id", store.id)
-    .order("position", { ascending: true });
+  const products = await loadProducts(store.id);
 
   // New stores persist a full `designSystem`; older ones are adapted from their
   // legacy palette so nothing breaks while the generator is upgraded.
@@ -68,5 +98,19 @@ export default async function StorefrontPage({ params }: Props) {
     : themeToDesignSystem(parseTheme(store.theme_config));
   const logo = parseLogo(store.theme_config);
 
-  return <StorefrontRenderer storeName={store.store_name} ds={ds} catalog={products ?? []} logo={logo} />;
+  const theme = parseTheme(store.theme_config);
+  const jsonLd = storeJsonLd({
+    storeName: store.store_name,
+    tagline: theme.tagline,
+    subdomain,
+    url: storeUrl(subdomain),
+    products,
+  });
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <StorefrontRenderer storeName={store.store_name} ds={ds} catalog={products} logo={logo} />
+    </>
+  );
 }
