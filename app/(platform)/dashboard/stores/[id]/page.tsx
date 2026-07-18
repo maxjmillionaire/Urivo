@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/storefront";
+import { parseLogo } from "@/lib/storefront/design-system";
 import { env } from "@/lib/env";
 import { AppShell } from "../../_shell/app-shell";
 import { loadRailStore } from "../../_shell/rail-data";
@@ -76,7 +77,9 @@ export default async function StoreDetailPage({
           priceEUR: Number(p.price_eur),
           inventoryCount: p.inventory_count,
           imageUrl: p.image_url ?? null,
+          showLogo: (p as { show_logo?: boolean }).show_logo ?? true,
         }))}
+        initialLogo={parseLogo(store.theme_config)}
         initialTheme={{
           storeName: store.store_name,
           tagline: theme.tagline,

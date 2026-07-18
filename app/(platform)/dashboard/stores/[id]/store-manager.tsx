@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { LOGO_POSITIONS, type StoreLogo, type LogoPosition } from "@/lib/storefront/design-system";
 
 /*
  * Merchant store management (screens-v1 §6): product CRUD table with an
@@ -16,6 +17,15 @@ type Product = {
   priceEUR: number;
   inventoryCount: number;
   imageUrl: string | null;
+  showLogo: boolean;
+};
+
+const POSITION_LABELS: Record<LogoPosition, string> = {
+  "top-left": "Top left",
+  "top-right": "Top right",
+  "bottom-left": "Bottom left",
+  "bottom-right": "Bottom right",
+  center: "Center",
 };
 
 type Theme = {
@@ -36,10 +46,12 @@ export function StoreManager({
   storeId,
   initialProducts,
   initialTheme,
+  initialLogo,
 }: {
   storeId: string;
   initialProducts: Product[];
   initialTheme: Theme;
+  initialLogo: StoreLogo | null;
 }) {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -48,6 +60,71 @@ export function StoreManager({
   const [themeOpen, setThemeOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [regenning, setRegenning] = useState<Set<string>>(new Set());
+  const [logo, setLogo] = useState<StoreLogo | null>(initialLogo);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  async function uploadLogo(file: File) {
+    setError(null);
+    setLogoBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("logo", file);
+      const res = await fetch(`/api/stores/${storeId}/logo`, { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.message || "Could not upload the logo.");
+        return;
+      }
+      setLogo(data.logo);
+      router.refresh();
+    } catch {
+      setError("Could not upload the logo. Please try again.");
+    } finally {
+      setLogoBusy(false);
+    }
+  }
+
+  async function updateLogo(patch: Partial<Pick<StoreLogo, "position" | "sizePct" | "opacity">>) {
+    if (!logo) return;
+    const next = { ...logo, ...patch };
+    setLogo(next); // optimistic
+    const res = await fetch(`/api/stores/${storeId}/logo`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) {
+      setLogo(logo);
+      setError("Could not save the logo settings.");
+    }
+  }
+
+  async function removeLogo() {
+    if (!confirm("Remove the brand logo from your store?")) return;
+    const snapshot = logo;
+    setLogo(null);
+    const res = await fetch(`/api/stores/${storeId}/logo`, { method: "DELETE" });
+    if (!res.ok) {
+      setLogo(snapshot);
+      setError("Could not remove the logo.");
+      return;
+    }
+    router.refresh();
+  }
+
+  async function toggleProductLogo(id: string, showLogo: boolean) {
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, showLogo } : p))); // optimistic
+    const res = await fetch(`/api/products/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ showLogo }),
+    });
+    if (!res.ok) {
+      setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, showLogo: !showLogo } : p)));
+      setError("Could not update the logo toggle.");
+    }
+  }
 
   async function regenImage(id: string) {
     setError(null);
@@ -72,7 +149,7 @@ export function StoreManager({
     }
   }
 
-  async function saveProduct(form: Omit<Product, "id" | "imageUrl">, id?: string) {
+  async function saveProduct(form: Omit<Product, "id" | "imageUrl" | "showLogo">, id?: string) {
     setError(null);
     const url = id ? `/api/products/${id}` : `/api/stores/${storeId}/products`;
     const res = await fetch(url, {
@@ -92,6 +169,7 @@ export function StoreManager({
       priceEUR: Number(data.product.price_eur),
       inventoryCount: data.product.inventory_count,
       imageUrl: id ? (products.find((p) => p.id === id)?.imageUrl ?? null) : null,
+      showLogo: id ? (products.find((p) => p.id === id)?.showLogo ?? true) : true,
     };
     setProducts((prev) => (id ? prev.map((p) => (p.id === id ? saved : p)) : [...prev, saved]));
     setEditing(null);
@@ -167,6 +245,105 @@ export function StoreManager({
         </button>
       </section>
 
+      {/* Brand logo */}
+      <section className="u-float mt-5 rounded-2xl border border-hair bg-panel/70 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-ivory">Brand logo</p>
+            <p className="mt-1 max-w-md text-xs text-mist-dim">
+              Overlaid on your product photos, always pixel-perfect. Toggle it per product below.
+            </p>
+          </div>
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void uploadLogo(f);
+              e.target.value = "";
+            }}
+          />
+          {logo ? (
+            <button
+              type="button"
+              onClick={removeLogo}
+              className="shrink-0 text-sm font-semibold text-alert/80 transition-colors hover:text-alert"
+            >
+              Remove
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => logoInputRef.current?.click()}
+              disabled={logoBusy}
+              className="u-gold u-lift shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+            >
+              {logoBusy ? "Uploading…" : "Upload logo"}
+            </button>
+          )}
+        </div>
+
+        {logo && (
+          <div className="mt-5 grid gap-5 sm:grid-cols-[auto_1fr]">
+            {/* checkerboard preview */}
+            <div
+              className="flex h-28 w-28 items-center justify-center rounded-xl border border-hair"
+              style={{
+                backgroundImage:
+                  "linear-gradient(45deg,#1a2540 25%,transparent 25%),linear-gradient(-45deg,#1a2540 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#1a2540 75%),linear-gradient(-45deg,transparent 75%,#1a2540 75%)",
+                backgroundSize: "16px 16px",
+                backgroundPosition: "0 0,0 8px,8px -8px,-8px 0",
+                backgroundColor: "#0e1626",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logo.url} alt="Brand logo" className="max-h-20 max-w-20 object-contain" style={{ opacity: logo.opacity }} />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-mist">Position</span>
+                <select
+                  value={logo.position}
+                  onChange={(e) => updateLogo({ position: e.target.value as LogoPosition })}
+                  className={inputClass}
+                >
+                  {LOGO_POSITIONS.map((pos) => (
+                    <option key={pos} value={pos}>{POSITION_LABELS[pos]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-mist">Size · {logo.sizePct}%</span>
+                <input
+                  type="range"
+                  min={6}
+                  max={40}
+                  step={1}
+                  value={logo.sizePct}
+                  onChange={(e) => updateLogo({ sizePct: Number(e.target.value) })}
+                  className="mt-3 w-full accent-gold"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-mist">Opacity · {Math.round(logo.opacity * 100)}%</span>
+                <input
+                  type="range"
+                  min={0.2}
+                  max={1}
+                  step={0.05}
+                  value={logo.opacity}
+                  onChange={(e) => updateLogo({ opacity: Number(e.target.value) })}
+                  className="mt-3 w-full accent-gold"
+                />
+              </label>
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* Products */}
       <section className="mt-8">
         <div className="flex items-center justify-between">
@@ -229,6 +406,17 @@ export function StoreManager({
                         >
                           {busy ? "Generating…" : p.imageUrl ? "Regenerate" : "Generate"}
                         </button>
+                        {logo && (
+                          <label className="mt-2 flex items-center gap-1.5 text-[11px] text-mist" title="Overlay the brand logo on this product">
+                            <input
+                              type="checkbox"
+                              checked={p.showLogo}
+                              onChange={(e) => toggleProductLogo(p.id, e.target.checked)}
+                              className="h-3.5 w-3.5 accent-gold"
+                            />
+                            Logo
+                          </label>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <p className="font-medium text-ivory">{p.title}</p>
@@ -276,7 +464,7 @@ function ProductModal({
 }: {
   product: Product | null;
   onClose: () => void;
-  onSave: (form: Omit<Product, "id" | "imageUrl">, id?: string) => Promise<void>;
+  onSave: (form: Omit<Product, "id" | "imageUrl" | "showLogo">, id?: string) => Promise<void>;
 }) {
   const [title, setTitle] = useState(product?.title ?? "");
   const [description, setDescription] = useState(product?.description ?? "");

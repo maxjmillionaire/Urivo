@@ -18,6 +18,7 @@ export const ProductUpdateSchema = z.object({
   description: z.string().trim().max(400).optional(),
   priceEUR: z.number().positive().max(1_000_000).optional(),
   inventoryCount: z.number().int().min(0).max(1_000_000).optional(),
+  showLogo: z.boolean().optional(),
 });
 
 export const StoreUpdateSchema = z.object({

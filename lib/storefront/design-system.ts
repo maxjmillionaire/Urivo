@@ -89,6 +89,33 @@ export interface StoreDesignSystem {
   };
 }
 
+/* --------------------------------- brand logo ------------------------------ */
+
+export const LOGO_POSITIONS = ["top-left", "top-right", "bottom-left", "bottom-right", "center"] as const;
+export type LogoPosition = (typeof LOGO_POSITIONS)[number];
+
+/** A merchant's logo, overlaid non-destructively on product shots. */
+export interface StoreLogo {
+  url: string;
+  position: LogoPosition;
+  sizePct: number; // width as % of the image
+  opacity: number; // 0.2–1
+}
+
+/** Read + validate the store logo from theme_config (untrusted). Only our own
+ *  https storage URLs are accepted into an <img src>. */
+export function parseLogo(themeConfig: unknown): StoreLogo | null {
+  const cfg = (themeConfig ?? {}) as Record<string, unknown>;
+  const l = cfg.logo as Record<string, unknown> | undefined;
+  if (!l || typeof l.url !== "string" || !/^https:\/\//.test(l.url)) return null;
+  return {
+    url: l.url,
+    position: oneOf(l.position, LOGO_POSITIONS, "bottom-right"),
+    sizePct: clampNum(l.sizePct, 6, 40, 18),
+    opacity: clampNum(l.opacity, 0.2, 1, 1),
+  };
+}
+
 /* ------------------------------- font library ------------------------------ */
 /*
  * Curated, pairing-tested library. The AI selects a KEY; we resolve it to a

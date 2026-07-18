@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/storefront";
-import { parseDesignSystem, themeToDesignSystem } from "@/lib/storefront/design-system";
+import { parseDesignSystem, themeToDesignSystem, parseLogo } from "@/lib/storefront/design-system";
 import { StorefrontRenderer } from "./storefront-renderer";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +56,7 @@ export default async function StorefrontPage({ params }: Props) {
   const supabase = await supabaseServer();
   const { data: products } = await supabase
     .from("products")
-    .select("id, title, description, price_eur, image_url")
+    .select("id, title, description, price_eur, image_url, show_logo")
     .eq("store_id", store.id)
     .order("position", { ascending: true });
 
@@ -66,6 +66,7 @@ export default async function StorefrontPage({ params }: Props) {
   const ds = config.designSystem
     ? parseDesignSystem(config.designSystem)
     : themeToDesignSystem(parseTheme(store.theme_config));
+  const logo = parseLogo(store.theme_config);
 
-  return <StorefrontRenderer storeName={store.store_name} ds={ds} catalog={products ?? []} />;
+  return <StorefrontRenderer storeName={store.store_name} ds={ds} catalog={products ?? []} logo={logo} />;
 }

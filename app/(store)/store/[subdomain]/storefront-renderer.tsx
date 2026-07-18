@@ -7,6 +7,8 @@ import {
   sectionPadding,
   type SectionKey,
   type StoreDesignSystem,
+  type StoreLogo,
+  type LogoPosition,
 } from "@/lib/storefront/design-system";
 
 /*
@@ -28,6 +30,39 @@ export interface RenderProduct {
   description: string | null;
   price_eur: number | string;
   image_url?: string | null;
+  show_logo?: boolean;
+}
+
+function logoAnchor(position: LogoPosition): CSSProperties {
+  const pad = "6%";
+  switch (position) {
+    case "top-left": return { top: pad, left: pad };
+    case "top-right": return { top: pad, right: pad };
+    case "bottom-left": return { bottom: pad, left: pad };
+    case "center": return { top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
+    default: return { bottom: pad, right: pad };
+  }
+}
+
+function LogoOverlay({ logo }: { logo: StoreLogo }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={logo.url}
+      alt=""
+      aria-hidden
+      style={{
+        position: "absolute",
+        width: `${logo.sizePct}%`,
+        height: "auto",
+        opacity: logo.opacity,
+        objectFit: "contain",
+        pointerEvents: "none",
+        filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.28))",
+        ...logoAnchor(logo.position),
+      }}
+    />
+  );
 }
 
 const BLACK: [number, number, number] = [0, 0, 0];
@@ -148,7 +183,19 @@ function planeStyle(ds: StoreDesignSystem): CSSProperties {
   }
 }
 
-function Plane({ ds, index, src, alt }: { ds: StoreDesignSystem; index: number; src?: string | null; alt?: string }) {
+function Plane({
+  ds,
+  index,
+  src,
+  alt,
+  logo,
+}: {
+  ds: StoreDesignSystem;
+  index: number;
+  src?: string | null;
+  alt?: string;
+  logo?: StoreLogo | null;
+}) {
   const p = ds.palette;
   // Real product photography when available; the palette plane is the fallback.
   if (src) {
@@ -165,6 +212,7 @@ function Plane({ ds, index, src, alt }: { ds: StoreDesignSystem; index: number; 
         {ds.layout.imageTreatment === "duotone" && (
           <div style={{ position: "absolute", inset: 0, mixBlendMode: "multiply", background: `linear-gradient(150deg, ${rgba(p.accent, 0.4)}, ${rgba(p.ink, 0.5)})` }} />
         )}
+        {logo && <LogoOverlay logo={logo} />}
       </>
     );
   }
@@ -263,7 +311,7 @@ function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
 
 /* --------------------------------- HERO ------------------------------------ */
 
-function Hero({ storeName, ds, heroImage }: { storeName: string; ds: StoreDesignSystem; heroImage?: string | null }) {
+function Hero({ storeName, ds, heroImage, logo }: { storeName: string; ds: StoreDesignSystem; heroImage?: string | null; logo?: StoreLogo | null }) {
   const tagline = ds.tagline || ds.personality;
   const eyebrow = "New collection";
 
@@ -282,7 +330,7 @@ function Hero({ storeName, ds, heroImage }: { storeName: string; ds: StoreDesign
               </div>
             </div>
             <div style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: "var(--radius)", overflow: "hidden" }} className="uv-card">
-              <Plane ds={ds} index={0} src={heroImage} />
+              <Plane ds={ds} index={0} src={heroImage} logo={heroImage ? logo : null} />
             </div>
           </div>
         </div>
@@ -336,13 +384,14 @@ function Hero({ storeName, ds, heroImage }: { storeName: string; ds: StoreDesign
 
 /* ------------------------------ PRODUCT CARDS ------------------------------ */
 
-function ProductCard({ ds, product, index }: { ds: StoreDesignSystem; product: RenderProduct; index: number }) {
+function ProductCard({ ds, product, index, logo }: { ds: StoreDesignSystem; product: RenderProduct; index: number; logo?: StoreLogo | null }) {
   const variant = ds.layout.card;
+  const cardLogo = logo && product.show_logo !== false ? logo : null;
 
   if (variant === "overlay") {
     return (
       <article className="uv-card" style={{ position: "relative", aspectRatio: "3 / 4", borderRadius: "var(--radius)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
-        <Plane ds={ds} index={index} src={product.image_url} alt={product.title} />
+        <Plane ds={ds} index={index} src={product.image_url} alt={product.title} logo={cardLogo} />
         <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, transparent 45%, ${rgba(ds.palette.ink, 0.55)})` }} />
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "1.2rem" }}>
           <h3 className="uv-h" style={{ color: "#fff", fontSize: "1.05rem" }}>{product.title}</h3>
@@ -359,7 +408,7 @@ function ProductCard({ ds, product, index }: { ds: StoreDesignSystem; product: R
     return (
       <article className="uv-card" style={{ border: `var(--border-w) solid ${ds.palette.line}`, borderRadius: "var(--radius)", padding: "1rem", background: "var(--surface)", boxShadow: "var(--shadow-card)" }}>
         <div style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: "calc(var(--radius) * .7)", overflow: "hidden" }}>
-          <Plane ds={ds} index={index} src={product.image_url} alt={product.title} />
+          <Plane ds={ds} index={index} src={product.image_url} alt={product.title} logo={cardLogo} />
         </div>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "1rem", marginTop: "1rem" }}>
           <h3 className="uv-h" style={{ fontSize: "1.02rem" }}>{product.title}</h3>
@@ -375,7 +424,7 @@ function ProductCard({ ds, product, index }: { ds: StoreDesignSystem; product: R
     return (
       <article className="uv-card">
         <div style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: "var(--radius)", overflow: "hidden" }}>
-          <Plane ds={ds} index={index} src={product.image_url} alt={product.title} />
+          <Plane ds={ds} index={index} src={product.image_url} alt={product.title} logo={cardLogo} />
         </div>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: ".8rem" }}>
           <h3 className="uv-h" style={{ fontSize: ".96rem", fontWeight: 500 }}>{product.title}</h3>
@@ -389,7 +438,7 @@ function ProductCard({ ds, product, index }: { ds: StoreDesignSystem; product: R
   return (
     <article className="uv-card">
       <div style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: "var(--radius)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
-        <Plane ds={ds} index={index} src={product.image_url} alt={product.title} />
+        <Plane ds={ds} index={index} src={product.image_url} alt={product.title} logo={cardLogo} />
       </div>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "1rem", marginTop: "1.1rem" }}>
         <h3 className="uv-h" style={{ fontSize: "1.12rem" }}>{product.title}</h3>
@@ -403,7 +452,7 @@ function ProductCard({ ds, product, index }: { ds: StoreDesignSystem; product: R
   );
 }
 
-function Collection({ ds, catalog }: { ds: StoreDesignSystem; catalog: RenderProduct[] }) {
+function Collection({ ds, catalog, logo }: { ds: StoreDesignSystem; catalog: RenderProduct[]; logo?: StoreLogo | null }) {
   if (catalog.length === 0) {
     return (
       <section className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
@@ -427,7 +476,7 @@ function Collection({ ds, catalog }: { ds: StoreDesignSystem; catalog: RenderPro
         }}
       >
         {catalog.map((product, i) => (
-          <ProductCard key={product.id} ds={ds} product={product} index={i} />
+          <ProductCard key={product.id} ds={ds} product={product} index={i} logo={logo} />
         ))}
       </div>
     </section>
@@ -607,10 +656,12 @@ export function StorefrontRenderer({
   storeName,
   ds,
   catalog,
+  logo,
 }: {
   storeName: string;
   ds: StoreDesignSystem;
   catalog: RenderProduct[];
+  logo?: StoreLogo | null;
 }) {
   const fontsHref = googleFontsUrl(ds);
   // A hero image lifts the split/fullbleed heroes; use the first product photo.
@@ -619,10 +670,10 @@ export function StorefrontRenderer({
   const render = (key: SectionKey) => {
     switch (key) {
       case "announcement": return <Announcement key={key} ds={ds} />;
-      case "hero": return <Hero key={key} storeName={storeName} ds={ds} heroImage={heroImage} />;
+      case "hero": return <Hero key={key} storeName={storeName} ds={ds} heroImage={heroImage} logo={logo} />;
       case "marquee": return <Marquee key={key} ds={ds} storeName={storeName} />;
       case "trust": return <Trust key={key} ds={ds} />;
-      case "collection": return <Collection key={key} ds={ds} catalog={catalog} />;
+      case "collection": return <Collection key={key} ds={ds} catalog={catalog} logo={logo} />;
       case "story": return <Story key={key} ds={ds} storeName={storeName} />;
       case "highlights": return <Highlights key={key} ds={ds} />;
       case "newsletter": return <Newsletter key={key} ds={ds} storeName={storeName} />;

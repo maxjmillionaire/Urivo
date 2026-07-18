@@ -69,6 +69,7 @@ export async function PATCH(
   if (body.description !== undefined) update.description = body.description;
   if (body.priceEUR !== undefined) update.price_eur = body.priceEUR;
   if (body.inventoryCount !== undefined) update.inventory_count = body.inventoryCount;
+  if (body.showLogo !== undefined) update.show_logo = body.showLogo;
   if (Object.keys(update).length === 0) {
     return fail(400, "INVALID_INPUT", "Nothing to update.");
   }
@@ -78,7 +79,7 @@ export async function PATCH(
     .from("products")
     .update(update)
     .eq("id", id)
-    .select("id, title, description, price_eur, inventory_count")
+    .select("id, title, description, price_eur, inventory_count, show_logo")
     .single();
 
   if (error) {
