@@ -2,25 +2,21 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { runEvolution } from "@/lib/evolution/engine";
-import { describeVariant, type Candidate } from "@/lib/evolution/candidates";
+import { describeVariant } from "@/lib/evolution/candidates";
 
 /*
- * The Generation Cinema — Urivo's signature creation sequence (spec 6.6),
- * rebuilt to keynote level: the Optimization Arena.
+ * The Generation Cinema — Urivo's signature creation sequence (spec 6.6).
  *
- * When a user generates a store, a field of competing storefronts is forged and
- * then judged by a lightning sweep. Losing variants strike RED and dissolve;
- * surviving variants strike GREEN and advance in 3D. Round by round the field
- * halves — 16 → 8 → 4 → 2 → 1 — until a single green champion remains, which
- * blooms into the real AI-generated store (real brand, palette, products).
+ * A live A/B tournament bracket: eight storefront variants are seeded on the
+ * left, compete pair by pair along dotted bracket connectors, and converge —
+ * 8 → 4 → 2 → 1 — into a single champion on the right, which blooms into the
+ * real AI-generated store. Bloomberg-terminal chrome (LIVE, CVR uplift, traffic,
+ * confidence) wraps the bracket. Hold Q for voice.
  *
- * The competing variants are a deterministic visualization (evolution engine);
- * the final reveal is the real generated store. Pure CSS 3D transforms — no 3D
- * library — so it stays fast. Reduced-motion aware.
- *
- * This is the one intentional dark "stage" in an otherwise light app: a
- * Bloomberg-terminal / A/B-arena aesthetic (deep slate, mono type, green = win,
- * red = eliminated, gold reserved for the Urivo mark).
+ * Deliberate reference-faithful layout (founder exception); Urivo palette —
+ * slate-navy canvas, ivory mono type, gold for the champion + brand, green as
+ * the CVR / winning signal. The bracket is a deterministic visualization; the
+ * reveal is the real generated store.
  */
 
 export interface CinemaResult {
@@ -40,68 +36,30 @@ type Props = {
   onClose: () => void;
 };
 
-const KEEP = [16, 8, 4, 2, 1] as const; // variants alive at round 0..4
-const ROUNDS = KEEP.length - 1; // 4 elimination rounds
-const ROUND_MS = 1650;
-const SEED_MS = 1400;
-const BOOT_MS = 700;
+// Logical stage size; scaled to fit the viewport.
+const STAGE_W = 1180;
+const STAGE_H = 560;
+const CARD_W = 168;
+const CARD_H = 62;
+const COL_X = [16, 336, 656, 946]; // left edge of each column
+const LETTERS = "ABCDEFGH";
 
-const PHASE_TEXT = [
-  "Generating the field",
-  "Scoring every variant",
-  "Eliminating the weak",
-  "Refining the finalists",
-  "Selecting the champion",
-];
+const BOOT_MS = 550;
+const SEED_MS = 950;
+const ROUND_MS = 1450;
 
-const CVR_UPLIFT = [0.4, 1.1, 1.9, 2.6, 3.2];
-const CONFIDENCE = [46, 63, 78, 89, 95];
-const VISITORS = [120_000, 430_000, 820_000, 1_240_000, 1_700_000];
-
-interface Placed extends Candidate {
-  rank: number;
+interface Node {
+  id: string;
+  letter: string;
   cvr: number;
-}
-
-interface Slot {
+  palette: [string, string, string];
   x: number;
   y: number;
-  z: number;
-  scale: number;
-  rot: number;
+  col: number;
+  parents?: [Node, Node]; // the two children that fed this node
 }
 
-// Deterministic layout for a field of `count` cards, centred on the origin.
-// As the field shrinks the survivors gather toward centre and advance forward.
-function layoutFor(count: number): Slot[] {
-  const cfg: Record<number, { cols: number; cw: number; ch: number; z0: number; z1: number; scale: number }> = {
-    16: { cols: 4, cw: 236, ch: 144, z0: -320, z1: -60, scale: 0.8 },
-    8: { cols: 4, cw: 244, ch: 162, z0: -170, z1: -20, scale: 0.94 },
-    4: { cols: 4, cw: 250, ch: 0, z0: -30, z1: -30, scale: 1.04 },
-    2: { cols: 2, cw: 330, ch: 0, z0: 70, z1: 70, scale: 1.16 },
-    1: { cols: 1, cw: 0, ch: 0, z0: 150, z1: 150, scale: 1.34 },
-  };
-  const c = cfg[count] ?? cfg[16];
-  const rows = Math.ceil(count / c.cols);
-  const slots: Slot[] = [];
-  for (let i = 0; i < count; i++) {
-    const col = i % c.cols;
-    const row = Math.floor(i / c.cols);
-    const colsInRow = Math.min(c.cols, count - row * c.cols);
-    const cx = (col - (colsInRow - 1) / 2) * c.cw;
-    const cy = rows > 1 ? (row - (rows - 1) / 2) * c.ch : 0;
-    const seed = (i * 2654435761) >>> 0;
-    const jx = (((seed & 0xff) / 255) - 0.5) * 26;
-    const jy = (((seed >>> 8 & 0xff) / 255) - 0.5) * 20;
-    const z = rows > 1 ? c.z0 + (row / Math.max(1, rows - 1)) * (c.z1 - c.z0) : c.z0;
-    const rot = ((seed >>> 16 & 0xff) / 255 - 0.5) * 14;
-    slots.push({ x: Math.round(cx + jx), y: Math.round(cy + jy), z: Math.round(z), scale: c.scale, rot: Math.round(rot) });
-  }
-  return slots;
-}
-
-function cvrFor(score: number): number {
-  const v = 4.3 + ((Math.max(45, Math.min(100, score)) - 45) / 55) * 3.3;
+function cvrFor(v: number): number {
   return Math.round(v * 10) / 10;
 }
 
@@ -111,49 +69,119 @@ function fmtCount(n: number): string {
   return String(n);
 }
 
-const LETTERS = "ABCDEFGHIJKLMNOP";
+const UPLIFT = [1.3, 2.0, 2.7, 3.2];
+const CONF = [71, 82, 90, 95];
+const TRAFFIC = [0.9e6, 1.3e6, 1.5e6, 1.7e6];
+const IN_PLAY = [8, 4, 2, 1];
 
 export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }: Props) {
-  // Deterministic field of 16 finalists, ranked by fitness.
-  const cards = useMemo<Placed[]>(() => {
+  // Build the bracket deterministically from the prompt.
+  const { rounds, connectors } = useMemo(() => {
     const run = runEvolution(prompt || "urivo");
     const ranked = run.generations[0].variants
       .map(describeVariant)
       .sort((a, b) => b.score - a.score)
-      .slice(0, KEEP[0]);
-    return ranked.map((c, i) => ({ ...c, rank: i, cvr: cvrFor(c.score) }));
+      .slice(0, 8);
+
+    // Distinct, realistic CVRs by rank (best → worst), placed into standard
+    // tournament seeding so the strongest two meet in the final.
+    const SPREAD = [6.9, 6.6, 6.4, 6.1, 5.8, 5.5, 5.2, 4.8];
+    const SLOT_RANK = [0, 7, 4, 3, 2, 5, 6, 1]; // column slot → rank index
+
+    const col0: Node[] = SLOT_RANK.map((rankIdx, slot) => {
+      const c = ranked[rankIdx];
+      const jitter = ((c.id.charCodeAt(c.id.length - 1) % 3) - 1) * 0.1;
+      return {
+        id: c.id,
+        letter: LETTERS[slot],
+        cvr: cvrFor(SPREAD[rankIdx] + jitter),
+        palette: c.palette,
+        x: COL_X[0],
+        y: ((slot + 0.5) / 8) * STAGE_H,
+        col: 0,
+      };
+    });
+
+    const rounds: Node[][] = [col0];
+    let prev = col0;
+    for (let r = 1; r < 4; r++) {
+      const cur: Node[] = [];
+      for (let i = 0; i < prev.length; i += 2) {
+        const a = prev[i];
+        const b = prev[i + 1];
+        const win = a.cvr >= b.cvr ? a : b;
+        cur.push({ ...win, x: COL_X[r], y: (a.y + b.y) / 2, col: r, parents: [a, b] });
+      }
+      rounds.push(cur);
+      prev = cur;
+    }
+
+    // Bracket connectors (dotted elbows) keyed by the round they belong to.
+    const connectors: { round: number; d: string; win: boolean }[] = [];
+    for (let r = 1; r < 4; r++) {
+      for (const node of rounds[r]) {
+        const [a, b] = node.parents!;
+        const midX = (a.x + CARD_W + node.x) / 2;
+        const cy = node.y;
+        // each child → vertical bus → parent
+        connectors.push({ round: r, win: a.id === node.id, d: `M ${a.x + CARD_W} ${a.y} H ${midX}` });
+        connectors.push({ round: r, win: b.id === node.id, d: `M ${b.x + CARD_W} ${b.y} H ${midX}` });
+        connectors.push({ round: r, win: true, d: `M ${midX} ${a.y} V ${b.y}` });
+        connectors.push({ round: r, win: true, d: `M ${midX} ${cy} H ${node.x}` });
+      }
+    }
+    return { rounds, connectors };
   }, [prompt]);
 
-  const slots = useMemo(() => KEEP.map((n) => layoutFor(n)), []);
+  // advanced ids per round (a node that also appears in the next round)
+  const advancedByRound = useMemo(() => {
+    const m: Record<number, Set<string>> = {};
+    for (let r = 0; r < 3; r++) m[r] = new Set(rounds[r + 1].map((n) => n.id));
+    return m;
+  }, [rounds]);
 
-  // round: -1 boot, 0 seeded field, 1..4 elimination rounds complete
-  const [round, setRound] = useState(-1);
+  // revealCol: -1 boot, 0 seeded, 1..3 rounds resolved
+  const [revealCol, setRevealCol] = useState(-1);
   const [revealed, setRevealed] = useState(false);
   const [qHeld, setQHeld] = useState(false);
+  const [scale, setScale] = useState(1);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Fit the stage to the viewport.
+  useEffect(() => {
+    const fit = () => {
+      const el = wrapRef.current;
+      if (!el) return;
+      const s = Math.min(1, (el.clientWidth - 24) / STAGE_W, (el.clientHeight - 24) / STAGE_H);
+      setScale(Math.max(0.5, s));
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
 
   // Choreography.
   useEffect(() => {
     const t = timers.current;
-    t.push(setTimeout(() => setRound(0), BOOT_MS));
+    t.push(setTimeout(() => setRevealCol(0), BOOT_MS));
     let at = BOOT_MS + SEED_MS;
-    for (let r = 1; r <= ROUNDS; r++) {
+    for (let r = 1; r <= 3; r++) {
       const rr = r;
-      t.push(setTimeout(() => setRound(rr), at));
+      t.push(setTimeout(() => setRevealCol(rr), at));
       at += ROUND_MS;
     }
     return () => t.forEach(clearTimeout);
   }, []);
 
-  // The reveal is earned: the final round has run AND the real store has landed.
   useEffect(() => {
-    if (round >= ROUNDS && result && !revealed) {
-      const id = setTimeout(() => setRevealed(true), 800);
+    if (revealCol >= 3 && result && !revealed) {
+      const id = setTimeout(() => setRevealed(true), 900);
       return () => clearTimeout(id);
     }
-  }, [round, result, revealed]);
+  }, [revealCol, result, revealed]);
 
-  // Voice affordance — hold Q to "describe" (visual language from the keynote).
+  // Voice — hold Q.
   useEffect(() => {
     if (revealed || error) return;
     const down = (e: KeyboardEvent) => {
@@ -170,300 +198,218 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
     };
   }, [revealed, error]);
 
-  const stage = Math.max(0, Math.min(round, ROUNDS));
-  const inPlay = KEEP[stage];
-  const uplift = CVR_UPLIFT[stage];
-  const confidence = CONFIDENCE[stage];
-  const visitors = VISITORS[stage];
-  const progress = round < 0 ? 0 : (stage / ROUNDS) * 100;
+  const stage = Math.max(0, Math.min(revealCol, 3));
+  const uplift = UPLIFT[stage];
+  const conf = CONF[stage];
+  const traffic = TRAFFIC[stage];
+  const inPlay = IN_PLAY[stage];
+
+  const gridDash = "linear-gradient(rgba(148,163,188,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,188,0.4) 1px, transparent 1px)";
 
   return (
-    <div
-      className="fixed inset-0 z-50 overflow-hidden bg-[#080d16] font-mono text-white"
-      style={{ perspective: "1500px" }}
-    >
-      {/* Ambient + grid + scanline */}
+    <div className="fixed inset-0 z-50 overflow-hidden bg-[#080d16] font-mono text-ivory">
+      {/* grid + ambient */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.05]"
+        style={{ backgroundImage: gridDash, backgroundSize: "46px 46px", maskImage: "radial-gradient(75% 65% at 50% 45%, #000 40%, transparent 100%)" }}
+      />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(120% 90% at 50% 8%, rgba(34,197,94,0.10), rgba(8,13,22,0) 55%), radial-gradient(90% 70% at 50% 120%, rgba(30,41,59,0.6), rgba(8,13,22,0) 60%)",
-        }}
+        style={{ background: "radial-gradient(70% 50% at 50% 0%, rgba(36,50,76,0.35), rgba(8,13,22,0) 60%)" }}
       />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.06]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(148,163,184,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.5) 1px, transparent 1px)",
-          backgroundSize: "44px 44px",
-          maskImage: "radial-gradient(70% 60% at 50% 45%, #000 40%, transparent 100%)",
-        }}
-      />
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div
-          className="absolute inset-x-0 h-24 opacity-[0.05]"
-          style={{ background: "linear-gradient(#fff, transparent)", animation: "urivo-scan 7s linear infinite" }}
-        />
-      </div>
-      <Motes />
-
-      {/* ── Top status bar ─────────────────────────────────────────── */}
-      {!revealed && !error && (
-        <div className="absolute inset-x-0 top-0 z-30 px-6 pt-5 sm:px-10">
-          <div className="flex items-center justify-between pr-16 text-[10px] tracking-[0.2em] sm:pr-24">
-            <div className="flex items-center gap-2.5 text-white/60">
-              <span
-                className="h-1.5 w-1.5 rounded-full bg-[#22c55e]"
-                style={{ animation: "urivo-live 1.6s ease-in-out infinite", boxShadow: "0 0 8px #22c55e" }}
-              />
-              <span className="uppercase">Live</span>
-              <span className="text-white/25">·</span>
-              <span className="uppercase text-white/40">Urivo Optimization Engine</span>
-            </div>
-            <div className="hidden items-center gap-2 sm:flex">
-              <span className="uppercase text-white/40">Projected CVR uplift</span>
-              <span className="tabular-nums text-sm font-semibold tracking-normal text-[#22c55e]">
-                +{uplift.toFixed(1)}%
-              </span>
-            </div>
-          </div>
-
-          {/* Stat cards */}
-          <div className="mt-5 grid grid-cols-3 gap-3 sm:gap-4">
-            <Stat label="Simulated visitors" value={fmtCount(visitors)} sub="/ 2.7M sample" />
-            <Stat label="Confidence" value={`${confidence}%`} sub="95% target" accent={confidence >= 95} />
-            <Stat label="Variants in play" value={String(inPlay)} sub={`of ${KEEP[0]} finalists`} />
-          </div>
-
-          {/* Running bar */}
-          <div className="mt-4 flex items-center gap-3 text-[10px] uppercase tracking-[0.18em] text-white/40">
-            <span className="h-2 w-2 shrink-0 bg-[#22c55e]" style={{ boxShadow: "0 0 8px #22c55e" }} />
-            <span className="shrink-0">Running · {PHASE_TEXT[stage]}</span>
-            <span className="h-px flex-1 overflow-hidden bg-white/10">
-              <span
-                className="block h-full bg-gradient-to-r from-[#22c55e]/40 to-[#22c55e]"
-                style={{ width: `${progress}%`, transition: "width 900ms cubic-bezier(0.16,1,0.3,1)" }}
-              />
-            </span>
-            <span className="hidden shrink-0 tabular-nums sm:inline">{fmtCount(visitors)} / 2.7M</span>
-          </div>
-        </div>
-      )}
 
       {/* Close */}
       {!revealed && (
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-6 top-5 z-40 text-[10px] uppercase tracking-[0.2em] text-white/30 transition-colors hover:text-white sm:right-10"
+          className="absolute right-6 top-5 z-40 text-[10px] uppercase tracking-[0.2em] text-mist-dim transition-colors hover:text-ivory"
         >
           Cancel
         </button>
       )}
 
-      {/* ── Error ──────────────────────────────────────────────────── */}
+      {/* Error */}
       {error && !revealed && (
         <div className="absolute inset-0 z-40 flex flex-col items-center justify-center px-6 text-center">
-          <span className="mb-4 text-[10px] uppercase tracking-[0.25em] text-[#f87171]">Generation halted</span>
-          <p className="max-w-md text-lg text-white/80">{error}</p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="mt-8 rounded-md border border-white/15 px-6 py-3 text-[10px] font-semibold uppercase tracking-[0.25em] text-white/80 transition-colors hover:border-white/30"
-          >
+          <span className="mb-4 text-[10px] uppercase tracking-[0.25em] text-alert">Generation halted</span>
+          <p className="max-w-md text-lg text-ivory/80">{error}</p>
+          <button type="button" onClick={onClose} className="u-lift mt-8 rounded-xl border border-hair px-6 py-3 text-[10px] font-semibold uppercase tracking-[0.25em] text-ivory/80 hover:border-hair-strong">
             Back
           </button>
         </div>
       )}
 
-      {/* ── The arena ──────────────────────────────────────────────── */}
       {!error && !revealed && (
-        <>
-          <div
-            className="absolute left-1/2 top-1/2 z-20"
-            style={{ transformStyle: "preserve-3d", transform: "translate(-50%,-50%)" }}
-          >
-            {cards.map((c) => {
-              const aliveNow = c.rank < KEEP[stage];
-              const diedThisRound =
-                round > 0 && c.rank >= KEEP[stage] && c.rank < KEEP[Math.max(0, stage - 1)];
-              const deadBefore = round > 0 && c.rank >= KEEP[Math.max(0, stage - 1)] && !aliveNow && !diedThisRound;
-              if (deadBefore) return null;
-
-              const slot = aliveNow ? slots[stage][c.rank] : slots[Math.max(0, stage - 1)][c.rank];
-              const state: CardState =
-                round < 0
-                  ? "enter"
-                  : diedThisRound
-                    ? "dying"
-                    : stage === ROUNDS && c.rank === 0
-                      ? "champion"
-                      : round === 0
-                        ? "seed"
-                        : "win";
-
-              return (
-                <ArenaCard
-                  key={c.id}
-                  card={c}
-                  slot={slot}
-                  state={state}
-                  roundKey={round}
-                />
-              );
-            })}
+        <div className="flex h-full flex-col px-6 pb-4 pt-5 sm:px-9">
+          {/* ── Top status bar ── */}
+          <div className="flex items-center justify-between pr-16 text-[10px] tracking-[0.16em] sm:pr-20">
+            <div className="flex items-center gap-2.5 text-mist">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" style={{ animation: "urivo-live 1.6s ease-in-out infinite", boxShadow: "0 0 8px #22c55e" }} />
+              <span className="uppercase">Live</span>
+              <span className="text-mist-dim">·</span>
+              <span className="uppercase text-mist-dim">CVR uplift since testing began</span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <span className="hidden text-mist-dim sm:inline">3 tests · 8 variants each</span>
+              <span className="hidden items-center gap-3 text-mist-dim sm:flex">
+                <span className="inline-flex items-center gap-1"><span className="h-1 w-1 rounded-full bg-mist" /> Regenerate</span>
+                <span className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 ${qHeld ? "border-gold/50 text-gold" : "border-hair text-mist"}`}>◈ Voice</span>
+                <span>▲ Manual</span>
+              </span>
+              <span className="tabular-nums text-sm font-semibold tracking-normal text-[#22c55e]">+{uplift.toFixed(1)}%</span>
+              <span className="hidden uppercase text-mist-dim sm:inline">Conversion</span>
+            </div>
           </div>
 
-          {/* Lightning beam + strike flash — replay each round via keyed remount */}
-          {round >= 1 && round <= ROUNDS && (
-            <div key={round} aria-hidden className="pointer-events-none absolute inset-0 z-[25] overflow-hidden">
-              <div
-                className="absolute inset-0"
-                style={{
-                  background:
-                    round === ROUNDS
-                      ? "radial-gradient(circle at 50% 52%, rgba(232,205,128,0.5), rgba(34,197,94,0.12) 42%, transparent 68%)"
-                      : "radial-gradient(circle at 50% 52%, rgba(255,255,255,0.42), rgba(34,197,94,0.1) 44%, transparent 70%)",
-                  animation: "urivo-strikeflash 620ms ease-out both",
-                }}
-              />
-              <div
-                className="absolute top-0 h-full w-[3px]"
-                style={{
-                  left: 0,
-                  background: "linear-gradient(180deg, transparent, rgba(255,255,255,0.95), rgba(34,197,94,0.6), transparent)",
-                  boxShadow: "0 0 24px 6px rgba(255,255,255,0.55), 0 0 60px 18px rgba(34,197,94,0.35)",
-                  animation: "urivo-beam 720ms cubic-bezier(0.4,0,0.2,1) both",
-                }}
-              />
-            </div>
-          )}
+          {/* ── Stat cards ── */}
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat label="Time elapsed" value="433d 15h" sub="since first impression" />
+            <Stat label="Traffic collected" value={`${fmtCount(traffic)} / 2.7M`} sub={`${Math.round((traffic / 2.7e6) * 100)}% of required sample`} />
+            <Stat label="Est. completion" value="in 247d 11h" sub="at 4.0K visitors / day" />
+            <Stat label="Variants in play" value={String(inPlay)} sub={`${conf}% confidence`} accent={inPlay === 1} />
+          </div>
 
-          {/* Voice affordance */}
-          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col items-center gap-4 pb-9 text-center">
-            {qHeld ? (
-              <div className="flex flex-col items-center gap-3">
+          {/* ── Tabs ── */}
+          <div className="mt-4 flex items-center justify-between border-b border-hair pb-2 text-[11px]">
+            <div className="flex items-center gap-4">
+              <span className="relative pb-2 font-medium text-ivory">
+                Product page
+                <span className="absolute inset-x-0 -bottom-[9px] h-[2px] rounded-full" style={{ backgroundImage: "var(--grad-gold)" }} />
+              </span>
+              <span className="pb-2 text-mist-dim">Add to cart</span>
+            </div>
+            <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.15em] text-mist">
+              <span className="h-2 w-2 bg-[#22c55e]" style={{ boxShadow: "0 0 8px #22c55e" }} /> Running · {inPlay > 1 ? `${inPlay} variants` : "final"}
+            </span>
+          </div>
+
+          {/* ── Bracket stage ── */}
+          <div ref={wrapRef} className="relative flex flex-1 items-center justify-center overflow-hidden">
+            <div
+              className="relative"
+              style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${scale})`, transformOrigin: "center" }}
+            >
+              {/* connectors */}
+              <svg viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} className="absolute inset-0 h-full w-full overflow-visible">
+                {connectors.map((c, i) => (
+                  <path
+                    key={i}
+                    d={c.d}
+                    fill="none"
+                    stroke={revealCol >= c.round ? (c.win ? "#22c55e" : "#2b3a54") : "transparent"}
+                    strokeOpacity={c.win ? 0.7 : 0.5}
+                    strokeWidth={1.4}
+                    strokeDasharray="2 5"
+                    strokeLinecap="round"
+                    style={{ transition: "stroke 500ms ease, stroke-opacity 500ms ease" }}
+                  />
+                ))}
+              </svg>
+
+              {/* cards */}
+              {rounds.map((col, r) =>
+                col.map((n) => {
+                  if (revealCol < r) return null;
+                  const advanced = r < 3 && advancedByRound[r].has(n.id);
+                  const eliminated = r < 3 && revealCol > r && !advanced;
+                  const champion = r === 3;
+                  return (
+                    <BracketCard
+                      key={`${r}-${n.id}`}
+                      node={n}
+                      state={champion ? "champion" : eliminated ? "dead" : advanced ? "won" : "live"}
+                    />
+                  );
+                }),
+              )}
+            </div>
+
+            {/* Voice overlay */}
+            {qHeld && (
+              <div className="absolute inset-x-0 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-3">
                 <Waveform />
-                <span className="text-[10px] uppercase tracking-[0.22em] text-[#22c55e]">
+                <span className="text-[10px] uppercase tracking-[0.2em] text-[#22c55e]">
                   ● Listening · release Q to generate
                 </span>
               </div>
-            ) : (
-              <div className="flex items-center gap-5 text-[10px] uppercase tracking-[0.2em] text-white/30">
-                <span className="flex items-center gap-1.5">
-                  <kbd className="rounded border border-white/15 px-1.5 py-0.5 text-white/50">Q</kbd> Hold to describe
-                </span>
-                <span className="hidden sm:inline">◈ Regenerate</span>
-                <span className="hidden sm:inline">▲ Manual</span>
-              </div>
             )}
           </div>
-        </>
+
+          {/* footer hint */}
+          <div className="flex items-center justify-center gap-5 pt-1 text-[10px] uppercase tracking-[0.18em] text-mist-dim">
+            <span className="flex items-center gap-1.5">
+              <kbd className="rounded border border-hair px-1.5 py-0.5 text-mist">Q</kbd> Hold to describe
+            </span>
+            <span className="hidden sm:inline">◈ Regenerate</span>
+            <span className="hidden sm:inline">▲ Manual</span>
+          </div>
+        </div>
       )}
 
-      {/* ── Reveal ─────────────────────────────────────────────────── */}
       {revealed && result && <Reveal result={result} onOpenStore={onOpenStore} onClose={onClose} />}
     </div>
   );
 }
 
-type CardState = "enter" | "seed" | "win" | "dying" | "champion";
+type CardState = "live" | "won" | "dead" | "champion";
 
-function ArenaCard({
-  card,
-  slot,
-  state,
-  roundKey,
-}: {
-  card: Placed;
-  slot: Slot;
-  state: CardState;
-  roundKey: number;
-}) {
-  const [bg, structure, accent] = card.palette;
-  const dying = state === "dying";
+function BracketCard({ node, state }: { node: Node; state: CardState }) {
+  const [bg, structure, accent] = node.palette;
+  const dead = state === "dead";
   const champion = state === "champion";
-  const preEnter = state === "enter";
-
-  // Pre-entrance: parked in depth and hidden, so the flip to the slot transform
-  // animates the whole field flying in from the dark. Dying cards fall back.
-  const transform = preEnter
-    ? `translate3d(${Math.round(slot.x * 0.42)}px, ${Math.round(slot.y * 0.42 + 24)}px, -840px) rotateY(${slot.rot}deg) scale(0.55)`
-    : dying
-      ? `translate3d(${slot.x}px, ${slot.y + 70}px, -520px) rotateY(${slot.rot}deg) scale(${slot.scale * 0.78})`
-      : `translate3d(${slot.x}px, ${slot.y}px, ${slot.z}px) rotateY(${slot.rot}deg) scale(${slot.scale})`;
-
-  const glow =
-    champion
-      ? "urivo-champion 2.4s ease-in-out infinite"
-      : state === "win"
-        ? "urivo-win 780ms cubic-bezier(0.16,1,0.3,1) both"
-        : dying
-          ? "urivo-die 900ms cubic-bezier(0.4,0,0.2,1) both"
-          : undefined;
+  const won = state === "won" || champion;
 
   return (
     <div
-      className="absolute"
+      className="absolute overflow-hidden rounded-lg border"
       style={{
-        left: 0,
-        top: 0,
-        transform,
-        transformStyle: "preserve-3d",
-        transition: "transform 900ms cubic-bezier(0.16,1,0.3,1), opacity 700ms ease-out",
-        transitionDelay: preEnter || state === "seed" ? `${(card.rank % 16) * 26}ms` : "0ms",
-        zIndex: 1000 + slot.z,
-        opacity: preEnter ? 0 : 1,
+        left: node.x,
+        top: node.y - CARD_H / 2,
+        width: CARD_W,
+        height: CARD_H,
+        borderColor: champion ? "rgba(232,205,128,0.9)" : won ? "rgba(34,197,94,0.55)" : "rgba(255,255,255,0.12)",
+        background: "rgba(16,24,40,0.9)",
+        boxShadow: champion
+          ? "0 0 0 1px rgba(232,205,128,0.5), 0 12px 34px -12px rgba(232,205,128,0.4)"
+          : won
+            ? "0 0 22px -6px rgba(34,197,94,0.5)"
+            : "0 10px 24px -14px rgba(0,0,0,0.8)",
+        opacity: dead ? 0.32 : 1,
+        filter: dead ? "grayscale(0.7)" : "none",
+        transition: "opacity 500ms ease, filter 500ms ease, box-shadow 500ms ease, border-color 500ms ease, left 700ms cubic-bezier(0.16,1,0.3,1), top 700ms cubic-bezier(0.16,1,0.3,1)",
+        animation: "urivo-fade-up 460ms cubic-bezier(0.16,1,0.3,1) both",
       }}
     >
-      {/* Glow layer — remounts per round so win/die replays */}
-      <div
-        key={`${card.id}-${roundKey}-${state}`}
-        className="w-[150px] overflow-hidden rounded-lg border"
-        style={{
-          borderColor: champion
-            ? "rgba(34,197,94,0.9)"
-            : dying
-              ? "rgba(239,68,68,0.9)"
-              : state === "win"
-                ? "rgba(34,197,94,0.55)"
-                : "rgba(255,255,255,0.12)",
-          background: "rgba(15,23,42,0.72)",
-          backdropFilter: "blur(6px)",
-          boxShadow: "0 16px 40px -20px rgba(0,0,0,0.85)",
-          animation: glow,
-        }}
-      >
-        {/* mini storefront thumbnail using the variant palette */}
-        <div className="p-2">
-          <div className="overflow-hidden rounded-sm" style={{ background: bg }}>
-            <div className="flex items-center justify-between px-2 py-1.5" style={{ background: structure }}>
-              <span className="h-1 w-6 rounded-full" style={{ background: bg, opacity: 0.85 }} />
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
-            </div>
-            <div className="px-2 py-2">
-              <div className="h-5 rounded-sm" style={{ background: structure, opacity: 0.18 }} />
-              <div className="mt-1.5 grid grid-cols-3 gap-1">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="aspect-square rounded-sm" style={{ background: structure, opacity: 0.12 }}>
-                    <div className="mx-auto mt-[70%] h-0.5 w-3/5 rounded-full" style={{ background: accent, opacity: 0.7 }} />
-                  </div>
-                ))}
-              </div>
+      <div className="flex h-full items-stretch">
+        {/* mini store thumbnail */}
+        <div className="h-full w-[52px] shrink-0 overflow-hidden" style={{ background: bg }}>
+          <div className="h-[13px] w-full" style={{ background: structure }} />
+          <div className="p-1">
+            <div className="h-3 w-full rounded-sm" style={{ background: structure, opacity: 0.2 }} />
+            <div className="mt-1 flex gap-0.5">
+              <div className="h-2 flex-1 rounded-sm" style={{ background: structure, opacity: 0.14 }} />
+              <div className="h-2 flex-1 rounded-sm" style={{ background: accent, opacity: 0.7 }} />
             </div>
           </div>
         </div>
-        {/* label row */}
-        <div className="flex items-center justify-between px-2.5 pb-2 pt-0.5 text-[8px] tracking-[0.15em]">
-          <span className="uppercase text-white/45">Variant {LETTERS[card.rank] ?? card.rank}</span>
-          <span
-            className="tabular-nums"
-            style={{ color: champion || state === "win" ? "#4ade80" : dying ? "#f87171" : "rgba(255,255,255,0.55)" }}
-          >
-            {card.cvr.toFixed(1)}%
-          </span>
+        {/* label */}
+        <div className="flex flex-1 flex-col justify-center px-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] uppercase tracking-[0.14em] text-mist">Variant {node.letter}</span>
+            {champion && <span className="text-[8px] uppercase tracking-wider text-gold">Winner</span>}
+          </div>
+          <div className="mt-1 flex items-baseline justify-between">
+            <span className="text-[8px] uppercase tracking-wider text-mist-dim">Seed</span>
+            <span
+              className="text-[13px] font-semibold tabular-nums"
+              style={{ color: champion ? "#e4c069" : won ? "#34d399" : dead ? "#5f6f89" : "#cbd5e1" }}
+            >
+              {node.cvr.toFixed(1)}%
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -472,32 +418,23 @@ function ArenaCard({
 
 function Stat({ label, value, sub, accent }: { label: string; value: string; sub: string; accent?: boolean }) {
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-2.5 backdrop-blur-sm sm:px-4 sm:py-3">
-      <p className="text-[9px] uppercase tracking-[0.18em] text-white/35">{label}</p>
-      <p
-        className={`mt-1.5 text-lg font-semibold tabular-nums tracking-tight sm:text-xl ${accent ? "text-[#22c55e]" : "text-white"}`}
-        style={{ transition: "color 400ms" }}
-      >
-        {value}
-      </p>
-      <p className="mt-0.5 text-[9px] tracking-[0.12em] text-white/25">{sub}</p>
+    <div className="rounded-lg border border-hair bg-white/[0.02] px-3.5 py-2.5">
+      <p className="text-[9px] uppercase tracking-[0.16em] text-mist-dim">{label}</p>
+      <p className={`mt-1 text-[17px] font-semibold tabular-nums tracking-tight ${accent ? "u-gold-text" : "text-ivory"}`}>{value}</p>
+      <p className="mt-0.5 text-[9px] tracking-[0.1em] text-mist-dim">{sub}</p>
     </div>
   );
 }
 
 function Waveform() {
-  const bars = useMemo(() => Array.from({ length: 34 }, (_, i) => (i * 37) % 100), []);
+  const bars = useMemo(() => Array.from({ length: 40 }, (_, i) => (i * 37) % 100), []);
   return (
-    <div className="flex h-10 items-center gap-[3px]">
+    <div className="flex h-12 items-center gap-[3px]">
       {bars.map((s, i) => (
         <span
           key={i}
-          className="w-[3px] rounded-full bg-white/80"
-          style={{
-            height: "100%",
-            transformOrigin: "center",
-            animation: `urivo-wave ${560 + (s % 240)}ms ease-in-out ${(s % 100) * 4}ms infinite`,
-          }}
+          className="w-[3px] rounded-full bg-ivory/80"
+          style={{ height: "100%", transformOrigin: "center", animation: `urivo-wave ${560 + (s % 240)}ms ease-in-out ${(s % 100) * 4}ms infinite` }}
         />
       ))}
     </div>
@@ -514,145 +451,61 @@ function Reveal({
   onClose: () => void;
 }) {
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center px-6">
-      {/* gold champion burst */}
+    <div className="absolute inset-0 z-40 flex items-center justify-center px-6 font-mono">
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full"
-        style={{
-          background: "radial-gradient(circle, rgba(232,205,128,0.35), rgba(34,197,94,0.12) 42%, transparent 68%)",
-          animation: "urivo-burst 1100ms cubic-bezier(0.16,1,0.3,1) 120ms both",
-        }}
+        style={{ background: "radial-gradient(circle, rgba(232,205,128,0.32), rgba(34,197,94,0.12) 42%, transparent 68%)", animation: "urivo-burst 1100ms cubic-bezier(0.16,1,0.3,1) 120ms both" }}
       />
       <div
         className="relative w-full max-w-md rounded-2xl border p-9 text-center"
         style={{
           borderColor: "rgba(232,205,128,0.28)",
           background: "linear-gradient(180deg, rgba(18,28,48,0.95), rgba(8,13,22,0.97))",
-          boxShadow: "0 60px 140px -40px rgba(0,0,0,0.85), 0 0 80px -18px rgba(232,205,128,0.3), 0 0 60px -22px rgba(34,197,94,0.4)",
+          boxShadow: "0 60px 140px -40px rgba(0,0,0,0.85), 0 0 80px -18px rgba(232,205,128,0.3)",
           animation: "urivo-bloom 900ms cubic-bezier(0.16,1,0.3,1) both",
         }}
       >
-        <p
-          className="flex items-center justify-center gap-2 font-mono text-[10px] uppercase tracking-[0.28em] text-[#22c55e]"
-          style={{ animation: "urivo-rise 700ms cubic-bezier(0.16,1,0.3,1) 200ms both" }}
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" style={{ boxShadow: "0 0 8px #22c55e" }} />
-          Champion selected
+        <p className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.28em] text-gold" style={{ animation: "urivo-rise 700ms cubic-bezier(0.16,1,0.3,1) 200ms both" }}>
+          <span className="h-1.5 w-1.5 rounded-full bg-gold" style={{ boxShadow: "0 0 8px rgba(232,205,128,0.8)" }} /> Champion selected
         </p>
-        <h2
-          className="mt-5 text-4xl font-semibold tracking-tight text-white"
-          style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 340ms both" }}
-        >
+        <h2 className="mt-5 text-4xl font-semibold tracking-tight text-ivory" style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 340ms both" }}>
           {result.storeName}
         </h2>
-        <p
-          className="mt-3 text-sm italic text-white/55"
-          style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 480ms both" }}
-        >
+        <p className="mt-3 text-sm italic text-mist" style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 480ms both" }}>
           {result.tagline}
         </p>
-
-        {/* Winning metrics */}
-        <div
-          className="mt-6 flex items-center justify-center gap-6 font-mono text-[10px] uppercase tracking-[0.16em] text-white/45"
-          style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 600ms both" }}
-        >
-          <span>
-            <span className="text-[#22c55e]">+3.2%</span> CVR
-          </span>
-          <span className="text-white/20">·</span>
-          <span>
-            <span className="text-white/80">95%</span> confidence
-          </span>
+        <div className="mt-6 flex items-center justify-center gap-6 text-[10px] uppercase tracking-[0.16em] text-mist" style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 600ms both" }}>
+          <span><span className="text-[#34d399]">+3.2%</span> CVR</span>
+          <span className="text-mist-dim">·</span>
+          <span><span className="text-ivory">95%</span> confidence</span>
         </div>
-
-        {/* Palette flowing in */}
-        <div
-          className="mt-6 flex justify-center gap-2"
-          style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 700ms both" }}
-        >
+        <div className="mt-6 flex justify-center gap-2" style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 700ms both" }}>
           {[result.palette.background, result.palette.structure, result.palette.accent].map((c, i) => (
             <span key={i} className="h-9 w-9 rounded-full border border-white/10" style={{ backgroundColor: c }} />
           ))}
         </div>
-
-        {/* Products materializing */}
         <div className="mt-7 space-y-2 text-left">
           {result.products.slice(0, 4).map((p, i) => (
             <div
               key={i}
-              className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5"
+              className="flex items-center justify-between rounded-lg border border-hair bg-white/[0.04] px-4 py-2.5"
               style={{ animation: `urivo-rise 700ms cubic-bezier(0.16,1,0.3,1) ${820 + i * 120}ms both` }}
             >
-              <span className="text-sm text-white/85">{p.title}</span>
-              <span className="font-mono text-xs text-[#22c55e]">€{p.priceEUR.toFixed(2)}</span>
+              <span className="text-sm text-ivory/85">{p.title}</span>
+              <span className="text-xs text-[#34d399]">€{p.priceEUR.toFixed(2)}</span>
             </div>
           ))}
         </div>
-
-        <div
-          className="mt-8 flex flex-col gap-3"
-          style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 1300ms both" }}
-        >
-          <button
-            type="button"
-            onClick={() => onOpenStore(result.storeUrl)}
-            className="u-gold u-lift rounded-lg px-6 py-3.5 text-[11px] font-semibold uppercase tracking-[0.22em]"
-          >
+        <div className="mt-8 flex flex-col gap-3" style={{ animation: "urivo-rise 800ms cubic-bezier(0.16,1,0.3,1) 1300ms both" }}>
+          <button type="button" onClick={() => onOpenStore(result.storeUrl)} className="u-gold u-lift rounded-lg px-6 py-3.5 text-[11px] font-semibold uppercase tracking-[0.22em]">
             Open your store
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45 transition-colors hover:text-white"
-          >
+          <button type="button" onClick={onClose} className="text-[10px] uppercase tracking-[0.2em] text-mist transition-colors hover:text-ivory">
             Back to workspace · {result.creditsRemaining} credits left
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Motes() {
-  const motes = useMemo(
-    () =>
-      Array.from({ length: 18 }, (_, i) => {
-        const s = (i * 40503) % 1000;
-        return {
-          left: (s % 100) + "%",
-          top: ((s * 7) % 100) + "%",
-          size: 2 + (s % 3),
-          dur: 9 + (s % 8),
-          delay: s % 6,
-          mx: ((s % 60) - 30) + "px",
-          my: -(40 + (s % 80)) + "px",
-          op: 0.2 + (s % 30) / 100,
-        };
-      }),
-    [],
-  );
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
-      {motes.map((m, i) => (
-        <span
-          key={i}
-          className="absolute rounded-full bg-[#22c55e]"
-          style={{
-            left: m.left,
-            top: m.top,
-            width: m.size,
-            height: m.size,
-            // @ts-expect-error custom props
-            "--mote-x": m.mx,
-            "--mote-y": m.my,
-            "--mote-opacity": m.op,
-            filter: "blur(0.5px)",
-            animation: `urivo-mote ${m.dur}s linear ${m.delay}s infinite`,
-          }}
-        />
-      ))}
     </div>
   );
 }
