@@ -316,9 +316,19 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
             })}
           </div>
 
-          {/* Lightning beam — replays each round via keyed remount */}
+          {/* Lightning beam + strike flash — replay each round via keyed remount */}
           {round >= 1 && round <= ROUNDS && (
             <div key={round} aria-hidden className="pointer-events-none absolute inset-0 z-[25] overflow-hidden">
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    round === ROUNDS
+                      ? "radial-gradient(circle at 50% 52%, rgba(232,205,128,0.5), rgba(34,197,94,0.12) 42%, transparent 68%)"
+                      : "radial-gradient(circle at 50% 52%, rgba(255,255,255,0.42), rgba(34,197,94,0.1) 44%, transparent 70%)",
+                  animation: "urivo-strikeflash 620ms ease-out both",
+                }}
+              />
               <div
                 className="absolute top-0 h-full w-[3px]"
                 style={{
@@ -505,12 +515,21 @@ function Reveal({
 }) {
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center px-6">
+      {/* gold champion burst */}
       <div
-        className="w-full max-w-md rounded-2xl border p-9 text-center"
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full"
         style={{
-          borderColor: "rgba(34,197,94,0.35)",
-          background: "linear-gradient(180deg, rgba(15,23,42,0.94), rgba(8,13,22,0.97))",
-          boxShadow: "0 60px 140px -40px rgba(0,0,0,0.85), 0 0 70px -18px rgba(34,197,94,0.4)",
+          background: "radial-gradient(circle, rgba(232,205,128,0.35), rgba(34,197,94,0.12) 42%, transparent 68%)",
+          animation: "urivo-burst 1100ms cubic-bezier(0.16,1,0.3,1) 120ms both",
+        }}
+      />
+      <div
+        className="relative w-full max-w-md rounded-2xl border p-9 text-center"
+        style={{
+          borderColor: "rgba(232,205,128,0.28)",
+          background: "linear-gradient(180deg, rgba(18,28,48,0.95), rgba(8,13,22,0.97))",
+          boxShadow: "0 60px 140px -40px rgba(0,0,0,0.85), 0 0 80px -18px rgba(232,205,128,0.3), 0 0 60px -22px rgba(34,197,94,0.4)",
           animation: "urivo-bloom 900ms cubic-bezier(0.16,1,0.3,1) both",
         }}
       >

@@ -303,6 +303,20 @@
   50% { transform: scaleY(1); }
 }
 
+/* Keynote arena: a quick flash as the lightning strikes a round */
+@keyframes urivo-strikeflash {
+  0% { opacity: 0; }
+  10% { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+
+/* Gold burst when the champion is crowned */
+@keyframes urivo-burst {
+  0% { opacity: 0; transform: scale(0.6); }
+  30% { opacity: 0.8; }
+  100% { opacity: 0; transform: scale(2.2); }
+}
+
 /* ================================================================== */
 /* Premium finish — metallic gold, glass, depth, motion               */
 /* ================================================================== */
