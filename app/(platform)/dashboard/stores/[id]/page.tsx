@@ -40,7 +40,7 @@ export default async function StoreDetailPage({
   const [{ data: products }, { data: profile }, rail] = await Promise.all([
     supabase
       .from("products")
-      .select("id, title, description, price_eur, inventory_count")
+      .select("id, title, description, price_eur, inventory_count, image_url")
       .eq("store_id", id)
       .order("position", { ascending: true }),
     supabase.from("profiles").select("email").eq("id", user.id).single(),
@@ -75,6 +75,7 @@ export default async function StoreDetailPage({
           description: p.description,
           priceEUR: Number(p.price_eur),
           inventoryCount: p.inventory_count,
+          imageUrl: p.image_url ?? null,
         }))}
         initialTheme={{
           storeName: store.store_name,

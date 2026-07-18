@@ -205,6 +205,27 @@ export interface ImageableProduct {
   priceEUR: number;
 }
 
+/** True when at least one image provider is configured. */
+export function isImageGenerationConfigured(): boolean {
+  return imageProvider() !== null;
+}
+
+/**
+ * Generate + store a single product image (used by the store manager's re-roll).
+ * Returns the new public URL, or null on any failure.
+ */
+export async function generateSingleProductImage(
+  subdomain: string,
+  designSystem: StoreDesignSystem,
+  product: ImageableProduct,
+): Promise<string | null> {
+  const provider = imageProvider();
+  if (!provider) return null;
+  const img = await provider.generate(productPrompt(designSystem, product.title, product.description));
+  if (!img) return null;
+  return uploadImage(subdomain, Date.now(), img);
+}
+
 /**
  * Generate + store one photograph per product. Returns an array of image URLs
  * (or null per product) aligned to the input order. Never throws — imagery is an

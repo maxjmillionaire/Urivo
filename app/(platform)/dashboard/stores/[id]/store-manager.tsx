@@ -15,6 +15,7 @@ type Product = {
   description: string;
   priceEUR: number;
   inventoryCount: number;
+  imageUrl: string | null;
 };
 
 type Theme = {
@@ -46,8 +47,32 @@ export function StoreManager({
   const [editing, setEditing] = useState<Product | "new" | null>(null);
   const [themeOpen, setThemeOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [regenning, setRegenning] = useState<Set<string>>(new Set());
 
-  async function saveProduct(form: Omit<Product, "id">, id?: string) {
+  async function regenImage(id: string) {
+    setError(null);
+    setRegenning((s) => new Set(s).add(id));
+    try {
+      const res = await fetch(`/api/products/${id}/image`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.message || "Could not generate an image.");
+        return;
+      }
+      setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, imageUrl: data.imageUrl } : p)));
+      router.refresh();
+    } catch {
+      setError("Could not generate an image. Please try again.");
+    } finally {
+      setRegenning((s) => {
+        const n = new Set(s);
+        n.delete(id);
+        return n;
+      });
+    }
+  }
+
+  async function saveProduct(form: Omit<Product, "id" | "imageUrl">, id?: string) {
     setError(null);
     const url = id ? `/api/products/${id}` : `/api/stores/${storeId}/products`;
     const res = await fetch(url, {
@@ -66,6 +91,7 @@ export function StoreManager({
       description: data.product.description,
       priceEUR: Number(data.product.price_eur),
       inventoryCount: data.product.inventory_count,
+      imageUrl: id ? (products.find((p) => p.id === id)?.imageUrl ?? null) : null,
     };
     setProducts((prev) => (id ? prev.map((p) => (p.id === id ? saved : p)) : [...prev, saved]));
     setEditing(null);
@@ -163,6 +189,7 @@ export function StoreManager({
             <table className="w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-hair bg-white/[0.02] text-[11px] font-semibold uppercase tracking-[0.1em] text-mist">
+                  <th className="px-6 py-4">Image</th>
                   <th className="px-6 py-4">Product</th>
                   <th className="px-6 py-4">Price</th>
                   <th className="px-6 py-4">Stock</th>
@@ -170,32 +197,64 @@ export function StoreManager({
                 </tr>
               </thead>
               <tbody className="divide-y divide-hair">
-                {products.map((p) => (
-                  <tr key={p.id} className="align-top transition-colors hover:bg-white/[0.02]">
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-ivory">{p.title}</p>
-                      <p className="mt-1 max-w-md text-xs text-mist-dim">{p.description}</p>
-                    </td>
-                    <td className="px-6 py-4 font-mono text-ivory">€{p.priceEUR.toFixed(2)}</td>
-                    <td className="px-6 py-4 font-mono text-mist">{p.inventoryCount}</td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setEditing(p)}
-                        className="text-sm font-semibold text-gold-soft hover:text-gold"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteProduct(p.id)}
-                        className="ml-4 text-sm font-semibold text-alert/80 hover:text-alert"
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {products.map((p) => {
+                  const busy = regenning.has(p.id);
+                  return (
+                    <tr key={p.id} className="align-top transition-colors hover:bg-white/[0.02]">
+                      <td className="px-6 py-4">
+                        <div className="group relative h-16 w-16 overflow-hidden rounded-lg border border-hair bg-night">
+                          {p.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-mist-dim">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                <circle cx="9" cy="9" r="1.6" />
+                                <path d="m21 15-5-5L5 21" />
+                              </svg>
+                            </div>
+                          )}
+                          {busy && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-night/70">
+                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-hair-strong border-t-gold" />
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => regenImage(p.id)}
+                          disabled={busy}
+                          className="mt-2 text-[11px] font-semibold text-gold-soft transition-colors hover:text-gold disabled:opacity-50"
+                        >
+                          {busy ? "Generating…" : p.imageUrl ? "Regenerate" : "Generate"}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-ivory">{p.title}</p>
+                        <p className="mt-1 max-w-md text-xs text-mist-dim">{p.description}</p>
+                      </td>
+                      <td className="px-6 py-4 font-mono text-ivory">€{p.priceEUR.toFixed(2)}</td>
+                      <td className="px-6 py-4 font-mono text-mist">{p.inventoryCount}</td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setEditing(p)}
+                          className="text-sm font-semibold text-gold-soft hover:text-gold"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteProduct(p.id)}
+                          className="ml-4 text-sm font-semibold text-alert/80 hover:text-alert"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -217,7 +276,7 @@ function ProductModal({
 }: {
   product: Product | null;
   onClose: () => void;
-  onSave: (form: Omit<Product, "id">, id?: string) => Promise<void>;
+  onSave: (form: Omit<Product, "id" | "imageUrl">, id?: string) => Promise<void>;
 }) {
   const [title, setTitle] = useState(product?.title ?? "");
   const [description, setDescription] = useState(product?.description ?? "");
