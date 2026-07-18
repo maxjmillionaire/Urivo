@@ -53,6 +53,7 @@ export type SectionKey = (typeof SECTION_KEYS)[number];
 
 export interface StoreDesignSystem {
   personality: string;
+  tagline?: string;
   palette: {
     background: string;
     surface: string;
@@ -116,6 +117,9 @@ export const FONT_LIBRARY: Record<string, FontDef> = {
   bebas: { stack: "'Bebas Neue', Impact, sans-serif", import: "Bebas+Neue" },
   ibmmono: { stack: "'IBM Plex Mono', ui-monospace, monospace", import: "IBM+Plex+Mono:wght@400;500;600" },
 };
+
+/** The font keys the AI may choose from (tuple for schema enums). */
+export const FONT_KEYS = Object.keys(FONT_LIBRARY) as [string, ...string[]];
 
 const DEFAULT_HEADING = "playfair";
 const DEFAULT_BODY = "inter";
@@ -233,6 +237,7 @@ export function parseDesignSystem(raw: unknown): StoreDesignSystem {
   return {
     personality:
       typeof r.personality === "string" ? r.personality.trim().slice(0, 80) : "Considered, premium",
+    tagline: typeof r.tagline === "string" && r.tagline.trim() ? r.tagline.trim().slice(0, 160) : undefined,
     palette: { background, surface, ink, muted, line, accent, accentInk },
     fonts: {
       headingKey: fontKey(fRaw.headingKey, DEFAULT_HEADING),
@@ -280,6 +285,7 @@ export function themeToDesignSystem(theme: StorefrontTheme): StoreDesignSystem {
   const headingKey = /serif/i.test(theme.headingFont) ? "playfair" : "manrope";
   return parseDesignSystem({
     personality: "Editorial, premium",
+    tagline: theme.tagline || undefined,
     palette: { background: theme.background, ink: theme.structure, accent: theme.accent },
     fonts: { headingKey, bodyKey: "inter" },
     typeStyle: { headingWeight: 500, headingCase: "none", headingTracking: -0.01, scale: 1.28 },

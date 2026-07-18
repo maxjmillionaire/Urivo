@@ -125,17 +125,17 @@ export async function POST(request: NextRequest) {
     return fail(502, "AI_FAILED", "Generation hit a snag. Your credits were not used — please try again.");
   }
 
-  // 6. Atomic persist: deduct credits + create store + products + audit
+  // 6. Atomic persist: deduct credits + create store + products + audit.
+  // The full design system is the source of truth for the storefront; a legacy
+  // palette/tagline mirror is kept so the dashboard rail preview keeps working.
+  const ds = generated.designSystem;
   const themeConfig = {
     tagline: generated.brand.tagline,
-    typography: {
-      primaryHeader: generated.brand.headingFont,
-      secondaryBody: generated.brand.bodyFont,
-    },
+    designSystem: ds,
     palette: {
-      primaryBackground: generated.brand.background,
-      secondaryStructure: generated.brand.structure,
-      accentConversion: generated.brand.accent,
+      primaryBackground: ds.palette.background,
+      secondaryStructure: ds.palette.ink,
+      accentConversion: ds.palette.accent,
     },
     generation: {
       model: STORE_GENERATOR_MODEL,
@@ -192,9 +192,9 @@ export async function POST(request: NextRequest) {
     storeName: generated.brand.name,
     tagline: generated.brand.tagline,
     palette: {
-      background: generated.brand.background,
-      structure: generated.brand.structure,
-      accent: generated.brand.accent,
+      background: ds.palette.background,
+      structure: ds.palette.ink,
+      accent: ds.palette.accent,
     },
     products: generated.products.map((p) => ({ title: p.title, priceEUR: p.priceEUR })),
     creditsRemaining: result.credits_remaining,

@@ -253,7 +253,7 @@ function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
 /* --------------------------------- HERO ------------------------------------ */
 
 function Hero({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
-  const tagline = ds.personality;
+  const tagline = ds.tagline || ds.personality;
   const eyebrow = "New collection";
 
   if (ds.layout.hero === "split") {
