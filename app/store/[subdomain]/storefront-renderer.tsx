@@ -1,0 +1,632 @@
+import type { CSSProperties } from "react";
+import {
+  fontStack,
+  googleFontsUrl,
+  mix,
+  rgba,
+  sectionPadding,
+  type SectionKey,
+  type StoreDesignSystem,
+} from "@/lib/storefront/design-system";
+
+/*
+ * The generative storefront RENDERER.
+ *
+ * One component, radically different outputs. It reads a validated
+ * StoreDesignSystem and composes structurally distinct section variants — nav,
+ * hero, product cards, footer each have several real layouts, not restyles —
+ * over a fully tokenised, self-contained (scoped) stylesheet. Two design
+ * systems produce two stores that read as the work of two different agencies.
+ *
+ * Deliberately isolated from Urivo's own brand: the store owns its type, colour,
+ * shape, motion and spacing. Urivo appears only as a quiet footer credit.
+ */
+
+export interface RenderProduct {
+  id: string;
+  title: string;
+  description: string | null;
+  price_eur: number | string;
+}
+
+const BLACK: [number, number, number] = [0, 0, 0];
+const WHITE: [number, number, number] = [255, 255, 255];
+
+function price(v: number | string): string {
+  return `€${Number(v).toFixed(2)}`;
+}
+
+/* ------------------------------ token plumbing ----------------------------- */
+
+function buildVars(ds: StoreDesignSystem): CSSProperties {
+  const { palette: p, typeStyle: t, shape: s, space } = ds;
+  const btnRadius = s.buttonShape === "sharp" ? 0 : s.buttonShape === "pill" ? 999 : s.radius;
+  const heroMax = 3.2 + ((t.scale - 1.12) / (1.4 - 1.12)) * 6.2; // 3.2 → 9.4rem
+  const h2Max = 1.6 + ((t.scale - 1.12) / (1.4 - 1.12)) * 1.6;
+
+  const shadowCard =
+    s.shadow === "none"
+      ? "none"
+      : s.shadow === "elevated"
+        ? `0 2px 6px ${rgba(p.ink, 0.06)}, 0 30px 60px -28px ${rgba(p.ink, 0.4)}`
+        : `0 1px 2px ${rgba(p.ink, 0.04)}, 0 14px 34px -18px ${rgba(p.ink, 0.22)}`;
+
+  return {
+    ["--bg" as string]: p.background,
+    ["--surface" as string]: p.surface,
+    ["--ink" as string]: p.ink,
+    ["--muted" as string]: p.muted,
+    ["--line" as string]: p.line,
+    ["--accent" as string]: p.accent,
+    ["--accent-ink" as string]: p.accentInk,
+    ["--radius" as string]: `${s.radius}px`,
+    ["--btn-radius" as string]: `${btnRadius}px`,
+    ["--border-w" as string]: `${s.borderWidth}px`,
+    ["--font-h" as string]: fontStack(ds.fonts.headingKey),
+    ["--font-b" as string]: fontStack(ds.fonts.bodyKey),
+    ["--h-weight" as string]: String(t.headingWeight),
+    ["--h-tracking" as string]: `${t.headingTracking}em`,
+    ["--h-transform" as string]: t.headingCase === "upper" ? "uppercase" : "none",
+    ["--container" as string]: `${space.container}px`,
+    ["--h1" as string]: `clamp(2.4rem, 7vw, ${heroMax.toFixed(2)}rem)`,
+    ["--h2" as string]: `clamp(1.5rem, 3.4vw, ${h2Max.toFixed(2)}rem)`,
+    ["--shadow-card" as string]: shadowCard,
+    ["--pad-y" as string]: sectionPadding(space.density),
+    backgroundColor: p.background,
+    color: p.ink,
+    fontFamily: fontStack(ds.fonts.bodyKey),
+  } as CSSProperties;
+}
+
+/** Scoped stylesheet — every rule lives under #uv-store, so the store is a
+ *  self-contained design system that cannot touch (or be touched by) Urivo. */
+function scopedCss(ds: StoreDesignSystem): string {
+  const p = ds.palette;
+  const gloss1 = mix(p.accent, WHITE, 0.24);
+  const gloss3 = mix(p.accent, BLACK, 0.16);
+  const lively = ds.layout.motion === "lively";
+  return `
+#uv-store *{box-sizing:border-box;}
+#uv-store{ -webkit-font-smoothing:antialiased; line-height:1.55; }
+#uv-store h1,#uv-store h2,#uv-store h3,#uv-store .uv-h{ font-family:var(--font-h); font-weight:var(--h-weight); letter-spacing:var(--h-tracking); text-transform:var(--h-transform); line-height:1.05; }
+#uv-store .uv-wrap{ max-width:var(--container); margin:0 auto; padding-left:clamp(1.25rem,4vw,2.75rem); padding-right:clamp(1.25rem,4vw,2.75rem); }
+#uv-store .uv-eyebrow{ font-size:.7rem; letter-spacing:.28em; text-transform:uppercase; color:var(--muted); }
+#uv-store a{ color:inherit; text-decoration:none; }
+#uv-store .uv-navlink{ font-size:.74rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); transition:color .2s ease; }
+#uv-store .uv-navlink:hover{ color:var(--ink); }
+#uv-store .uv-btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  padding:.95rem 1.9rem; border-radius:var(--btn-radius); border:none; cursor:pointer;
+  font-family:var(--font-b); font-size:.76rem; font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--accent-ink);
+  background-image:linear-gradient(180deg, ${gloss1}, var(--accent) 48%, ${gloss3});
+  box-shadow: inset 0 1px 0 ${rgba("#ffffff", 0.4)}, inset 0 -1px 0 ${rgba("#000000", 0.14)}, 0 10px 26px -12px ${rgba(p.accent, 0.5)};
+  transition: box-shadow .24s ease, transform .18s ease, filter .24s ease;
+}
+#uv-store .uv-btn:hover{ filter:brightness(1.05) saturate(1.03); box-shadow: inset 0 1px 0 ${rgba("#ffffff", 0.5)}, 0 16px 36px -12px ${rgba(p.accent, 0.55)}; transform:translateY(-1px); }
+#uv-store .uv-btn:active{ transform:translateY(1px) scale(.985); }
+#uv-store .uv-btn-ghost{
+  display:inline-flex; align-items:center; gap:.5rem; padding:.9rem 1.7rem; border-radius:var(--btn-radius);
+  border:var(--border-w) solid var(--line); background:transparent; color:var(--ink); cursor:pointer;
+  font-family:var(--font-b); font-size:.76rem; font-weight:600; letter-spacing:.14em; text-transform:uppercase; transition:border-color .2s ease, background .2s ease;
+}
+#uv-store .uv-btn-ghost:hover{ border-color:var(--ink); }
+#uv-store .uv-link{ font-size:.72rem; font-weight:700; letter-spacing:.16em; text-transform:uppercase; border-bottom:2px solid var(--accent); padding-bottom:2px; transition:opacity .2s ease; }
+#uv-store .uv-link:hover{ opacity:.6; }
+#uv-store .uv-card .uv-plane{ transition:transform .6s cubic-bezier(.2,.7,.2,1); }
+#uv-store .uv-card:hover .uv-plane{ transform:scale(1.045); }
+#uv-store .uv-overlay-cta{ opacity:0; transform:translateY(8px); transition:opacity .3s ease, transform .3s ease; }
+#uv-store .uv-card:hover .uv-overlay-cta{ opacity:1; transform:translateY(0); }
+#uv-store .uv-chip{ display:inline-flex; align-items:center; gap:.4rem; padding:.4rem .8rem; border-radius:999px; border:var(--border-w) solid var(--line); font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+@keyframes uv-marquee{ from{transform:translateX(0);} to{transform:translateX(-50%);} }
+#uv-store .uv-marquee-track{ display:inline-flex; white-space:nowrap; animation:uv-marquee ${lively ? 18 : 32}s linear infinite; }
+@keyframes uv-rise{ from{opacity:0; transform:translateY(16px);} to{opacity:1; transform:translateY(0);} }
+${lively ? "#uv-store .uv-rise{ animation:uv-rise .7s cubic-bezier(.2,.7,.2,1) both; }" : ""}
+#uv-store *:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
+@media (max-width: 820px){
+  #uv-store .uv-hero-split{ grid-template-columns:1fr !important; }
+  #uv-store .uv-foot-grid{ grid-template-columns:1fr 1fr !important; }
+}
+@media (prefers-reduced-motion: reduce){ #uv-store *{ animation:none !important; } #uv-store .uv-card:hover .uv-plane{ transform:none; } }
+`;
+}
+
+/* ------------------------------ image planes ------------------------------- */
+
+function planeStyle(ds: StoreDesignSystem): CSSProperties {
+  const p = ds.palette;
+  switch (ds.layout.imageTreatment) {
+    case "duotone":
+      return { background: `linear-gradient(150deg, ${rgba(p.accent, 0.35)}, ${rgba(p.ink, 0.6)})` };
+    case "framed":
+      return { background: p.surface, boxShadow: `inset 0 0 0 1px ${p.line}, inset 0 0 60px ${rgba(p.ink, 0.05)}` };
+    case "editorial":
+      return { background: `linear-gradient(180deg, ${mix(p.surface, WHITE, 0.02)}, ${p.surface})` };
+    default:
+      return { background: `linear-gradient(155deg, ${mix(p.surface, WHITE, 0.03)}, ${mix(p.surface, BLACK, 0.05)})` };
+  }
+}
+
+function Plane({ ds, index, aspect }: { ds: StoreDesignSystem; index: number; aspect: string }) {
+  const p = ds.palette;
+  return (
+    <div className="uv-plane" style={{ position: "absolute", inset: 0, ...planeStyle(ds) }}>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: `radial-gradient(120% 90% at 30% 18%, ${rgba(p.accent, 0.14)}, transparent 60%)`,
+        }}
+      />
+      <span
+        className="uv-h"
+        style={{
+          position: "absolute",
+          left: "1rem",
+          top: "0.85rem",
+          fontSize: ".7rem",
+          letterSpacing: ".2em",
+          opacity: 0.4,
+        }}
+      >
+        {String(index + 1).padStart(2, "0")}
+      </span>
+      <span aria-hidden style={{ position: "absolute", inset: 0 }} data-aspect={aspect} />
+    </div>
+  );
+}
+
+/* --------------------------------- NAV ------------------------------------- */
+
+function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
+  const links = ["Shop", "About", "Journal"];
+  const brand = (
+    <span className="uv-h" style={{ fontSize: "1.15rem", fontWeight: Math.max(ds.typeStyle.headingWeight, 600) }}>
+      {storeName}
+    </span>
+  );
+  const cart = (
+    <span className="uv-chip" style={{ color: "var(--ink)" }}>
+      Cart · 0
+    </span>
+  );
+
+  if (ds.layout.nav === "centered") {
+    return (
+      <header style={{ borderBottom: `var(--border-w) solid ${ds.palette.line}` }}>
+        <div className="uv-wrap" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "1rem", padding: "1.4rem 0" }}>
+          <nav style={{ display: "flex", gap: "1.6rem" }}>
+            {links.slice(0, 2).map((l) => (
+              <a key={l} className="uv-navlink">{l}</a>
+            ))}
+          </nav>
+          <div style={{ justifySelf: "center" }}>{brand}</div>
+          <div style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: "1.4rem" }}>
+            <a className="uv-navlink">Reviews</a>
+            {cart}
+          </div>
+        </div>
+      </header>
+    );
+  }
+  if (ds.layout.nav === "bordered") {
+    return (
+      <header style={{ margin: "1rem", border: `var(--border-w) solid ${ds.palette.line}`, borderRadius: "var(--radius)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 1.4rem" }}>
+          {brand}
+          <nav style={{ display: "flex", gap: "1.8rem" }}>
+            {[...links, "Reviews"].map((l) => (
+              <a key={l} className="uv-navlink">{l}</a>
+            ))}
+          </nav>
+          {cart}
+        </div>
+      </header>
+    );
+  }
+  if (ds.layout.nav === "minimal") {
+    return (
+      <header>
+        <div className="uv-wrap" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.8rem 0" }}>
+          {brand}
+          <a className="uv-navlink" style={{ fontSize: ".76rem" }}>Cart (0)</a>
+        </div>
+      </header>
+    );
+  }
+  // editorial (default)
+  return (
+    <header style={{ borderBottom: `var(--border-w) solid ${ds.palette.line}` }}>
+      <div className="uv-wrap" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.35rem 0" }}>
+        {brand}
+        <nav style={{ display: "flex", alignItems: "center", gap: "1.9rem" }}>
+          {[...links, "Reviews"].map((l) => (
+            <a key={l} className="uv-navlink">{l}</a>
+          ))}
+          {cart}
+        </nav>
+      </div>
+    </header>
+  );
+}
+
+/* --------------------------------- HERO ------------------------------------ */
+
+function Hero({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
+  const tagline = ds.personality;
+  const eyebrow = "New collection";
+
+  if (ds.layout.hero === "split") {
+    return (
+      <section className="uv-wrap" style={{ paddingTop: "clamp(2.5rem,5vw,4.5rem)", paddingBottom: "var(--pad-y)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "3rem", alignItems: "center" }}>
+          <div style={{ display: "grid", gap: "3rem", gridTemplateColumns: "1.05fr 1fr" }} className="uv-hero-split">
+            <div className="uv-rise">
+              <p className="uv-eyebrow">{eyebrow}</p>
+              <h1 style={{ fontSize: "var(--h1)", marginTop: "1.2rem" }}>{storeName}</h1>
+              <p style={{ marginTop: "1.4rem", maxWidth: "34ch", color: "var(--muted)", fontSize: "1.05rem" }}>{tagline}.</p>
+              <div style={{ marginTop: "2.2rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+                <button className="uv-btn">Shop the collection</button>
+                <button className="uv-btn-ghost">Our story</button>
+              </div>
+            </div>
+            <div style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: "var(--radius)", overflow: "hidden" }} className="uv-card">
+              <Plane ds={ds} index={0} aspect="4/5" />
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (ds.layout.hero === "fullbleed") {
+    return (
+      <section style={{ position: "relative", minHeight: "72vh", display: "flex", alignItems: "flex-end", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, ...planeStyle(ds) }} />
+        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, transparent 30%, ${rgba(ds.palette.background, 0.86)})` }} />
+        <div className="uv-wrap uv-rise" style={{ position: "relative", paddingBottom: "clamp(3rem,6vw,6rem)", paddingTop: "6rem" }}>
+          <p className="uv-eyebrow">{eyebrow}</p>
+          <h1 style={{ fontSize: "var(--h1)", marginTop: "1rem", maxWidth: "16ch" }}>{storeName}</h1>
+          <p style={{ marginTop: "1.3rem", maxWidth: "40ch", color: "var(--muted)", fontSize: "1.1rem" }}>{tagline}.</p>
+          <button className="uv-btn" style={{ marginTop: "2rem" }}>Shop now</button>
+        </div>
+      </section>
+    );
+  }
+
+  if (ds.layout.hero === "statement") {
+    return (
+      <section className="uv-wrap uv-rise" style={{ paddingTop: "clamp(4rem,9vw,9rem)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
+        <p className="uv-eyebrow">{eyebrow}</p>
+        <h1 style={{ fontSize: "var(--h1)", marginTop: "1.4rem", marginLeft: "auto", marginRight: "auto", maxWidth: "14ch" }}>{storeName}</h1>
+        <p style={{ marginTop: "1.6rem", maxWidth: "48ch", marginLeft: "auto", marginRight: "auto", color: "var(--muted)", fontSize: "1.12rem" }}>{tagline}.</p>
+        <div style={{ marginTop: "2.4rem" }}>
+          <button className="uv-btn">Explore</button>
+        </div>
+      </section>
+    );
+  }
+
+  // editorial (default)
+  return (
+    <section className="uv-wrap uv-rise" style={{ paddingTop: "clamp(3rem,6vw,6rem)", paddingBottom: "var(--pad-y)" }}>
+      <p className="uv-eyebrow">{eyebrow}</p>
+      <h1 style={{ fontSize: "var(--h1)", marginTop: "1.3rem", maxWidth: "18ch" }}>{storeName}</h1>
+      <p style={{ marginTop: "1.5rem", maxWidth: "44ch", color: "var(--muted)", fontSize: "1.1rem", fontStyle: ds.fonts.headingKey === "playfair" ? "italic" : "normal" }}>{tagline}.</p>
+      <button className="uv-btn" style={{ marginTop: "2.2rem" }}>Shop the collection</button>
+    </section>
+  );
+}
+
+/* ------------------------------ PRODUCT CARDS ------------------------------ */
+
+function ProductCard({ ds, product, index }: { ds: StoreDesignSystem; product: RenderProduct; index: number }) {
+  const variant = ds.layout.card;
+
+  if (variant === "overlay") {
+    return (
+      <article className="uv-card" style={{ position: "relative", aspectRatio: "3 / 4", borderRadius: "var(--radius)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
+        <Plane ds={ds} index={index} aspect="3/4" />
+        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, transparent 45%, ${rgba(ds.palette.ink, 0.55)})` }} />
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "1.2rem" }}>
+          <h3 className="uv-h" style={{ color: "#fff", fontSize: "1.05rem" }}>{product.title}</h3>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: ".4rem" }}>
+            <span style={{ color: "#fff", opacity: 0.85, fontSize: ".9rem" }}>{price(product.price_eur)}</span>
+            <button className="uv-btn uv-overlay-cta" style={{ padding: ".55rem 1rem", fontSize: ".64rem" }}>Add</button>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  if (variant === "framed") {
+    return (
+      <article className="uv-card" style={{ border: `var(--border-w) solid ${ds.palette.line}`, borderRadius: "var(--radius)", padding: "1rem", background: "var(--surface)", boxShadow: "var(--shadow-card)" }}>
+        <div style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: "calc(var(--radius) * .7)", overflow: "hidden" }}>
+          <Plane ds={ds} index={index} aspect="1/1" />
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "1rem", marginTop: "1rem" }}>
+          <h3 className="uv-h" style={{ fontSize: "1.02rem" }}>{product.title}</h3>
+          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{price(product.price_eur)}</span>
+        </div>
+        {product.description && <p style={{ marginTop: ".5rem", fontSize: ".86rem", color: "var(--muted)", lineHeight: 1.55 }}>{product.description}</p>}
+        <button className="uv-btn" style={{ marginTop: "1rem", width: "100%" }}>Add to cart</button>
+      </article>
+    );
+  }
+
+  if (variant === "minimal") {
+    return (
+      <article className="uv-card">
+        <div style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: "var(--radius)", overflow: "hidden" }}>
+          <Plane ds={ds} index={index} aspect="1/1" />
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: ".8rem" }}>
+          <h3 className="uv-h" style={{ fontSize: ".96rem", fontWeight: 500 }}>{product.title}</h3>
+          <span style={{ fontSize: ".9rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{price(product.price_eur)}</span>
+        </div>
+      </article>
+    );
+  }
+
+  // editorial (default)
+  return (
+    <article className="uv-card">
+      <div style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: "var(--radius)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
+        <Plane ds={ds} index={index} aspect="4/5" />
+      </div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "1rem", marginTop: "1.1rem" }}>
+        <h3 className="uv-h" style={{ fontSize: "1.12rem" }}>{product.title}</h3>
+        <span style={{ fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{price(product.price_eur)}</span>
+      </div>
+      {product.description && <p style={{ marginTop: ".55rem", fontSize: ".9rem", color: "var(--muted)", lineHeight: 1.6 }}>{product.description}</p>}
+      <div style={{ marginTop: "1rem" }}>
+        <button className="uv-link" style={{ background: "none", cursor: "pointer" }}>Add to cart</button>
+      </div>
+    </article>
+  );
+}
+
+function Collection({ ds, catalog }: { ds: StoreDesignSystem; catalog: RenderProduct[] }) {
+  if (catalog.length === 0) {
+    return (
+      <section className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
+        <p className="uv-eyebrow">Opening soon</p>
+        <h2 className="uv-h" style={{ fontSize: "var(--h2)", marginTop: "1rem" }}>The collection is being curated.</h2>
+      </section>
+    );
+  }
+  const cols = ds.layout.card === "minimal" ? 4 : ds.layout.card === "overlay" ? 3 : 3;
+  return (
+    <section className="uv-wrap" style={{ paddingTop: "calc(var(--pad-y) * .5)", paddingBottom: "var(--pad-y)" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "2.4rem" }}>
+        <h2 className="uv-h" style={{ fontSize: "var(--h2)" }}>The collection</h2>
+        <span className="uv-eyebrow">{catalog.length} pieces</span>
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gap: ds.space.density === "tight" ? "1.2rem" : "clamp(1.4rem, 2.4vw, 2.4rem)",
+          gridTemplateColumns: `repeat(auto-fill, minmax(${cols === 4 ? 200 : 260}px, 1fr))`,
+        }}
+      >
+        {catalog.map((product, i) => (
+          <ProductCard key={product.id} ds={ds} product={product} index={i} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------ OTHER SECTIONS ----------------------------- */
+
+function Announcement({ ds }: { ds: StoreDesignSystem }) {
+  if (!ds.layout.announcement) return null;
+  return (
+    <div style={{ background: ds.palette.accent, color: ds.palette.accentInk, textAlign: "center", padding: ".6rem 1rem", fontSize: ".72rem", letterSpacing: ".16em", textTransform: "uppercase", fontWeight: 600 }}>
+      {ds.layout.announcement}
+    </div>
+  );
+}
+
+function Marquee({ ds, storeName }: { ds: StoreDesignSystem; storeName: string }) {
+  const word = ds.personality.split(",")[0] || storeName;
+  const run = Array.from({ length: 8 }).map((_, i) => (
+    <span key={i} className="uv-h" style={{ fontSize: "clamp(1.6rem,4vw,3rem)", padding: "0 1.5rem", opacity: 0.9 }}>
+      {word} <span style={{ color: "var(--accent)" }}>✦</span>
+    </span>
+  ));
+  return (
+    <section style={{ borderTop: `var(--border-w) solid ${ds.palette.line}`, borderBottom: `var(--border-w) solid ${ds.palette.line}`, padding: "1.4rem 0", overflow: "hidden" }}>
+      <div className="uv-marquee-track">
+        {run}
+        {run}
+      </div>
+    </section>
+  );
+}
+
+function Trust({ ds }: { ds: StoreDesignSystem }) {
+  const items = [
+    ["Free shipping", "On all orders over €60"],
+    ["30-day returns", "No questions asked"],
+    ["Secure checkout", "Encrypted end to end"],
+    ["Made to last", "Considered, never disposable"],
+  ];
+  return (
+    <section className="uv-wrap" style={{ paddingTop: "calc(var(--pad-y) * .5)", paddingBottom: "calc(var(--pad-y) * .5)" }}>
+      <div style={{ display: "grid", gap: "1.5rem", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", borderTop: `var(--border-w) solid ${ds.palette.line}`, paddingTop: "2.2rem" }}>
+        {items.map(([h, s]) => (
+          <div key={h}>
+            <p className="uv-h" style={{ fontSize: ".98rem" }}>{h}</p>
+            <p style={{ marginTop: ".4rem", fontSize: ".84rem", color: "var(--muted)" }}>{s}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Story({ ds, storeName }: { ds: StoreDesignSystem; storeName: string }) {
+  return (
+    <section className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)" }}>
+      <div style={{ display: "grid", gap: "2.5rem", gridTemplateColumns: "1fr", maxWidth: "62ch" }}>
+        <div>
+          <p className="uv-eyebrow">Our philosophy</p>
+          <h2 className="uv-h" style={{ fontSize: "var(--h2)", marginTop: "1.2rem" }}>
+            {storeName} exists for people who notice the details.
+          </h2>
+          <p style={{ marginTop: "1.4rem", color: "var(--muted)", fontSize: "1.05rem", lineHeight: 1.7 }}>
+            Every piece is made in small runs with materials chosen to age well. Nothing is rushed, nothing is disposable — only work we would be proud to keep for years.
+          </p>
+          <div style={{ marginTop: "1.8rem" }}>
+            <button className="uv-link" style={{ background: "none", cursor: "pointer" }}>Read the full story</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Highlights({ ds }: { ds: StoreDesignSystem }) {
+  const items = [
+    ["Considered materials", "Sourced for longevity, not margin."],
+    ["Made in small runs", "Quality control on every piece."],
+    ["Carbon-aware delivery", "Offset on every order."],
+  ];
+  return (
+    <section className="uv-wrap" style={{ paddingTop: "calc(var(--pad-y) * .6)", paddingBottom: "calc(var(--pad-y) * .6)" }}>
+      <div style={{ display: "grid", gap: "1.6rem", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+        {items.map(([h, s], i) => (
+          <div key={h} style={{ padding: "1.6rem", border: `var(--border-w) solid ${ds.palette.line}`, borderRadius: "var(--radius)", background: "var(--surface)" }}>
+            <span className="uv-h" style={{ color: "var(--accent)", fontSize: "1.4rem" }}>{String(i + 1).padStart(2, "0")}</span>
+            <p className="uv-h" style={{ fontSize: "1.05rem", marginTop: ".8rem" }}>{h}</p>
+            <p style={{ marginTop: ".5rem", fontSize: ".88rem", color: "var(--muted)" }}>{s}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Newsletter({ ds, storeName }: { ds: StoreDesignSystem; storeName: string }) {
+  return (
+    <section style={{ background: "var(--surface)", borderTop: `var(--border-w) solid ${ds.palette.line}` }}>
+      <div className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
+        <h2 className="uv-h" style={{ fontSize: "var(--h2)", maxWidth: "20ch", margin: "0 auto" }}>Join the {storeName} list</h2>
+        <p style={{ marginTop: "1rem", color: "var(--muted)" }}>Early access, quiet drops, nothing else.</p>
+        <div style={{ marginTop: "1.8rem", display: "flex", gap: ".6rem", justifyContent: "center", flexWrap: "wrap" }}>
+          <input
+            placeholder="you@email.com"
+            style={{ padding: ".9rem 1.1rem", minWidth: "260px", borderRadius: "var(--btn-radius)", border: `var(--border-w) solid ${ds.palette.line}`, background: "var(--bg)", color: "var(--ink)", fontFamily: "var(--font-b)" }}
+          />
+          <button className="uv-btn">Subscribe</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer({ ds, storeName }: { ds: StoreDesignSystem; storeName: string }) {
+  if (ds.layout.footer === "bold") {
+    return (
+      <footer style={{ background: ds.palette.accent, color: ds.palette.accentInk }}>
+        <div className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "2rem" }}>
+          <p className="uv-h" style={{ fontSize: "clamp(2.5rem,9vw,7rem)", lineHeight: 0.95 }}>{storeName}</p>
+          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", marginTop: "3rem", opacity: 0.9, fontSize: ".8rem" }}>
+            <span>© {new Date().getFullYear()} {storeName}</span>
+            <span style={{ letterSpacing: ".2em", textTransform: "uppercase", opacity: 0.7 }}>Powered by Urivo</span>
+          </div>
+        </div>
+      </footer>
+    );
+  }
+  if (ds.layout.footer === "minimal") {
+    return (
+      <footer style={{ borderTop: `var(--border-w) solid ${ds.palette.line}` }}>
+        <div className="uv-wrap" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", padding: "2.2rem 0" }}>
+          <span className="uv-h" style={{ fontSize: "1rem" }}>{storeName}</span>
+          <span className="uv-eyebrow">Powered by Urivo</span>
+        </div>
+      </footer>
+    );
+  }
+  // editorial
+  const cols = [
+    ["Shop", ["New in", "Best sellers", "Collections", "Gift cards"]],
+    ["About", ["Our story", "Materials", "Sustainability", "Contact"]],
+    ["Support", ["Shipping", "Returns", "FAQ", "Care guide"]],
+  ] as const;
+  return (
+    <footer style={{ borderTop: `var(--border-w) solid ${ds.palette.line}` }}>
+      <div className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "2.4rem" }}>
+        <div style={{ display: "grid", gap: "2.4rem", gridTemplateColumns: "1.4fr 1fr 1fr 1fr" }} className="uv-foot-grid">
+          <div>
+            <p className="uv-h" style={{ fontSize: "1.35rem" }}>{storeName}</p>
+            <p style={{ marginTop: ".9rem", color: "var(--muted)", fontSize: ".9rem", maxWidth: "28ch" }}>{ds.personality}.</p>
+          </div>
+          {cols.map(([h, items]) => (
+            <div key={h}>
+              <p className="uv-eyebrow">{h}</p>
+              <ul style={{ listStyle: "none", padding: 0, margin: "1rem 0 0", display: "grid", gap: ".6rem" }}>
+                {items.map((it) => (
+                  <li key={it}><a className="uv-navlink" style={{ textTransform: "none", letterSpacing: 0, fontSize: ".88rem" }}>{it}</a></li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", marginTop: "3rem", paddingTop: "1.6rem", borderTop: `var(--border-w) solid ${ds.palette.line}`, color: "var(--muted)", fontSize: ".8rem" }}>
+          <span>© {new Date().getFullYear()} {storeName}</span>
+          <span className="uv-eyebrow">Powered by Urivo</span>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* -------------------------------- assembly --------------------------------- */
+
+export function StorefrontRenderer({
+  storeName,
+  ds,
+  catalog,
+}: {
+  storeName: string;
+  ds: StoreDesignSystem;
+  catalog: RenderProduct[];
+}) {
+  const fontsHref = googleFontsUrl(ds);
+
+  const render = (key: SectionKey) => {
+    switch (key) {
+      case "announcement": return <Announcement key={key} ds={ds} />;
+      case "hero": return <Hero key={key} storeName={storeName} ds={ds} />;
+      case "marquee": return <Marquee key={key} ds={ds} storeName={storeName} />;
+      case "trust": return <Trust key={key} ds={ds} />;
+      case "collection": return <Collection key={key} ds={ds} catalog={catalog} />;
+      case "story": return <Story key={key} ds={ds} storeName={storeName} />;
+      case "highlights": return <Highlights key={key} ds={ds} />;
+      case "newsletter": return <Newsletter key={key} ds={ds} storeName={storeName} />;
+      case "footer": return <Footer key={key} ds={ds} storeName={storeName} />;
+      default: return null;
+    }
+  };
+
+  // Announcement always sits above the nav; everything else follows order.
+  const order = ds.layout.sectionOrder;
+  const hasAnnouncement = order.includes("announcement");
+  const body = order.filter((k) => k !== "announcement");
+
+  return (
+    <>
+      {fontsHref && <link rel="stylesheet" href={fontsHref} />}
+      <style dangerouslySetInnerHTML={{ __html: scopedCss(ds) }} />
+      <div id="uv-store" style={buildVars(ds)}>
+        {hasAnnouncement && <Announcement ds={ds} />}
+        <Nav storeName={storeName} ds={ds} />
+        {body.map(render)}
+      </div>
+    </>
+  );
+}

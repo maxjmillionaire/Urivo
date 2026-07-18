@@ -3,7 +3,8 @@ import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/storefront";
-import { StorefrontView } from "./storefront-view";
+import { parseDesignSystem, themeToDesignSystem } from "@/lib/storefront/design-system";
+import { StorefrontRenderer } from "./storefront-renderer";
 
 export const dynamic = "force-dynamic";
 
@@ -59,9 +60,12 @@ export default async function StorefrontPage({ params }: Props) {
     .eq("store_id", store.id)
     .order("position", { ascending: true });
 
-  const theme = parseTheme(store.theme_config);
+  // New stores persist a full `designSystem`; older ones are adapted from their
+  // legacy palette so nothing breaks while the generator is upgraded.
+  const config = (store.theme_config ?? {}) as Record<string, unknown>;
+  const ds = config.designSystem
+    ? parseDesignSystem(config.designSystem)
+    : themeToDesignSystem(parseTheme(store.theme_config));
 
-  return (
-    <StorefrontView storeName={store.store_name} theme={theme} catalog={products ?? []} />
-  );
+  return <StorefrontRenderer storeName={store.store_name} ds={ds} catalog={products ?? []} />;
 }
