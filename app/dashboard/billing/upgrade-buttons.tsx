@@ -46,15 +46,15 @@ export function UpgradeButton({
         type="button"
         onClick={upgrade}
         disabled={busy}
-        className={`w-full rounded-md px-6 py-3 text-sm font-semibold transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60 ${
+        className={`u-lift w-full rounded-xl px-6 py-3 text-sm font-semibold disabled:opacity-60 ${
           highlight
-            ? "bg-brand text-white shadow-soft hover:bg-brand-hover"
-            : "border border-line bg-surface text-ink hover:bg-surface-muted"
+            ? "u-gold"
+            : "border border-hair bg-panel text-ivory hover:border-hair-strong hover:bg-panel-2"
         }`}
       >
         {busy ? "One moment…" : label}
       </button>
-      {note && <p className="mt-3 text-center text-xs text-muted">{note}</p>}
+      {note && <p className="mt-3 text-center text-xs text-mist">{note}</p>}
     </div>
   );
 }

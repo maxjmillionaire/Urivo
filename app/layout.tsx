@@ -17,11 +17,9 @@ export const viewport: Viewport = {
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  // Body stays neutral-light until every page is migrated onto the dark shell,
-  // which sets its own bg-night. Flipped to full dark at the end of the rollout.
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
-      <body className="bg-canvas font-sans text-ink antialiased">
+      <body className="bg-night font-sans text-ivory antialiased">
         {children}
         <ConsentBanner />
       </body>

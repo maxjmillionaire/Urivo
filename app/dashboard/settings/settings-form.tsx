@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 const inputClass =
-  "w-full rounded-md border border-line bg-surface px-4 py-3 text-sm text-ink placeholder:text-muted/70 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/15";
+  "w-full rounded-xl border border-hair bg-night px-4 py-3 text-sm text-ivory placeholder:text-mist-dim transition-colors focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/20";
 
 export function PasswordForm() {
   const [password, setPassword] = useState("");
@@ -44,7 +44,7 @@ export function PasswordForm() {
   return (
     <form onSubmit={submit} className="space-y-4">
       <div>
-        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-mist">
           New password
         </label>
         <input
@@ -56,14 +56,14 @@ export function PasswordForm() {
         />
       </div>
       {msg && (
-        <p className={`text-sm ${msg.kind === "ok" ? "text-[#15803d]" : "text-error"}`}>
+        <p className={`text-sm ${msg.kind === "ok" ? "text-live" : "text-alert"}`}>
           {msg.text}
         </p>
       )}
       <button
         type="submit"
         disabled={busy}
-        className="rounded-md border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-surface-muted disabled:opacity-60"
+        className="u-lift rounded-xl border border-hair bg-panel px-5 py-2.5 text-sm font-semibold text-ivory hover:border-hair-strong hover:bg-panel-2 disabled:opacity-60"
       >
         {busy ? "Saving…" : "Update password"}
       </button>
@@ -99,9 +99,9 @@ export function DeleteAccount() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm leading-relaxed text-muted">
+      <p className="text-sm leading-relaxed text-mist">
         This permanently deletes your account, all your stores, products and
-        credit history. This cannot be undone. Type <strong className="font-semibold text-ink">DELETE</strong> to confirm.
+        credit history. This cannot be undone. Type <strong className="font-semibold text-ivory">DELETE</strong> to confirm.
       </p>
       <input
         type="text"
@@ -110,12 +110,12 @@ export function DeleteAccount() {
         placeholder="DELETE"
         className={`${inputClass} max-w-xs`}
       />
-      {error && <p className="text-sm text-error">{error}</p>}
+      {error && <p className="text-sm text-alert">{error}</p>}
       <button
         type="button"
         disabled={confirm !== "DELETE" || busy}
         onClick={remove}
-        className="block rounded-md border border-error/40 bg-surface px-5 py-2.5 text-sm font-semibold text-error transition-colors hover:bg-error/5 disabled:opacity-40"
+        className="u-lift block rounded-xl border border-alert/40 bg-alert/[0.04] px-5 py-2.5 text-sm font-semibold text-alert hover:bg-alert/10 disabled:opacity-40"
       >
         {busy ? "Deleting…" : "Delete my account"}
       </button>

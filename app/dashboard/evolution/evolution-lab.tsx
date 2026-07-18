@@ -88,14 +88,14 @@ export function EvolutionLab() {
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           disabled={phase === "running"}
-          className="flex-1 rounded-md border border-line bg-surface px-4 py-3 text-sm text-ink placeholder:text-muted/70 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/15 disabled:opacity-60"
+          className="flex-1 rounded-xl border border-hair bg-night px-4 py-3 text-sm text-ivory placeholder:text-mist-dim transition-colors focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/20 disabled:opacity-60"
           placeholder="Describe a business to evolve"
         />
         <button
           type="button"
           onClick={start}
           disabled={phase === "running"}
-          className="rounded-md bg-brand px-6 py-3 text-sm font-semibold text-white shadow-soft transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 hover:bg-brand-hover disabled:translate-y-0 disabled:opacity-60"
+          className="u-gold u-lift rounded-xl px-6 py-3 text-sm font-semibold disabled:opacity-60"
         >
           {phase === "running" ? "Evolving…" : phase === "done" ? "Run again" : "Start evolution"}
         </button>
@@ -105,16 +105,16 @@ export function EvolutionLab() {
       {activeGen && (
         <div className="mt-6 flex flex-wrap items-baseline justify-between gap-4">
           <div>
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mist">
               Generation {activeGen.index}
             </span>
-            <p className="mt-1 text-sm text-muted">{activeGen.commentary}</p>
+            <p className="mt-1 text-sm text-mist">{activeGen.commentary}</p>
           </div>
           <div className="text-right">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mist">
               Best fitness
             </span>
-            <p className="text-4xl font-semibold tracking-tight text-brand tabular-nums">
+            <p className="text-4xl font-semibold tracking-tight u-gold-text tabular-nums">
               {activeGen.best.overall.toFixed(1)}
             </p>
           </div>
@@ -122,7 +122,7 @@ export function EvolutionLab() {
       )}
 
       {/* The tree — an intentional dark "stage" (spec 6.6) where glowing nodes live */}
-      <div className="relative mt-6 overflow-hidden rounded-xl border border-white/5 bg-[#0f172a] shadow-lift">
+      <div className="u-float relative mt-6 overflow-hidden rounded-2xl border border-hair bg-[#0a1020]">
         {!run && (
           <div className="flex h-[560px] items-center justify-center px-6 text-center">
             <p className="max-w-md text-2xl font-medium leading-snug text-white/70">
@@ -188,17 +188,17 @@ export function EvolutionLab() {
           </svg>
         )}
 
-        {/* Winner reveal — a light result card spotlit on the dark stage */}
+        {/* Winner reveal — a dark glass card spotlit on the stage */}
         {phase === "done" && run && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-6">
-            <div className="pointer-events-auto rounded-xl border border-line bg-surface px-8 py-5 text-center shadow-lift">
+            <div className="u-glass u-float pointer-events-auto rounded-2xl border border-gold/25 px-8 py-5 text-center">
               <div className="flex items-center justify-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-gold" />
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-soft">
                   Winner · fitness {run.winner.overall.toFixed(1)}
                 </p>
               </div>
-              <p className="mt-2 text-2xl font-semibold tracking-tight text-ink">
+              <p className="mt-2 text-2xl font-semibold tracking-tight text-ivory">
                 This becomes your Store v1.0
               </p>
             </div>
@@ -206,7 +206,7 @@ export function EvolutionLab() {
         )}
       </div>
 
-      <p className="mt-4 text-center text-xs text-muted">
+      <p className="mt-4 text-center text-xs text-mist">
         Continuous optimization never stops — Urivo keeps running experiments
         after launch to find better conversions.
       </p>

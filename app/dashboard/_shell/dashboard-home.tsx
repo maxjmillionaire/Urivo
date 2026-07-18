@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GenerateStorePanel } from "../generate-store-panel";
 import { IconRefresh, IconStore, IconBox, IconGlobe, IconCard, IconSpark } from "./icons";
 
 /*
@@ -66,13 +67,7 @@ export function DashboardHome({
           <button className="u-lift inline-flex items-center gap-1.5 rounded-lg border border-hair bg-panel px-3 py-2 text-xs font-medium text-mist hover:border-hair-strong hover:text-ivory">
             <IconRefresh width={14} height={14} /> Refresh
           </button>
-          <button
-            type="button"
-            disabled={!canGenerate}
-            className="u-gold u-lift inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold hover:u-glow-gold disabled:opacity-50"
-          >
-            <IconSpark width={14} height={14} /> Generate store
-          </button>
+          <GenerateStorePanel canGenerate={canGenerate} />
         </div>
       </div>
 

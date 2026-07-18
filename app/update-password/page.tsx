@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import logo from "@/assets/brand/urivo-logo.png";
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
@@ -40,33 +42,28 @@ export default function UpdatePasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas px-6 py-16 text-ink">
-      <div className="w-full max-w-105">
-        <div className="text-center">
-          <h1 className="text-3xl font-semibold tracking-tight text-ink">
-            Choose a new password
-          </h1>
-          <p className="mt-2 text-sm text-muted">
-            8+ characters with uppercase, lowercase and a number.
-          </p>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-night px-6 py-16 text-ivory">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{ background: "radial-gradient(60% 45% at 50% 8%, rgba(232,205,128,0.10), rgba(11,18,32,0) 55%)" }}
+      />
+      <div className="relative w-full max-w-[400px]">
+        <div className="flex flex-col items-center text-center">
+          <Image src={logo} alt="Urivo" width={64} height={64} priority className="rounded-[18px] u-float" />
+          <h1 className="mt-6 text-[26px] font-semibold tracking-tight text-ivory">Choose a new password</h1>
+          <p className="mt-1.5 text-sm text-mist">8+ characters with uppercase, lowercase and a number.</p>
         </div>
 
-        <div className="mt-8 rounded-xl border border-line bg-surface p-7 shadow-soft sm:p-8">
+        <div className="u-float u-glass mt-8 rounded-2xl border border-hair p-7">
           {error && (
-            <p
-              role="alert"
-              className="mb-6 rounded-md border border-error/20 bg-error/5 px-4 py-3 text-sm text-error"
-            >
+            <p role="alert" className="mb-6 rounded-xl border border-alert/20 bg-alert/5 px-4 py-3 text-sm text-alert">
               {error}
             </p>
           )}
-
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label
-                htmlFor="password"
-                className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-muted"
-              >
+              <label htmlFor="password" className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-mist">
                 New password
               </label>
               <input
@@ -76,14 +73,10 @@ export default function UpdatePasswordPage() {
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-md border border-line bg-surface px-4 py-3 text-sm text-ink focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/15"
+                className="w-full rounded-xl border border-hair bg-night px-4 py-3 text-sm text-ivory transition-colors focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/20"
               />
             </div>
-            <button
-              type="submit"
-              disabled={pending}
-              className="w-full rounded-md bg-brand px-4 py-3 text-sm font-semibold text-white shadow-soft transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 hover:bg-brand-hover disabled:translate-y-0 disabled:opacity-60"
-            >
+            <button type="submit" disabled={pending} className="u-gold u-lift w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-60">
               {pending ? "One moment…" : "Save password"}
             </button>
           </form>

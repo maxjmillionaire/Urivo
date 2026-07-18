@@ -1,6 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
+import { AppShell } from "../_shell/app-shell";
+import { loadRailStore } from "../_shell/rail-data";
 import {
   welcomeEmail,
   subscriptionConfirmedEmail,
@@ -13,8 +14,6 @@ export const dynamic = "force-dynamic";
 
 /*
  * Founder-facing preview of every transactional email (auth-gated, not public).
- * Lets the founder review the designs before launch; also the visual check
- * for the templates.
  */
 export default async function EmailPreviewPage() {
   const supabase = await supabaseServer();
@@ -22,6 +21,11 @@ export default async function EmailPreviewPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const [{ data: profile }, rail] = await Promise.all([
+    supabase.from("profiles").select("email").eq("id", user.id).single(),
+    loadRailStore(user.id),
+  ]);
 
   const previews = [
     { name: "Welcome", email: welcomeEmail("Max") },
@@ -35,42 +39,28 @@ export default async function EmailPreviewPage() {
   ];
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-4xl px-6 py-16">
-      <div className="mb-10">
-        <Link
-          href="/dashboard"
-          className="text-sm font-medium text-muted transition-colors hover:text-ink"
-        >
-          ← Workspace
-        </Link>
-      </div>
-      <header className="border-b border-line pb-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-          Internal
-        </p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-ink">
-          Email templates
-        </h1>
-        <p className="mt-2 text-sm text-muted">
-          Preview of every transactional email. Sent via Resend once configured.
-        </p>
+    <AppShell active="emails" email={profile?.email ?? user.email ?? null} store={rail}>
+      <header>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">Internal</p>
+        <h1 className="mt-2 text-[28px] font-semibold tracking-tight text-ivory">Email templates</h1>
+        <p className="mt-2 text-sm text-mist">Preview of every transactional email. Sent via Resend once configured.</p>
       </header>
 
-      <div className="mt-10 space-y-12">
+      <div className="mt-8 space-y-10">
         {previews.map((p) => (
           <section key={p.name}>
             <div className="mb-3 flex items-baseline justify-between">
-              <h2 className="text-xl font-semibold text-ink">{p.name}</h2>
-              <span className="font-mono text-xs text-muted">{p.email.subject}</span>
+              <h2 className="text-lg font-semibold text-ivory">{p.name}</h2>
+              <span className="font-mono text-xs text-mist-dim">{p.email.subject}</span>
             </div>
             <iframe
               title={p.name}
               srcDoc={p.email.html}
-              className="h-[520px] w-full rounded-xl border border-line bg-white shadow-soft"
+              className="u-float h-[520px] w-full rounded-2xl border border-hair bg-white"
             />
           </section>
         ))}
       </div>
-    </main>
+    </AppShell>
   );
 }

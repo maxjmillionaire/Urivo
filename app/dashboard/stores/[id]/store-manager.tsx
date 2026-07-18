@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 /*
  * Merchant store management (screens-v1 §6): product CRUD table with an
  * add/edit modal, plus a theme editor slide-over. Optimistic where safe,
- * with rollback on failure.
+ * with rollback on failure. Dark Midnight theme.
  */
 
 type Product = {
@@ -27,6 +27,9 @@ type Theme = {
 };
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
+
+const inputClass =
+  "w-full rounded-xl border border-hair bg-night px-4 py-3 text-sm text-ivory placeholder:text-mist-dim transition-colors focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/20";
 
 export function StoreManager({
   storeId,
@@ -64,9 +67,7 @@ export function StoreManager({
       priceEUR: Number(data.product.price_eur),
       inventoryCount: data.product.inventory_count,
     };
-    setProducts((prev) =>
-      id ? prev.map((p) => (p.id === id ? saved : p)) : [...prev, saved],
-    );
+    setProducts((prev) => (id ? prev.map((p) => (p.id === id ? saved : p)) : [...prev, saved]));
     setEditing(null);
     router.refresh();
   }
@@ -74,10 +75,10 @@ export function StoreManager({
   async function deleteProduct(id: string) {
     if (!confirm("Remove this product?")) return;
     const snapshot = products;
-    setProducts((prev) => prev.filter((p) => p.id !== id)); // optimistic
+    setProducts((prev) => prev.filter((p) => p.id !== id));
     const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
     if (!res.ok) {
-      setProducts(snapshot); // rollback
+      setProducts(snapshot);
       setError("Could not remove the product.");
       return;
     }
@@ -111,29 +112,22 @@ export function StoreManager({
   return (
     <>
       {error && (
-        <p
-          role="alert"
-          className="mt-8 rounded-md border border-error/20 bg-error/5 px-4 py-3 text-sm text-error"
-        >
+        <p role="alert" className="mt-6 rounded-xl border border-alert/20 bg-alert/5 px-4 py-3 text-sm text-alert">
           {error}
         </p>
       )}
 
       {/* Design */}
-      <section className="mt-10 flex items-center justify-between rounded-lg border border-line bg-surface p-6 shadow-soft">
+      <section className="u-float mt-7 flex items-center justify-between rounded-2xl border border-hair bg-panel/70 p-5">
         <div className="flex items-center gap-4">
           <div className="flex gap-1.5">
             {[theme.background, theme.structure, theme.accent].map((c) => (
-              <span
-                key={c}
-                className="h-8 w-8 rounded-full border border-line"
-                style={{ backgroundColor: c }}
-              />
+              <span key={c} className="h-8 w-8 rounded-full border border-hair" style={{ backgroundColor: c }} />
             ))}
           </div>
           <div>
-            <p className="text-sm font-medium text-ink">{theme.storeName}</p>
-            <p className="text-xs text-muted">
+            <p className="text-sm font-medium text-ivory">{theme.storeName}</p>
+            <p className="text-xs text-mist-dim">
               {theme.tagline || "No tagline"} · {theme.isActive ? "Live" : "Paused"}
             </p>
           </div>
@@ -141,65 +135,61 @@ export function StoreManager({
         <button
           type="button"
           onClick={() => setThemeOpen(true)}
-          className="rounded-md border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-surface-muted"
+          className="u-lift rounded-xl border border-hair bg-panel px-4 py-2.5 text-sm font-semibold text-ivory hover:border-hair-strong hover:bg-panel-2"
         >
           Edit design
         </button>
       </section>
 
       {/* Products */}
-      <section className="mt-10">
+      <section className="mt-8">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold tracking-tight text-ink">Products</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-ivory">Products</h2>
           <button
             type="button"
             onClick={() => setEditing("new")}
-            className="rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 hover:bg-brand-hover"
+            className="u-gold u-lift rounded-xl px-5 py-2.5 text-sm font-semibold"
           >
             + Add product
           </button>
         </div>
 
         {products.length === 0 ? (
-          <p className="mt-6 rounded-lg border border-line bg-surface p-10 text-center text-sm text-muted shadow-soft">
+          <p className="u-float mt-4 rounded-2xl border border-dashed border-hair-strong bg-panel/40 p-10 text-center text-sm text-mist">
             No products yet. Add your first one.
           </p>
         ) : (
-          <div className="mt-6 overflow-hidden rounded-lg border border-line bg-surface shadow-soft">
+          <div className="u-float mt-4 overflow-hidden rounded-2xl border border-hair bg-panel/70">
             <table className="w-full border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-line bg-surface-muted text-xs font-semibold uppercase tracking-[0.1em] text-muted">
+                <tr className="border-b border-hair bg-white/[0.02] text-[11px] font-semibold uppercase tracking-[0.1em] text-mist">
                   <th className="px-6 py-4">Product</th>
                   <th className="px-6 py-4">Price</th>
                   <th className="px-6 py-4">Stock</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody className="divide-y divide-hair">
                 {products.map((p) => (
-                  <tr key={p.id} className="align-top transition-colors hover:bg-surface-muted">
+                  <tr key={p.id} className="align-top transition-colors hover:bg-white/[0.02]">
                     <td className="px-6 py-4">
-                      <p className="font-medium text-ink">{p.title}</p>
-                      <p className="mt-1 max-w-md text-xs text-muted">
-                        {p.description}
-                      </p>
+                      <p className="font-medium text-ivory">{p.title}</p>
+                      <p className="mt-1 max-w-md text-xs text-mist-dim">{p.description}</p>
                     </td>
-                    <td className="px-6 py-4 font-mono text-ink">
-                      €{p.priceEUR.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 font-mono text-muted">{p.inventoryCount}</td>
+                    <td className="px-6 py-4 font-mono text-ivory">€{p.priceEUR.toFixed(2)}</td>
+                    <td className="px-6 py-4 font-mono text-mist">{p.inventoryCount}</td>
                     <td className="px-6 py-4 text-right">
                       <button
                         type="button"
                         onClick={() => setEditing(p)}
-                        className="text-sm font-semibold text-brand hover:underline"
+                        className="text-sm font-semibold text-gold-soft hover:text-gold"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => deleteProduct(p.id)}
-                        className="ml-4 text-sm font-semibold text-error/80 hover:text-error"
+                        className="ml-4 text-sm font-semibold text-alert/80 hover:text-alert"
                       >
                         Remove
                       </button>
@@ -213,15 +203,9 @@ export function StoreManager({
       </section>
 
       {editing && (
-        <ProductModal
-          product={editing === "new" ? null : editing}
-          onClose={() => setEditing(null)}
-          onSave={saveProduct}
-        />
+        <ProductModal product={editing === "new" ? null : editing} onClose={() => setEditing(null)} onSave={saveProduct} />
       )}
-      {themeOpen && (
-        <ThemeEditor theme={theme} onClose={() => setThemeOpen(false)} onSave={saveTheme} />
-      )}
+      {themeOpen && <ThemeEditor theme={theme} onClose={() => setThemeOpen(false)} onSave={saveTheme} />}
     </>
   );
 }
@@ -248,76 +232,37 @@ function ProductModal({
     if (!title.trim() || !(priceNum > 0) || !Number.isInteger(stockNum) || stockNum < 0) return;
     setBusy(true);
     await onSave(
-      {
-        title: title.trim(),
-        description: description.trim(),
-        priceEUR: priceNum,
-        inventoryCount: stockNum,
-      },
+      { title: title.trim(), description: description.trim(), priceEUR: priceNum, inventoryCount: stockNum },
       product?.id,
     );
     setBusy(false);
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-6 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-xl border border-line bg-surface p-8 shadow-lift">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/70 px-6 backdrop-blur-sm">
+      <div className="u-float w-full max-w-md rounded-2xl border border-hair bg-panel p-7">
         <div className="flex items-center justify-between">
-          <h3 className="text-2xl font-semibold tracking-tight text-ink">
-            {product ? "Edit product" : "New product"}
-          </h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-muted hover:text-ink">
+          <h3 className="text-xl font-semibold tracking-tight text-ivory">{product ? "Edit product" : "New product"}</h3>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-mist hover:text-ivory">
             ✕
           </button>
         </div>
         <form onSubmit={submit} className="mt-6 space-y-4">
           <Field label="Title">
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className={inputClass}
-            />
+            <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} />
           </Field>
           <Field label="Description">
-            <textarea
-              rows={3}
-              maxLength={400}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className={`${inputClass} resize-none`}
-            />
+            <textarea rows={3} maxLength={400} value={description} onChange={(e) => setDescription(e.target.value)} className={`${inputClass} resize-none`} />
           </Field>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Price (€)">
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                required
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className={inputClass}
-              />
+              <input type="number" step="0.01" min="0.01" required value={price} onChange={(e) => setPrice(e.target.value)} className={inputClass} />
             </Field>
             <Field label="Stock">
-              <input
-                type="number"
-                min="0"
-                step="1"
-                required
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
-                className={inputClass}
-              />
+              <input type="number" min="0" step="1" required value={stock} onChange={(e) => setStock(e.target.value)} className={inputClass} />
             </Field>
           </div>
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full rounded-md bg-brand px-4 py-3 text-sm font-semibold text-white shadow-soft transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 hover:bg-brand-hover disabled:translate-y-0 disabled:opacity-60"
-          >
+          <button type="submit" disabled={busy} className="u-gold u-lift w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-60">
             {busy ? "Saving…" : "Save product"}
           </button>
         </form>
@@ -357,7 +302,7 @@ function ThemeEditor({
           type="color"
           value={draft[key]}
           onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-          className="h-10 w-12 cursor-pointer rounded border border-line bg-transparent"
+          className="h-10 w-12 cursor-pointer rounded border border-hair bg-transparent"
         />
         <input
           type="text"
@@ -370,51 +315,35 @@ function ThemeEditor({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-ink/40 backdrop-blur-sm">
-      <div className="flex h-full w-full max-w-md flex-col border-l border-line bg-surface p-8 shadow-lift">
+    <div className="fixed inset-0 z-50 flex justify-end bg-night/70 backdrop-blur-sm">
+      <div className="u-float flex h-full w-full max-w-md flex-col border-l border-hair bg-panel p-7">
         <div className="flex items-center justify-between">
-          <h3 className="text-2xl font-semibold tracking-tight text-ink">Edit design</h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-muted hover:text-ink">
+          <h3 className="text-xl font-semibold tracking-tight text-ivory">Edit design</h3>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-mist hover:text-ivory">
             ✕
           </button>
         </div>
         <form onSubmit={submit} className="mt-6 flex-1 space-y-4 overflow-y-auto">
           <Field label="Store name">
-            <input
-              type="text"
-              value={draft.storeName}
-              onChange={(e) => setDraft({ ...draft, storeName: e.target.value })}
-              className={inputClass}
-            />
+            <input type="text" value={draft.storeName} onChange={(e) => setDraft({ ...draft, storeName: e.target.value })} className={inputClass} />
           </Field>
           <Field label="Tagline">
-            <textarea
-              rows={2}
-              maxLength={120}
-              value={draft.tagline}
-              onChange={(e) => setDraft({ ...draft, tagline: e.target.value })}
-              className={`${inputClass} resize-none`}
-            />
+            <textarea rows={2} maxLength={120} value={draft.tagline} onChange={(e) => setDraft({ ...draft, tagline: e.target.value })} className={`${inputClass} resize-none`} />
           </Field>
           {swatch("background", "Background")}
           {swatch("structure", "Text / structure")}
           {swatch("accent", "Accent")}
-          <label className="flex items-center gap-3 pt-2 text-sm text-ink">
+          <label className="flex items-center gap-3 pt-2 text-sm text-ivory">
             <input
               type="checkbox"
               checked={draft.isActive}
               onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })}
-              className="h-4 w-4 accent-brand"
+              className="h-4 w-4 accent-gold"
             />
             Store is live
           </label>
         </form>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={busy || invalid}
-          className="mt-6 w-full rounded-md bg-brand px-4 py-3 text-sm font-semibold text-white shadow-soft transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 hover:bg-brand-hover disabled:translate-y-0 disabled:opacity-60"
-        >
+        <button type="button" onClick={submit} disabled={busy || invalid} className="u-gold u-lift mt-6 w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-60">
           {busy ? "Saving…" : "Save changes"}
         </button>
       </div>
@@ -422,15 +351,10 @@ function ThemeEditor({
   );
 }
 
-const inputClass =
-  "w-full rounded-md border border-line bg-surface px-4 py-3 text-sm text-ink placeholder:text-muted/70 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/15";
-
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-muted">
-        {label}
-      </label>
+      <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-mist">{label}</label>
       {children}
     </div>
   );

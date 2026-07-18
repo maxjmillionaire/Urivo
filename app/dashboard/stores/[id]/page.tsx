@@ -1,8 +1,9 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/storefront";
 import { env } from "@/lib/env";
+import { AppShell } from "../../_shell/app-shell";
+import { loadRailStore } from "../../_shell/rail-data";
 import { StoreManager } from "./store-manager";
 
 export const dynamic = "force-dynamic";
@@ -34,45 +35,33 @@ export default async function StoreDetailPage({
     .eq("id", id)
     .maybeSingle();
 
-  // Ownership check — not-owned is indistinguishable from not-found.
   if (!store || store.user_id !== user.id) notFound();
 
-  const { data: products } = await supabase
-    .from("products")
-    .select("id, title, description, price_eur, inventory_count")
-    .eq("store_id", id)
-    .order("position", { ascending: true });
+  const [{ data: products }, { data: profile }, rail] = await Promise.all([
+    supabase
+      .from("products")
+      .select("id, title, description, price_eur, inventory_count")
+      .eq("store_id", id)
+      .order("position", { ascending: true }),
+    supabase.from("profiles").select("email").eq("id", user.id).single(),
+    loadRailStore(user.id),
+  ]);
 
   const theme = parseTheme(store.theme_config);
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-6 py-16">
-      <div className="mb-10">
-        <Link
-          href="/dashboard"
-          className="text-sm font-medium text-muted transition-colors hover:text-ink"
-        >
-          ← Workspace
-        </Link>
-      </div>
-
-      <header className="flex flex-col gap-6 border-b border-line pb-10 sm:flex-row sm:items-end sm:justify-between">
+    <AppShell active="stores" email={profile?.email ?? user.email ?? null} store={rail}>
+      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-            Storefront
-          </p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-ink">
-            {store.store_name}
-          </h1>
-          <p className="mt-2 font-mono text-xs text-muted">
-            {store.subdomain}.urivo.ai
-          </p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">Storefront</p>
+          <h1 className="mt-2 text-[28px] font-semibold tracking-tight text-ivory">{store.store_name}</h1>
+          <p className="mt-1.5 font-mono text-xs text-mist-dim">{store.subdomain}.urivo.ai</p>
         </div>
         <a
           href={storeUrl(store.subdomain)}
           target="_blank"
           rel="noreferrer"
-          className="self-start rounded-md border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-ink transition-colors duration-200 hover:bg-surface-muted"
+          className="u-lift self-start rounded-xl border border-hair bg-panel px-5 py-2.5 text-sm font-semibold text-ivory hover:border-hair-strong hover:bg-panel-2"
         >
           View live
         </a>
@@ -96,6 +85,6 @@ export default async function StoreDetailPage({
           isActive: store.is_active,
         }}
       />
-    </main>
+    </AppShell>
   );
 }
