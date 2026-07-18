@@ -3,19 +3,37 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GenerationStudio, type StudioResult } from "./generation-studio";
+import { GenerationCinema } from "./generation-cinema";
 
 /*
  * Store generation entry point. Collects the idea + address, then flashes to the
- * full-screen Generation Studio — a focused creation experience with a quiet way
- * back to the dashboard. The real API request runs while the studio plays; the
- * reveal uses the real generated store.
+ * full-screen creation experience while the real API request runs; the reveal
+ * uses the real generated store.
+ *
+ * The signature experience is the Generation Cinema — a real design-search
+ * visualization (every number comes from the evolution engine, nothing faked).
+ * Visitors who prefer reduced motion get the calmer, staged Generation Studio
+ * instead. Both are honest and both reveal the same real store.
  */
+
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const m = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const on = () => setReduced(m.matches);
+    on();
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return reduced;
+}
 
 const SUBDOMAIN_RE = /^[a-z0-9](?:[a-z0-9-]{1,61})[a-z0-9]$/;
 
 export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const reducedMotion = usePrefersReducedMotion();
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [subdomain, setSubdomain] = useState("");
@@ -91,6 +109,11 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
     setStudioError(null);
     reset();
     router.refresh();
+  }
+
+  function openStore(url: string) {
+    if (url.startsWith("/")) window.location.href = url;
+    else window.open(url, "_blank", "noreferrer");
   }
 
   return (
@@ -190,18 +213,24 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
       )}
 
       {/* The focused, full-screen creation experience */}
-      {studio && (
-        <GenerationStudio
-          prompt={studio.prompt}
-          result={result}
-          error={studioError}
-          onOpenStore={(url) => {
-            if (url.startsWith("/")) window.location.href = url;
-            else window.open(url, "_blank", "noreferrer");
-          }}
-          onClose={closeStudio}
-        />
-      )}
+      {studio &&
+        (reducedMotion ? (
+          <GenerationStudio
+            prompt={studio.prompt}
+            result={result}
+            error={studioError}
+            onOpenStore={openStore}
+            onClose={closeStudio}
+          />
+        ) : (
+          <GenerationCinema
+            prompt={studio.prompt}
+            result={result}
+            error={studioError}
+            onOpenStore={openStore}
+            onClose={closeStudio}
+          />
+        ))}
     </>
   );
 }

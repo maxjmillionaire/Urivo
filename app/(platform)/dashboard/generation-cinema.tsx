@@ -1,22 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { runEvolution } from "@/lib/evolution/engine";
+import { runEvolution, type Scores } from "@/lib/evolution/engine";
 import { describeVariant } from "@/lib/evolution/candidates";
 
 /*
  * The Generation Cinema — Urivo's signature creation sequence (spec 6.6).
  *
- * A live A/B tournament bracket: eight storefront variants are seeded on the
- * left, compete pair by pair along dotted bracket connectors, and converge —
- * 8 → 4 → 2 → 1 — into a single champion on the right, which blooms into the
- * real AI-generated store. Bloomberg-terminal chrome (LIVE, CVR uplift, traffic,
- * confidence) wraps the bracket. Hold Q for voice.
+ * A design-search visualization: Urivo's evolution engine explores many storefront
+ * candidates across successive generations, scoring each on real design-quality
+ * dimensions, and converges on the strongest — which then blooms into the real
+ * AI-generated store.
  *
- * Deliberate reference-faithful layout (founder exception); Urivo palette —
- * slate-navy canvas, ivory mono type, gold for the champion + brand, green as
- * the CVR / winning signal. The bracket is a deterministic visualization; the
- * reveal is the real generated store.
+ * EVERY NUMBER ON THIS SCREEN IS REAL. The candidate count, generation count,
+ * scoring-dimension count and per-candidate fitness scores all come from the
+ * deterministic evolution engine (lib/evolution). The elapsed time is real
+ * wall-clock. There are no fabricated traffic/conversion/confidence metrics and
+ * no decorative controls that don't do anything — honesty is the whole point.
+ * The champion reveal uses the real AI-generated store passed in `result`.
  */
 
 export interface CinemaResult {
@@ -48,53 +49,66 @@ const BOOT_MS = 550;
 const SEED_MS = 950;
 const ROUND_MS = 1450;
 
+// Honest display names for the engine's seven design-quality dimensions.
+const DIM_LABEL: Record<keyof Scores, string> = {
+  conversion: "Action clarity",
+  trust: "Trust",
+  readability: "Readability",
+  balance: "Balance",
+  premium: "Premium feel",
+  brand: "Brand voice",
+  purchase: "Purchase flow",
+};
+
 interface Node {
   id: string;
   letter: string;
-  cvr: number;
+  fit: number; // real design-fitness score (0–100) from the evolution engine
   palette: [string, string, string];
   x: number;
   y: number;
   col: number;
-  parents?: [Node, Node]; // the two children that fed this node
+  parents?: [Node, Node];
 }
 
-function cvrFor(v: number): number {
-  return Math.round(v * 10) / 10;
-}
-
-function fmtCount(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1000) return Math.round(n / 1000) + "K";
-  return String(n);
-}
-
-const UPLIFT = [1.3, 2.0, 2.7, 3.2];
-const CONF = [71, 82, 90, 95];
-const TRAFFIC = [0.9e6, 1.3e6, 1.5e6, 1.7e6];
-const IN_PLAY = [8, 4, 2, 1];
+// Visual tournament seeding (column slot → rank), so the two strongest
+// candidates meet in the final. Placement only — the fitness shown is real.
+const SLOT_RANK = [0, 7, 4, 3, 2, 5, 6, 1];
 
 export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }: Props) {
-  // Build the bracket deterministically from the prompt.
-  const { rounds, connectors } = useMemo(() => {
+  // Run the real evolution engine and build the bracket from its output.
+  const { rounds, connectors, facts } = useMemo(() => {
     const run = runEvolution(prompt || "urivo");
+
+    // Real aggregate facts.
+    const genSizes = run.generations.map((g) => g.variants.length);
+    const totalCandidates = genSizes.reduce((s, n) => s + n, 0);
+    const generations = run.generations.length;
+    const dimensions = Object.keys(DIM_LABEL).length;
+    const winnerFit = Math.round(run.winner.overall);
+    // Winning candidate's strongest design dimension.
+    let topDim: keyof Scores = "trust";
+    let topVal = -1;
+    for (const [k, v] of Object.entries(run.winner.scores) as [keyof Scores, number][]) {
+      if (v > topVal) { topVal = v; topDim = k; }
+    }
+    // Cumulative candidates explored by the time each bracket stage resolves.
+    const cum: number[] = [];
+    genSizes.reduce((s, n, i) => (cum[i] = s + n), 0);
+    const candByStage = [cum[0] ?? totalCandidates, cum[2] ?? totalCandidates, cum[4] ?? totalCandidates, totalCandidates];
+
+    // The eight strongest first-generation candidates, ranked by real fitness.
     const ranked = run.generations[0].variants
       .map(describeVariant)
       .sort((a, b) => b.score - a.score)
       .slice(0, 8);
 
-    // Distinct, realistic CVRs by rank (best → worst), placed into standard
-    // tournament seeding so the strongest two meet in the final.
-    const SPREAD = [6.9, 6.6, 6.4, 6.1, 5.8, 5.5, 5.2, 4.8];
-    const SLOT_RANK = [0, 7, 4, 3, 2, 5, 6, 1]; // column slot → rank index
-
     const col0: Node[] = SLOT_RANK.map((rankIdx, slot) => {
       const c = ranked[rankIdx];
-      const jitter = ((c.id.charCodeAt(c.id.length - 1) % 3) - 1) * 0.1;
       return {
         id: c.id,
         letter: LETTERS[slot],
-        cvr: cvrFor(SPREAD[rankIdx] + jitter),
+        fit: Math.round(c.score),
         palette: c.palette,
         x: COL_X[0],
         y: ((slot + 0.5) / 8) * STAGE_H,
@@ -109,31 +123,34 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
       for (let i = 0; i < prev.length; i += 2) {
         const a = prev[i];
         const b = prev[i + 1];
-        const win = a.cvr >= b.cvr ? a : b;
+        const win = a.fit >= b.fit ? a : b; // advance the higher REAL fitness
         cur.push({ ...win, x: COL_X[r], y: (a.y + b.y) / 2, col: r, parents: [a, b] });
       }
       rounds.push(cur);
       prev = cur;
     }
 
-    // Bracket connectors (dotted elbows) keyed by the round they belong to.
     const connectors: { round: number; d: string; win: boolean }[] = [];
     for (let r = 1; r < 4; r++) {
       for (const node of rounds[r]) {
         const [a, b] = node.parents!;
         const midX = (a.x + CARD_W + node.x) / 2;
         const cy = node.y;
-        // each child → vertical bus → parent
         connectors.push({ round: r, win: a.id === node.id, d: `M ${a.x + CARD_W} ${a.y} H ${midX}` });
         connectors.push({ round: r, win: b.id === node.id, d: `M ${b.x + CARD_W} ${b.y} H ${midX}` });
         connectors.push({ round: r, win: true, d: `M ${midX} ${a.y} V ${b.y}` });
         connectors.push({ round: r, win: true, d: `M ${midX} ${cy} H ${node.x}` });
       }
     }
-    return { rounds, connectors };
+
+    const topFit = Math.round(ranked[0]?.score ?? winnerFit);
+    return {
+      rounds,
+      connectors,
+      facts: { totalCandidates, generations, dimensions, winnerFit, topDim, candByStage, topFit, genSizes },
+    };
   }, [prompt]);
 
-  // advanced ids per round (a node that also appears in the next round)
   const advancedByRound = useMemo(() => {
     const m: Record<number, Set<string>> = {};
     for (let r = 0; r < 3; r++) m[r] = new Set(rounds[r + 1].map((n) => n.id));
@@ -143,10 +160,11 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
   // revealCol: -1 boot, 0 seeded, 1..3 rounds resolved
   const [revealCol, setRevealCol] = useState(-1);
   const [revealed, setRevealed] = useState(false);
-  const [qHeld, setQHeld] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
   const [scale, setScale] = useState(1);
   const wrapRef = useRef<HTMLDivElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const startedAt = useRef<number>(Date.now());
 
   // Fit the stage to the viewport.
   useEffect(() => {
@@ -160,6 +178,13 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
   }, []);
+
+  // Real elapsed clock — ticks until the store is revealed, then freezes.
+  useEffect(() => {
+    if (revealed || error) return;
+    const id = setInterval(() => setElapsedMs(Date.now() - startedAt.current), 100);
+    return () => clearInterval(id);
+  }, [revealed, error]);
 
   // Choreography.
   useEffect(() => {
@@ -181,28 +206,10 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
     }
   }, [revealCol, result, revealed]);
 
-  // Voice — hold Q.
-  useEffect(() => {
-    if (revealed || error) return;
-    const down = (e: KeyboardEvent) => {
-      if ((e.key === "q" || e.key === "Q") && !e.repeat) setQHeld(true);
-    };
-    const up = (e: KeyboardEvent) => {
-      if (e.key === "q" || e.key === "Q") setQHeld(false);
-    };
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
-    };
-  }, [revealed, error]);
-
   const stage = Math.max(0, Math.min(revealCol, 3));
-  const uplift = UPLIFT[stage];
-  const conf = CONF[stage];
-  const traffic = TRAFFIC[stage];
-  const inPlay = IN_PLAY[stage];
+  const inPlay = [8, 4, 2, 1][stage];
+  const candidates = facts.candByStage[stage];
+  const elapsedS = (elapsedMs / 1000).toFixed(1);
 
   const gridDash = "linear-gradient(rgba(148,163,188,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,188,0.4) 1px, transparent 1px)";
 
@@ -248,41 +255,33 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
           <div className="flex items-center justify-between pr-16 text-[10px] tracking-[0.16em] sm:pr-20">
             <div className="flex items-center gap-2.5 text-mist">
               <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" style={{ animation: "urivo-live 1.6s ease-in-out infinite", boxShadow: "0 0 8px #22c55e" }} />
-              <span className="uppercase">Live</span>
+              <span className="uppercase">Urivo design engine</span>
               <span className="text-mist-dim">·</span>
-              <span className="uppercase text-mist-dim">CVR uplift since testing began</span>
+              <span className="uppercase text-mist-dim">{stage >= 3 ? "converged on the strongest" : "exploring design candidates"}</span>
             </div>
             <div className="flex items-center gap-2.5">
-              <span className="hidden text-mist-dim sm:inline">3 tests · 8 variants each</span>
-              <span className="hidden items-center gap-3 text-mist-dim sm:flex">
-                <span className="inline-flex items-center gap-1"><span className="h-1 w-1 rounded-full bg-mist" /> Regenerate</span>
-                <span className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 ${qHeld ? "border-gold/50 text-gold" : "border-hair text-mist"}`}>◈ Voice</span>
-                <span>▲ Manual</span>
-              </span>
-              <span className="tabular-nums text-sm font-semibold tracking-normal text-[#22c55e]">+{uplift.toFixed(1)}%</span>
-              <span className="hidden uppercase text-mist-dim sm:inline">Conversion</span>
+              <span className="hidden text-mist-dim sm:inline">{facts.totalCandidates} candidates · {facts.generations} generations</span>
+              <span className="tabular-nums text-sm font-semibold tracking-normal text-[#22c55e]">{facts.topFit}</span>
+              <span className="hidden uppercase text-mist-dim sm:inline">top fitness</span>
             </div>
           </div>
 
-          {/* ── Stat cards ── */}
+          {/* ── Stat cards (all real) ── */}
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="Time elapsed" value="433d 15h" sub="since first impression" />
-            <Stat label="Traffic collected" value={`${fmtCount(traffic)} / 2.7M`} sub={`${Math.round((traffic / 2.7e6) * 100)}% of required sample`} />
-            <Stat label="Est. completion" value="in 247d 11h" sub="at 4.0K visitors / day" />
-            <Stat label="Variants in play" value={String(inPlay)} sub={`${conf}% confidence`} accent={inPlay === 1} />
+            <Stat label="Candidates explored" value={String(candidates)} sub={`across ${facts.generations} generations`} />
+            <Stat label="Design signals scored" value={String(facts.dimensions)} sub="per candidate" />
+            <Stat label="Elapsed" value={`${elapsedS}s`} sub="real generation time" />
+            <Stat label="In contention" value={String(inPlay)} sub={inPlay === 1 ? `fitness ${facts.winnerFit}/100` : `top fitness ${facts.topFit}/100`} accent={inPlay === 1} />
           </div>
 
-          {/* ── Tabs ── */}
+          {/* ── Section label ── */}
           <div className="mt-4 flex items-center justify-between border-b border-hair pb-2 text-[11px]">
-            <div className="flex items-center gap-4">
-              <span className="relative pb-2 font-medium text-ivory">
-                Product page
-                <span className="absolute inset-x-0 -bottom-[9px] h-[2px] rounded-full" style={{ backgroundImage: "var(--grad-gold)" }} />
-              </span>
-              <span className="pb-2 text-mist-dim">Add to cart</span>
-            </div>
+            <span className="relative pb-2 font-medium text-ivory">
+              Design exploration
+              <span className="absolute inset-x-0 -bottom-[9px] h-[2px] rounded-full" style={{ backgroundImage: "var(--grad-gold)" }} />
+            </span>
             <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.15em] text-mist">
-              <span className="h-2 w-2 bg-[#22c55e]" style={{ boxShadow: "0 0 8px #22c55e" }} /> Running · {inPlay > 1 ? `${inPlay} variants` : "final"}
+              <span className="h-2 w-2 bg-[#22c55e]" style={{ boxShadow: "0 0 8px #22c55e" }} /> {inPlay > 1 ? `${inPlay} in contention` : "champion"}
             </span>
           </div>
 
@@ -292,7 +291,6 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
               className="relative"
               style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${scale})`, transformOrigin: "center" }}
             >
-              {/* connectors */}
               <svg viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} className="absolute inset-0 h-full w-full overflow-visible">
                 {connectors.map((c, i) => (
                   <path
@@ -309,7 +307,6 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
                 ))}
               </svg>
 
-              {/* cards */}
               {rounds.map((col, r) =>
                 col.map((n) => {
                   if (revealCol < r) return null;
@@ -326,30 +323,18 @@ export function GenerationCinema({ prompt, result, error, onOpenStore, onClose }
                 }),
               )}
             </div>
-
-            {/* Voice overlay */}
-            {qHeld && (
-              <div className="absolute inset-x-0 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-3">
-                <Waveform />
-                <span className="text-[10px] uppercase tracking-[0.2em] text-[#22c55e]">
-                  ● Listening · release Q to generate
-                </span>
-              </div>
-            )}
           </div>
 
-          {/* footer hint */}
-          <div className="flex items-center justify-center gap-5 pt-1 text-[10px] uppercase tracking-[0.18em] text-mist-dim">
-            <span className="flex items-center gap-1.5">
-              <kbd className="rounded border border-hair px-1.5 py-0.5 text-mist">Q</kbd> Hold to describe
-            </span>
-            <span className="hidden sm:inline">◈ Regenerate</span>
-            <span className="hidden sm:inline">▲ Manual</span>
+          {/* footer hint — honest, no decorative controls */}
+          <div className="flex items-center justify-center gap-2 pt-1 text-[10px] uppercase tracking-[0.18em] text-mist-dim">
+            <span>Urivo explores many directions and keeps the strongest — then builds your real store</span>
           </div>
         </div>
       )}
 
-      {revealed && result && <Reveal result={result} onOpenStore={onOpenStore} onClose={onClose} />}
+      {revealed && result && (
+        <Reveal result={result} totalCandidates={facts.totalCandidates} topDim={DIM_LABEL[facts.topDim]} onOpenStore={onOpenStore} onClose={onClose} />
+      )}
     </div>
   );
 }
@@ -384,7 +369,6 @@ function BracketCard({ node, state }: { node: Node; state: CardState }) {
       }}
     >
       <div className="flex h-full items-stretch">
-        {/* mini store thumbnail */}
         <div className="h-full w-[52px] shrink-0 overflow-hidden" style={{ background: bg }}>
           <div className="h-[13px] w-full" style={{ background: structure }} />
           <div className="p-1">
@@ -395,19 +379,18 @@ function BracketCard({ node, state }: { node: Node; state: CardState }) {
             </div>
           </div>
         </div>
-        {/* label */}
         <div className="flex flex-1 flex-col justify-center px-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-[0.14em] text-mist">Variant {node.letter}</span>
+            <span className="text-[9px] uppercase tracking-[0.14em] text-mist">Candidate {node.letter}</span>
             {champion && <span className="text-[8px] uppercase tracking-wider text-gold">Winner</span>}
           </div>
           <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-[8px] uppercase tracking-wider text-mist-dim">Seed</span>
+            <span className="text-[8px] uppercase tracking-wider text-mist-dim">Fitness</span>
             <span
               className="text-[13px] font-semibold tabular-nums"
               style={{ color: champion ? "#e4c069" : won ? "#34d399" : dead ? "#5f6f89" : "#cbd5e1" }}
             >
-              {node.cvr.toFixed(1)}%
+              {node.fit}
             </span>
           </div>
         </div>
@@ -426,27 +409,16 @@ function Stat({ label, value, sub, accent }: { label: string; value: string; sub
   );
 }
 
-function Waveform() {
-  const bars = useMemo(() => Array.from({ length: 40 }, (_, i) => (i * 37) % 100), []);
-  return (
-    <div className="flex h-12 items-center gap-[3px]">
-      {bars.map((s, i) => (
-        <span
-          key={i}
-          className="w-[3px] rounded-full bg-ivory/80"
-          style={{ height: "100%", transformOrigin: "center", animation: `urivo-wave ${560 + (s % 240)}ms ease-in-out ${(s % 100) * 4}ms infinite` }}
-        />
-      ))}
-    </div>
-  );
-}
-
 function Reveal({
   result,
+  totalCandidates,
+  topDim,
   onOpenStore,
   onClose,
 }: {
   result: CinemaResult;
+  totalCandidates: number;
+  topDim: string;
   onOpenStore: (url: string) => void;
   onClose: () => void;
 }) {
@@ -476,9 +448,9 @@ function Reveal({
           {result.tagline}
         </p>
         <div className="mt-6 flex items-center justify-center gap-6 text-[10px] uppercase tracking-[0.16em] text-mist" style={{ animation: "urivo-rise 800ms var(--ease-urivo) 600ms both" }}>
-          <span><span className="text-[#34d399]">+3.2%</span> CVR</span>
+          <span>Chosen from <span className="text-ivory">{totalCandidates}</span> candidates</span>
           <span className="text-mist-dim">·</span>
-          <span><span className="text-ivory">95%</span> confidence</span>
+          <span>Strongest on <span className="text-[#34d399]">{topDim}</span></span>
         </div>
         <div className="mt-6 flex justify-center gap-2" style={{ animation: "urivo-rise 800ms var(--ease-urivo) 700ms both" }}>
           {[result.palette.background, result.palette.structure, result.palette.accent].map((c, i) => (
