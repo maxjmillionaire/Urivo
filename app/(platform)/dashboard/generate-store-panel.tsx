@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { GenerationStudio, type StudioResult } from "./generation-studio";
 
 /*
@@ -15,10 +15,24 @@ const SUBDOMAIN_RE = /^[a-z0-9](?:[a-z0-9-]{1,61})[a-z0-9]$/;
 
 export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [subdomain, setSubdomain] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // Arriving from Market Research with a prefilled idea → open the form ready.
+  useEffect(() => {
+    const idea = searchParams.get("idea");
+    if (idea) {
+      setPrompt(idea.slice(0, 500));
+      setError(null);
+      setOpen(true);
+      router.replace("/dashboard", { scroll: false });
+    }
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Studio state
   const [studio, setStudio] = useState<{ prompt: string } | null>(null);

@@ -21,6 +21,15 @@ export function IconHome(p: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+export function IconResearch(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M11 8v6M8 11h6" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
 export function IconStore(p: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...p}>
