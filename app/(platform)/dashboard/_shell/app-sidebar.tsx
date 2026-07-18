@@ -8,6 +8,7 @@ import {
   IconHome,
   IconStore,
   IconResearch,
+  IconMegaphone,
   IconEvolution,
   IconMail,
   IconCard,
@@ -22,12 +23,13 @@ import {
  * on mobile it collapses behind a top bar and slides in as a drawer.
  */
 
-export type NavKey = "home" | "research" | "stores" | "evolution" | "emails" | "billing" | "settings";
+export type NavKey = "home" | "research" | "stores" | "ads" | "evolution" | "emails" | "billing" | "settings";
 
 const NAV: { key: NavKey; label: string; href: string; Icon: typeof IconHome }[] = [
   { key: "home", label: "Home", href: "/dashboard", Icon: IconHome },
   { key: "research", label: "Research", href: "/dashboard/research", Icon: IconResearch },
   { key: "stores", label: "Stores", href: "/dashboard#stores", Icon: IconStore },
+  { key: "ads", label: "Ad Studio", href: "/dashboard/ads", Icon: IconMegaphone },
   { key: "evolution", label: "Evolution Lab", href: "/dashboard/evolution", Icon: IconEvolution },
   { key: "emails", label: "Emails", href: "/dashboard/emails", Icon: IconMail },
   { key: "billing", label: "Billing", href: "/dashboard/billing", Icon: IconCard },

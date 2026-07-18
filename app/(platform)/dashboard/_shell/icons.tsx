@@ -21,6 +21,15 @@ export function IconHome(p: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+export function IconMegaphone(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1Z" />
+      <path d="M14 7.5a5 5 0 0 1 0 9" />
+      <path d="M7 14v3.5a1.5 1.5 0 0 0 3 0V17" />
+    </svg>
+  );
+}
 export function IconResearch(p: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...p}>
