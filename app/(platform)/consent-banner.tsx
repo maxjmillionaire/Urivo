@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { getConsent, setConsent } from "@/lib/analytics";
 
@@ -10,21 +9,20 @@ import { getConsent, setConsent } from "@/lib/analytics";
  * always allowed; analytics is enabled only on explicit "Accept". No dark
  * patterns — declining is one click and equally prominent.
  *
- * This is Urivo's own platform banner and must never appear on a generated
- * merchant storefront — those are the merchant's brand, and Urivo stays behind
- * the scenes. Suppressed on /store/* accordingly.
+ * This banner is mounted ONLY by the (platform) root layout — Urivo's own
+ * surfaces. Generated storefronts live under the separate (store) root layout
+ * and structurally cannot mount it, so Urivo's consent UI can never appear on a
+ * merchant's store regardless of how the store is routed (subdomain rewrite,
+ * custom domain, path).
  */
 export function ConsentBanner() {
-  const pathname = usePathname();
   const [show, setShow] = useState(false);
 
-  const onStorefront = pathname?.startsWith("/store/") ?? false;
-
   useEffect(() => {
-    if (!onStorefront && getConsent() === null) setShow(true);
-  }, [onStorefront]);
+    if (getConsent() === null) setShow(true);
+  }, []);
 
-  if (onStorefront || !show) return null;
+  if (!show) return null;
 
   function choose(value: "granted" | "denied") {
     setConsent(value);

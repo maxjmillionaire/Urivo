@@ -1,9 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import "./globals.css";
+import "@/app/globals.css";
 import { ConsentBanner } from "./consent-banner";
 
+/*
+ * Root layout for Urivo's OWN product surfaces (marketing, auth, dashboard).
+ * Generated merchant storefronts live under the separate (store) root layout and
+ * deliberately inherit none of this — no Urivo theme, no Urivo consent banner.
+ */
 export const metadata: Metadata = {
   title: "Urivo — The AI Commerce Operating System",
   description:
@@ -14,7 +19,7 @@ export const viewport: Viewport = {
   themeColor: "#0B1220",
 };
 
-export default function RootLayout({
+export default function PlatformLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
