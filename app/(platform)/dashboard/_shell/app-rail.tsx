@@ -8,6 +8,7 @@ import { AskUrivo } from "./ask-urivo";
  */
 
 export interface RailStore {
+  id: string;
   name: string;
   subdomain: string;
   tagline?: string;
@@ -75,8 +76,8 @@ export function AppRail({ store }: { store: RailStore | null }) {
         </div>
       </div>
 
-      {/* Ask Urivo — interactive, grounded conversation */}
-      <AskUrivo hasStore={!!store} />
+      {/* Ask Urivo — interactive, grounded conversation + live editing */}
+      <AskUrivo hasStore={!!store} storeId={store?.id ?? null} />
     </aside>
   );
 }

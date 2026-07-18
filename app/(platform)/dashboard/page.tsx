@@ -48,6 +48,7 @@ export default async function DashboardPage() {
       .order("position", { ascending: true })
       .limit(4);
     rail = {
+      id: top.id,
       name: top.store_name,
       subdomain: top.subdomain,
       tagline: theme.tagline,

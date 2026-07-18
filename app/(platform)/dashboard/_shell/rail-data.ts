@@ -26,6 +26,7 @@ export async function loadRailStore(userId: string): Promise<RailStore | null> {
     .limit(4);
 
   return {
+    id: top.id,
     name: top.store_name,
     subdomain: top.subdomain,
     tagline: theme.tagline,
