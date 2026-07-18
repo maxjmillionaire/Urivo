@@ -102,7 +102,12 @@ export default async function BillingPage() {
       <section className="mt-8">
         <h2 className="text-lg font-semibold tracking-tight text-ivory">Credit history</h2>
         {ledger.length === 0 ? (
-          <p className="mt-4 text-sm text-mist">No credit activity yet.</p>
+          <div className="u-float mt-4 rounded-2xl border border-dashed border-hair-strong bg-panel/40 p-10 text-center">
+            <p className="text-sm text-ivory">No credit activity yet</p>
+            <p className="mx-auto mt-1.5 max-w-xs text-xs leading-relaxed text-mist">
+              Your welcome credits and every store you generate will show up here.
+            </p>
+          </div>
         ) : (
           <div className="u-float mt-4 overflow-hidden rounded-2xl border border-hair bg-panel/70">
             <table className="w-full border-collapse text-left text-sm">

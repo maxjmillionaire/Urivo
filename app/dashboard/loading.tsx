@@ -1,5 +1,5 @@
-import { UrivoLoader } from "../_brand/urivo-loader";
+import { ShellSkeleton } from "./_shell/shell-skeleton";
 
 export default function Loading() {
-  return <UrivoLoader />;
+  return <ShellSkeleton />;
 }

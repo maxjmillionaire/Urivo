@@ -1,4 +1,5 @@
-import { IconSpark, IconArrow, IconMic, IconGlobe } from "./icons";
+import { IconGlobe } from "./icons";
+import { AskUrivo } from "./ask-urivo";
 
 /*
  * Persistent companion rail — the product's spine. A live preview of the
@@ -51,44 +52,31 @@ export function AppRail({ store }: { store: RailStore | null }) {
 
         {/* Contextual actions */}
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <button className="u-lift rounded-lg border border-hair bg-panel px-3 py-2 text-xs font-medium text-ivory hover:border-hair-strong hover:bg-panel-2">
-            View live
-          </button>
-          <button className="u-gold u-lift rounded-lg px-3 py-2 text-xs font-semibold hover:u-glow-gold">
+          {store ? (
+            <a
+              href={`https://${store.subdomain}.urivo.ai`}
+              target="_blank"
+              rel="noreferrer"
+              className="u-lift rounded-lg border border-hair bg-panel px-3 py-2 text-center text-xs font-medium text-ivory transition-colors hover:border-hair-strong hover:bg-panel-2 active:scale-[0.98]"
+            >
+              View live
+            </a>
+          ) : (
+            <button
+              disabled
+              className="rounded-lg border border-hair bg-panel px-3 py-2 text-xs font-medium text-mist-dim opacity-60"
+            >
+              View live
+            </button>
+          )}
+          <button className="u-gold u-lift rounded-lg px-3 py-2 text-xs font-semibold transition-transform hover:u-glow-gold active:scale-[0.98]">
             Publish
           </button>
         </div>
       </div>
 
-      <div className="flex-1" />
-
-      {/* Ask Urivo */}
-      <div className="border-t border-hair p-4">
-        <div className="mb-2 flex items-center gap-1.5 px-1">
-          <IconSpark className="text-gold" width={13} height={13} />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mist">
-            Ask Urivo
-          </span>
-        </div>
-        <div className="rounded-xl border border-hair bg-night transition-colors focus-within:border-gold/50">
-          <textarea
-            rows={2}
-            placeholder="Rewrite my hero, add 3 products, change the palette…"
-            className="w-full resize-none bg-transparent px-3.5 pt-3 text-sm text-ivory placeholder:text-mist-dim focus:outline-none"
-          />
-          <div className="flex items-center justify-between px-2.5 pb-2.5">
-            <button className="text-mist-dim transition-colors hover:text-mist" aria-label="Voice">
-              <IconMic width={16} height={16} />
-            </button>
-            <button className="u-gold flex h-7 w-7 items-center justify-center rounded-lg" aria-label="Send">
-              <IconArrow width={15} height={15} />
-            </button>
-          </div>
-        </div>
-        <p className="mt-2 px-1 text-[10px] text-mist-dim">
-          Urivo AI can edit copy, products, design and settings for you.
-        </p>
-      </div>
+      {/* Ask Urivo — interactive, grounded conversation */}
+      <AskUrivo hasStore={!!store} />
     </aside>
   );
 }
