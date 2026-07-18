@@ -579,7 +579,7 @@ function Reveal({
           <button
             type="button"
             onClick={() => onOpenStore(result.storeUrl)}
-            className="rounded-md bg-[#22c55e] px-6 py-3.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#052e16] transition-all duration-200 ease-(--ease-urivo) hover:-translate-y-0.5 hover:bg-[#4ade80]"
+            className="u-gold u-lift rounded-lg px-6 py-3.5 text-[11px] font-semibold uppercase tracking-[0.22em]"
           >
             Open your store
           </button>

@@ -121,3 +121,17 @@ export function IconMic(p: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+export function IconMenu(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+export function IconClose(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  );
+}
