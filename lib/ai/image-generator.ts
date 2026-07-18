@@ -9,21 +9,35 @@ import type { StoreDesignSystem } from "@/lib/storefront/design-system";
  * placeholders. Generation runs ONCE at store-creation time; images are stored
  * in object storage and the URLs persisted with each product.
  *
- * The provider is pluggable. The default is Google Gemini (Imagen / "Nano
- * Banana"), which has a genuine free tier and a plain HTTPS API the app can call
- * server-side at no cost to us. Swapping to another provider (Higgsfield, etc.)
- * means implementing ImageProvider — nothing else changes.
+ * The provider is pluggable. The default is Higgsfield (its "Soul" text-to-image
+ * model — the same engine behind our reference shots), with Google Gemini as an
+ * automatic fallback. Swapping or adding a provider means implementing
+ * ImageProvider — nothing else changes.
  *
- * Every step is best-effort: if the key is unset, the provider errors, a request
- * times out, or storage is unavailable, the product simply has no image and the
- * renderer falls back to its palette plane. Store generation never fails because
- * of imagery.
+ * Every step is best-effort: if credentials are unset, a provider errors, a
+ * request times out, or storage is unavailable, the product simply has no image
+ * and the renderer falls back to its palette plane. Store generation never fails
+ * because of imagery, and a total wall-clock budget keeps it inside the request
+ * limit — whatever images finished in time are used.
  */
 
 const STORAGE_BUCKET = "product-images";
-const PER_IMAGE_TIMEOUT_MS = 30_000;
 const MAX_CONCURRENT = 3;
+// Whole-imagery budget: comfortably under the route's maxDuration so a slow
+// provider can never fail store creation. Images done by the deadline are used.
+const TOTAL_BUDGET_MS = 210_000;
+
+// Gemini (fallback)
 const GEMINI_IMAGE_MODEL = process.env.GOOGLE_AI_IMAGE_MODEL || "gemini-2.5-flash-image";
+const GEMINI_TIMEOUT_MS = 45_000;
+
+// Higgsfield (primary)
+const HIGGSFIELD_ENDPOINT = "/v1/text2image/soul";
+const HIGGSFIELD_TIMEOUT_MS = 90_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
+}
 
 export interface GeneratedImage {
   bytes: Buffer;
@@ -45,7 +59,7 @@ class GeminiImageProvider implements ImageProvider {
   async generate(prompt: string): Promise<GeneratedImage | null> {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent`;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PER_IMAGE_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
     try {
       const res = await fetch(url, {
         method: "POST",
@@ -76,8 +90,60 @@ interface GeminiResponse {
   }[];
 }
 
-/** Resolve the configured provider, or null when imagery is not configured. */
+/* ---------------------------- Higgsfield provider -------------------------- */
+
+class HiggsfieldImageProvider implements ImageProvider {
+  readonly name = "higgsfield";
+  constructor(
+    private readonly credentials: string,
+    private readonly size: string,
+    private readonly quality: "720p" | "1080p",
+  ) {}
+
+  async generate(prompt: string): Promise<GeneratedImage | null> {
+    try {
+      // Dynamic import so the SDK loads only when Higgsfield is configured.
+      const { createHiggsfieldClient } = await import("@higgsfield/client/v2");
+      const client = createHiggsfieldClient({ credentials: this.credentials });
+      const res = await withTimeout(
+        client.subscribe(HIGGSFIELD_ENDPOINT, {
+          input: {
+            prompt,
+            width_and_height: this.size,
+            quality: this.quality,
+            batch_size: 1,
+            enhance_prompt: true,
+            seed: Math.floor(Math.random() * 1_000_000_000),
+          },
+          withPolling: true,
+        }),
+        HIGGSFIELD_TIMEOUT_MS,
+      );
+      if (!res || res.status !== "completed") return null;
+      const imageUrl = res.images?.[0]?.url;
+      if (!imageUrl) return null;
+      const dl = await fetch(imageUrl);
+      if (!dl.ok) return null;
+      const bytes = Buffer.from(await dl.arrayBuffer());
+      return { bytes, mimeType: dl.headers.get("content-type") || "image/png" };
+    } catch {
+      return null;
+    }
+  }
+}
+
+/**
+ * Resolve the configured provider, or null when imagery is not configured.
+ * Higgsfield is primary (best product photography); Gemini is the fallback.
+ */
 export function imageProvider(): ImageProvider | null {
+  const hfKey = process.env.HIGGSFIELD_API_KEY;
+  const hfSecret = process.env.HIGGSFIELD_API_SECRET;
+  if (hfKey && hfSecret) {
+    const size = process.env.HIGGSFIELD_IMAGE_SIZE || "1536x2048"; // 3:4 portrait
+    const quality = process.env.HIGGSFIELD_IMAGE_QUALITY === "720p" ? "720p" : "1080p";
+    return new HiggsfieldImageProvider(`${hfKey}:${hfSecret}`, size, quality);
+  }
   const gemini = process.env.GOOGLE_AI_API_KEY;
   if (gemini) return new GeminiImageProvider(gemini);
   return null;
@@ -104,17 +170,17 @@ function productPrompt(ds: StoreDesignSystem, title: string, description: string
 
 /* ------------------------------- orchestration ----------------------------- */
 
-async function withConcurrency<T, R>(items: T[], limit: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
-  const results: R[] = new Array(items.length);
+/** Run fn over items with bounded concurrency, writing into `out` as each
+ *  completes so partial progress survives an outer deadline. */
+async function runInto<T>(out: (string | null)[], items: T[], limit: number, fn: (item: T, i: number) => Promise<string | null>): Promise<void> {
   let cursor = 0;
   async function worker() {
     while (cursor < items.length) {
       const i = cursor++;
-      results[i] = await fn(items[i], i);
+      out[i] = await fn(items[i], i);
     }
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
 }
 
 async function uploadImage(subdomain: string, index: number, img: GeneratedImage): Promise<string | null> {
@@ -152,13 +218,14 @@ export async function generateStoreImagery(
   const provider = imageProvider();
   if (!provider) return products.map(() => null);
 
-  try {
-    return await withConcurrency(products, MAX_CONCURRENT, async (product, i) => {
-      const img = await provider.generate(productPrompt(designSystem, product.title, product.description));
-      if (!img) return null;
-      return uploadImage(subdomain, i, img);
-    });
-  } catch {
-    return products.map(() => null);
-  }
+  const results: (string | null)[] = new Array(products.length).fill(null);
+  const core = runInto(results, products, MAX_CONCURRENT, async (product, i) => {
+    const img = await provider.generate(productPrompt(designSystem, product.title, product.description));
+    return img ? await uploadImage(subdomain, i, img) : null;
+  }).catch(() => {});
+
+  // Whichever finishes first: all images, or the wall-clock budget. On the
+  // deadline we return whatever completed — never blocking store creation.
+  await Promise.race([core, new Promise<void>((r) => setTimeout(r, TOTAL_BUDGET_MS))]);
+  return results;
 }

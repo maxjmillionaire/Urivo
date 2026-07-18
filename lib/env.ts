@@ -21,8 +21,13 @@ const serverEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   // AI provider — required for store generation (Phase 3).
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
-  // Image provider (Google Gemini free tier) — product photography. When unset,
-  // storefronts fall back to palette planes; imagery is never required.
+  // Image provider — product photography. Higgsfield is primary (its Soul
+  // text-to-image model); Google Gemini is the fallback. When neither is set,
+  // storefronts use palette planes; imagery is never required.
+  HIGGSFIELD_API_KEY: z.string().min(1).optional(),
+  HIGGSFIELD_API_SECRET: z.string().min(1).optional(),
+  HIGGSFIELD_IMAGE_SIZE: z.string().min(1).optional(),
+  HIGGSFIELD_IMAGE_QUALITY: z.enum(["720p", "1080p"]).optional(),
   GOOGLE_AI_API_KEY: z.string().min(1).optional(),
   GOOGLE_AI_IMAGE_MODEL: z.string().min(1).optional(),
   // Upstash Redis — rate limiting across instances (Phase 5). Falls back to
