@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { GenerationCinema, type CinemaResult } from "./generation-cinema";
+import { GenerationStudio, type StudioResult } from "./generation-studio";
 
 /*
- * Store generation entry point. Collects the idea + address, then hands off to
- * the Generation Cinema (the signature creation sequence). The real API request
- * runs while the cinema plays; the reveal uses the real generated store.
+ * Store generation entry point. Collects the idea + address, then flashes to the
+ * full-screen Generation Studio — a focused creation experience with a quiet way
+ * back to the dashboard. The real API request runs while the studio plays; the
+ * reveal uses the real generated store.
  */
 
 const SUBDOMAIN_RE = /^[a-z0-9](?:[a-z0-9-]{1,61})[a-z0-9]$/;
@@ -19,10 +20,10 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
   const [subdomain, setSubdomain] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Cinema state
-  const [cinema, setCinema] = useState<{ prompt: string } | null>(null);
-  const [result, setResult] = useState<CinemaResult | null>(null);
-  const [cinemaError, setCinemaError] = useState<string | null>(null);
+  // Studio state
+  const [studio, setStudio] = useState<{ prompt: string } | null>(null);
+  const [result, setResult] = useState<StudioResult | null>(null);
+  const [studioError, setStudioError] = useState<string | null>(null);
 
   function reset() {
     setPrompt("");
@@ -42,12 +43,12 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
       return;
     }
 
-    // Launch the cinema and fire the real request in parallel.
+    // Flash to the studio and fire the real request in parallel.
     const p = prompt.trim();
     setOpen(false);
     setResult(null);
-    setCinemaError(null);
-    setCinema({ prompt: p });
+    setStudioError(null);
+    setStudio({ prompt: p });
 
     try {
       const res = await fetch("/api/generate-store", {
@@ -66,14 +67,14 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
         creditsRemaining: data.creditsRemaining,
       });
     } catch (err) {
-      setCinemaError(err instanceof Error ? err.message : "Generation failed. Please try again.");
+      setStudioError(err instanceof Error ? err.message : "Generation failed. Please try again.");
     }
   }
 
-  function closeCinema() {
-    setCinema(null);
+  function closeStudio() {
+    setStudio(null);
     setResult(null);
-    setCinemaError(null);
+    setStudioError(null);
     reset();
     router.refresh();
   }
@@ -174,17 +175,17 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
         </div>
       )}
 
-      {/* The cinematic creation sequence */}
-      {cinema && (
-        <GenerationCinema
-          prompt={cinema.prompt}
+      {/* The focused, full-screen creation experience */}
+      {studio && (
+        <GenerationStudio
+          prompt={studio.prompt}
           result={result}
-          error={cinemaError}
+          error={studioError}
           onOpenStore={(url) => {
             if (url.startsWith("/")) window.location.href = url;
             else window.open(url, "_blank", "noreferrer");
           }}
-          onClose={closeCinema}
+          onClose={closeStudio}
         />
       )}
     </>
