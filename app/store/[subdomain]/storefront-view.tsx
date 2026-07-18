@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { StorefrontTheme } from "@/lib/storefront";
 
 /*
@@ -13,6 +14,51 @@ export interface StorefrontProduct {
   price_eur: number | string;
 }
 
+/* ---- Colour math: derive a premium glossy CTA from a single brand accent ---- */
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const n = parseInt(full, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function toHex(r: number, g: number, b: number): string {
+  const c = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+
+/** Mix a hex toward a target rgb by amount (0–1). */
+function mix(hex: string, target: [number, number, number], amt: number): string {
+  const [r, g, b] = hexToRgb(hex);
+  return toHex(r + (target[0] - r) * amt, g + (target[1] - g) * amt, b + (target[2] - b) * amt);
+}
+
+/** Relative luminance (WCAG) — used to pick readable ink on the accent. */
+function luminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex).map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+const WHITE: [number, number, number] = [255, 255, 255];
+const BLACK: [number, number, number] = [0, 0, 0];
+
+/** CSS custom properties that drive the shared `.u-cta-premium` finish. */
+function ctaVars(accent: string): CSSProperties {
+  const [r, g, b] = hexToRgb(accent);
+  const ink = luminance(accent) > 0.52 ? mix(accent, BLACK, 0.82) : "#ffffff";
+  return {
+    ["--cta-hi" as string]: mix(accent, WHITE, 0.24),
+    ["--cta-base" as string]: accent,
+    ["--cta-lo" as string]: mix(accent, BLACK, 0.16),
+    ["--cta-ink" as string]: ink,
+    ["--cta-glow" as string]: `rgba(${r}, ${g}, ${b}, 0.5)`,
+  } as CSSProperties;
+}
+
 export function StorefrontView({
   storeName,
   theme,
@@ -24,6 +70,7 @@ export function StorefrontView({
 }) {
   const line = `${theme.structure}1F`; // ~12% structure for hairlines
   const faint = `${theme.structure}0D`;
+  const cta = ctaVars(theme.accent);
 
   return (
     <div
@@ -42,10 +89,7 @@ export function StorefrontView({
           <nav className="flex items-center gap-7 text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70">
             <span>Shop</span>
             <span className="hidden sm:inline">About</span>
-            <span
-              className="rounded-full px-3 py-1.5 text-[10px]"
-              style={{ backgroundColor: theme.accent, color: theme.background }}
-            >
+            <span className="u-cta-premium rounded-full px-3 py-1.5 text-[10px]" style={cta}>
               Cart · 0
             </span>
           </nav>
@@ -64,8 +108,8 @@ export function StorefrontView({
           </h1>
           {theme.tagline && <p className="mt-6 max-w-xl text-lg italic opacity-70">{theme.tagline}</p>}
           <button
-            className="mt-9 rounded-full px-7 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] transition-transform duration-200 hover:scale-[1.02]"
-            style={{ backgroundColor: theme.accent, color: theme.background }}
+            className="u-cta-premium mt-9 rounded-full px-7 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] hover:-translate-y-0.5"
+            style={cta}
           >
             Shop the collection
           </button>
