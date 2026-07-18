@@ -27,6 +27,7 @@ export interface RenderProduct {
   title: string;
   description: string | null;
   price_eur: number | string;
+  image_url?: string | null;
 }
 
 const BLACK: [number, number, number] = [0, 0, 0];
@@ -147,8 +148,26 @@ function planeStyle(ds: StoreDesignSystem): CSSProperties {
   }
 }
 
-function Plane({ ds, index, aspect }: { ds: StoreDesignSystem; index: number; aspect: string }) {
+function Plane({ ds, index, src, alt }: { ds: StoreDesignSystem; index: number; src?: string | null; alt?: string }) {
   const p = ds.palette;
+  // Real product photography when available; the palette plane is the fallback.
+  if (src) {
+    return (
+      <>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          className="uv-plane"
+          src={src}
+          alt={alt || ""}
+          loading="lazy"
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+        />
+        {ds.layout.imageTreatment === "duotone" && (
+          <div style={{ position: "absolute", inset: 0, mixBlendMode: "multiply", background: `linear-gradient(150deg, ${rgba(p.accent, 0.4)}, ${rgba(p.ink, 0.5)})` }} />
+        )}
+      </>
+    );
+  }
   return (
     <div className="uv-plane" style={{ position: "absolute", inset: 0, ...planeStyle(ds) }}>
       <div
@@ -160,18 +179,10 @@ function Plane({ ds, index, aspect }: { ds: StoreDesignSystem; index: number; as
       />
       <span
         className="uv-h"
-        style={{
-          position: "absolute",
-          left: "1rem",
-          top: "0.85rem",
-          fontSize: ".7rem",
-          letterSpacing: ".2em",
-          opacity: 0.4,
-        }}
+        style={{ position: "absolute", left: "1rem", top: "0.85rem", fontSize: ".7rem", letterSpacing: ".2em", opacity: 0.4 }}
       >
         {String(index + 1).padStart(2, "0")}
       </span>
-      <span aria-hidden style={{ position: "absolute", inset: 0 }} data-aspect={aspect} />
     </div>
   );
 }
@@ -252,7 +263,7 @@ function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
 
 /* --------------------------------- HERO ------------------------------------ */
 
-function Hero({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
+function Hero({ storeName, ds, heroImage }: { storeName: string; ds: StoreDesignSystem; heroImage?: string | null }) {
   const tagline = ds.tagline || ds.personality;
   const eyebrow = "New collection";
 
@@ -271,7 +282,7 @@ function Hero({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
               </div>
             </div>
             <div style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: "var(--radius)", overflow: "hidden" }} className="uv-card">
-              <Plane ds={ds} index={0} aspect="4/5" />
+              <Plane ds={ds} index={0} src={heroImage} />
             </div>
           </div>
         </div>
@@ -282,8 +293,13 @@ function Hero({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
   if (ds.layout.hero === "fullbleed") {
     return (
       <section style={{ position: "relative", minHeight: "72vh", display: "flex", alignItems: "flex-end", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, ...planeStyle(ds) }} />
-        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, transparent 30%, ${rgba(ds.palette.background, 0.86)})` }} />
+        {heroImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={heroImage} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <div style={{ position: "absolute", inset: 0, ...planeStyle(ds) }} />
+        )}
+        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${rgba(ds.palette.background, 0.1)} 20%, ${rgba(ds.palette.background, 0.92)})` }} />
         <div className="uv-wrap uv-rise" style={{ position: "relative", paddingBottom: "clamp(3rem,6vw,6rem)", paddingTop: "6rem" }}>
           <p className="uv-eyebrow">{eyebrow}</p>
           <h1 style={{ fontSize: "var(--h1)", marginTop: "1rem", maxWidth: "16ch" }}>{storeName}</h1>
@@ -326,7 +342,7 @@ function ProductCard({ ds, product, index }: { ds: StoreDesignSystem; product: R
   if (variant === "overlay") {
     return (
       <article className="uv-card" style={{ position: "relative", aspectRatio: "3 / 4", borderRadius: "var(--radius)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
-        <Plane ds={ds} index={index} aspect="3/4" />
+        <Plane ds={ds} index={index} src={product.image_url} alt={product.title} />
         <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, transparent 45%, ${rgba(ds.palette.ink, 0.55)})` }} />
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "1.2rem" }}>
           <h3 className="uv-h" style={{ color: "#fff", fontSize: "1.05rem" }}>{product.title}</h3>
@@ -343,7 +359,7 @@ function ProductCard({ ds, product, index }: { ds: StoreDesignSystem; product: R
     return (
       <article className="uv-card" style={{ border: `var(--border-w) solid ${ds.palette.line}`, borderRadius: "var(--radius)", padding: "1rem", background: "var(--surface)", boxShadow: "var(--shadow-card)" }}>
         <div style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: "calc(var(--radius) * .7)", overflow: "hidden" }}>
-          <Plane ds={ds} index={index} aspect="1/1" />
+          <Plane ds={ds} index={index} src={product.image_url} alt={product.title} />
         </div>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "1rem", marginTop: "1rem" }}>
           <h3 className="uv-h" style={{ fontSize: "1.02rem" }}>{product.title}</h3>
@@ -359,7 +375,7 @@ function ProductCard({ ds, product, index }: { ds: StoreDesignSystem; product: R
     return (
       <article className="uv-card">
         <div style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: "var(--radius)", overflow: "hidden" }}>
-          <Plane ds={ds} index={index} aspect="1/1" />
+          <Plane ds={ds} index={index} src={product.image_url} alt={product.title} />
         </div>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: ".8rem" }}>
           <h3 className="uv-h" style={{ fontSize: ".96rem", fontWeight: 500 }}>{product.title}</h3>
@@ -373,7 +389,7 @@ function ProductCard({ ds, product, index }: { ds: StoreDesignSystem; product: R
   return (
     <article className="uv-card">
       <div style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: "var(--radius)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
-        <Plane ds={ds} index={index} aspect="4/5" />
+        <Plane ds={ds} index={index} src={product.image_url} alt={product.title} />
       </div>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "1rem", marginTop: "1.1rem" }}>
         <h3 className="uv-h" style={{ fontSize: "1.12rem" }}>{product.title}</h3>
@@ -597,11 +613,13 @@ export function StorefrontRenderer({
   catalog: RenderProduct[];
 }) {
   const fontsHref = googleFontsUrl(ds);
+  // A hero image lifts the split/fullbleed heroes; use the first product photo.
+  const heroImage = catalog.find((p) => p.image_url)?.image_url ?? null;
 
   const render = (key: SectionKey) => {
     switch (key) {
       case "announcement": return <Announcement key={key} ds={ds} />;
-      case "hero": return <Hero key={key} storeName={storeName} ds={ds} />;
+      case "hero": return <Hero key={key} storeName={storeName} ds={ds} heroImage={heroImage} />;
       case "marquee": return <Marquee key={key} ds={ds} storeName={storeName} />;
       case "trust": return <Trust key={key} ds={ds} />;
       case "collection": return <Collection key={key} ds={ds} catalog={catalog} />;

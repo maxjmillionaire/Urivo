@@ -56,7 +56,7 @@ export default async function StorefrontPage({ params }: Props) {
   const supabase = await supabaseServer();
   const { data: products } = await supabase
     .from("products")
-    .select("id, title, description, price_eur")
+    .select("id, title, description, price_eur, image_url")
     .eq("store_id", store.id)
     .order("position", { ascending: true });
 

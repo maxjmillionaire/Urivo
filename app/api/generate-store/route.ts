@@ -11,10 +11,11 @@ import {
   STORE_GENERATOR_MODEL,
   STORE_GENERATOR_PROMPT_VERSION,
 } from "@/lib/ai/store-generator";
+import { generateStoreImagery } from "@/lib/ai/image-generator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 /*
  * Store generation pipeline (spec 6.3 §21):
@@ -144,10 +145,21 @@ export async function POST(request: NextRequest) {
     },
   };
 
-  const products = generated.products.map((p) => ({
+  // 5b. Product photography (best-effort). Runs after a successful generation;
+  // never blocks or fails store creation — a missing image just falls back to
+  // the storefront's palette plane.
+  let imageUrls: (string | null)[] = generated.products.map(() => null);
+  try {
+    imageUrls = await generateStoreImagery(body.subdomain, ds, generated.products);
+  } catch (err) {
+    captureException(err, { requestId, userId: user.id, route: "generate-store:imagery" });
+  }
+
+  const products = generated.products.map((p, i) => ({
     title: p.title,
     description: p.description,
     price_eur: p.priceEUR,
+    image_url: imageUrls[i] ?? null,
     inventory_count: 100,
   }));
 

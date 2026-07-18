@@ -21,6 +21,10 @@ const serverEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   // AI provider — required for store generation (Phase 3).
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  // Image provider (Google Gemini free tier) — product photography. When unset,
+  // storefronts fall back to palette planes; imagery is never required.
+  GOOGLE_AI_API_KEY: z.string().min(1).optional(),
+  GOOGLE_AI_IMAGE_MODEL: z.string().min(1).optional(),
   // Upstash Redis — rate limiting across instances (Phase 5). Falls back to
   // in-memory when unset.
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
