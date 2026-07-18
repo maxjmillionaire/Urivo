@@ -21,3 +21,6 @@ out/
 # TypeScript incremental build info
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+
+# Local scratch/overview generator (not part of the product)
+scratchpad_gen.py
