@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/storefront";
 import { parseDesignSystem, themeToDesignSystem, parseLogo } from "@/lib/storefront/design-system";
-import { storeJsonLd } from "@/lib/seo";
+import { storeJsonLd, jsonLdScript } from "@/lib/seo";
 import { StorefrontRenderer } from "./storefront-renderer";
 
 export const dynamic = "force-dynamic";
@@ -109,7 +109,7 @@ export default async function StorefrontPage({ params }: Props) {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }} />
       <StorefrontRenderer storeName={store.store_name} ds={ds} catalog={products} logo={logo} />
     </>
   );

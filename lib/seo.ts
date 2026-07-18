@@ -20,6 +20,26 @@ export interface SeoStore {
   products: SeoProduct[];
 }
 
+/**
+ * Serialize a JSON-LD object for safe embedding inside an inline
+ * <script type="application/ld+json"> tag. `JSON.stringify` alone does NOT
+ * escape "<", so a product title or store name containing "</script>" would
+ * break out of the script element and execute arbitrary markup (stored XSS on
+ * the public storefront). Escaping "<" — plus the JS line separators U+2028 /
+ * U+2029, which are valid in JSON but illegal in a script body — closes that
+ * hole while keeping the output valid JSON-LD.
+ */
+export function jsonLdScript(data: Record<string, unknown>): string {
+  const LINE_SEP = String.fromCharCode(0x2028);
+  const PARA_SEP = String.fromCharCode(0x2029);
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .split(LINE_SEP)
+    .join("\\u2028")
+    .split(PARA_SEP)
+    .join("\\u2029");
+}
+
 /** JSON-LD for the store (Organization + ItemList of products with Offers). */
 export function storeJsonLd(store: SeoStore): Record<string, unknown> {
   const org = {
