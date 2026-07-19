@@ -24,16 +24,18 @@ export async function recordPaidOrder(
   admin: SupabaseClient,
   params: {
     eventId: string;
+    eventType: string;
     storeId: string;
     session: Stripe.Checkout.Session;
     lines: OrderLineInput[];
   },
 ): Promise<string | null> {
-  // Idempotency: claim the event id first. A duplicate insert means we've
-  // already handled this event.
+  // Idempotency: claim the event first. A duplicate insert (same event_id PK)
+  // means we've already handled this event. The table's columns are event_id
+  // (PK) + event_type (NOT NULL) — see migration 0001.
   const { error: claimErr } = await admin
     .from("stripe_webhook_events")
-    .insert({ id: params.eventId });
+    .insert({ event_id: params.eventId, event_type: params.eventType, processing_status: "processed" });
   if (claimErr) {
     // Unique violation → already processed.
     return null;

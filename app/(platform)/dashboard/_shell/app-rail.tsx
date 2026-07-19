@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { IconGlobe } from "./icons";
 import { AskUrivo } from "./ask-urivo";
 
@@ -54,25 +55,29 @@ export function AppRail({ store }: { store: RailStore | null }) {
         {/* Contextual actions */}
         <div className="mt-4 grid grid-cols-2 gap-2">
           {store ? (
-            <a
-              href={`https://${store.subdomain}.urivo.ai`}
-              target="_blank"
-              rel="noreferrer"
-              className="u-lift rounded-lg border border-hair bg-panel px-3 py-2 text-center text-xs font-medium text-ivory transition-colors hover:border-hair-strong hover:bg-panel-2 active:scale-[0.98]"
-            >
-              View live
-            </a>
+            <>
+              <a
+                href={`https://${store.subdomain}.urivo.ai`}
+                target="_blank"
+                rel="noreferrer"
+                className="u-lift rounded-lg border border-hair bg-panel px-3 py-2 text-center text-xs font-medium text-ivory transition-colors hover:border-hair-strong hover:bg-panel-2 active:scale-[0.98]"
+              >
+                View live
+              </a>
+              <Link
+                href={`/dashboard/stores/${store.id}`}
+                className="u-gold u-lift rounded-lg px-3 py-2 text-center text-xs font-semibold transition-transform hover:u-glow-gold active:scale-[0.98]"
+              >
+                Manage
+              </Link>
+            </>
           ) : (
-            <button
-              disabled
-              className="rounded-lg border border-hair bg-panel px-3 py-2 text-xs font-medium text-mist-dim opacity-60"
-            >
-              View live
-            </button>
+            <>
+              <button disabled className="col-span-2 rounded-lg border border-hair bg-panel px-3 py-2 text-xs font-medium text-mist-dim opacity-60">
+                No store to preview yet
+              </button>
+            </>
           )}
-          <button className="u-gold u-lift rounded-lg px-3 py-2 text-xs font-semibold transition-transform hover:u-glow-gold active:scale-[0.98]">
-            Publish
-          </button>
         </div>
       </div>
 

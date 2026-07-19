@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { GenerateStorePanel } from "../generate-store-panel";
-import { IconRefresh, IconStore, IconBox, IconGlobe, IconCard, IconSpark } from "./icons";
+import { IconStore, IconCard, IconSpark, IconResearch, IconMegaphone, IconEvolution, IconArrow } from "./icons";
 
 /*
  * Home — present-tense, task-first. A quiet metric strip, an AI to-do band,
@@ -27,10 +27,10 @@ export interface DashboardHomeProps {
 }
 
 const TASKS = [
-  { key: "generate", label: "Generate a store", hint: "Describe it in one sentence", Icon: IconStore },
-  { key: "products", label: "Add products", hint: "Let AI write the catalog", Icon: IconBox },
-  { key: "domain", label: "Connect a domain", hint: "Go live on your own address", Icon: IconGlobe },
-  { key: "plan", label: "Choose a plan", hint: "Unlock more credits", Icon: IconCard },
+  { href: "/dashboard/research", label: "Research the market", hint: "Find a winning niche and products", Icon: IconResearch },
+  { href: "/dashboard/ads", label: "Ad Studio", hint: "Channel strategy and ready-to-run creative", Icon: IconMegaphone },
+  { href: "/dashboard/evolution", label: "Evolution Lab", hint: "Evolve a stronger storefront", Icon: IconEvolution },
+  { href: "/dashboard/billing", label: "Plans and credits", hint: "Unlock more generations", Icon: IconCard },
 ];
 
 export function DashboardHome({
@@ -63,12 +63,7 @@ export function DashboardHome({
           </h1>
           <p className="mt-1.5 text-sm text-mist">Your commerce, running as one.</p>
         </div>
-        <div className="flex items-center gap-2.5">
-          <button className="u-lift inline-flex items-center gap-1.5 rounded-lg border border-hair bg-panel px-3 py-2 text-xs font-medium text-mist hover:border-hair-strong hover:text-ivory">
-            <IconRefresh width={14} height={14} /> Refresh
-          </button>
-          <GenerateStorePanel canGenerate={canGenerate} />
-        </div>
+        <GenerateStorePanel canGenerate={canGenerate} />
       </div>
 
       {/* Metric strip */}
@@ -85,15 +80,15 @@ export function DashboardHome({
           <div className="flex items-center gap-2">
             <IconSpark className="text-gold" width={14} height={14} />
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">
-              Let Urivo take it from here
+              Where to next
             </h2>
           </div>
           <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
-            {TASKS.map(({ key, label, hint, Icon }) => (
-              <button
-                key={key}
-                type="button"
-                className="u-lift group flex items-center justify-between rounded-xl border border-hair bg-night px-4 py-3.5 text-left hover:border-hair-strong hover:bg-night-2"
+            {TASKS.map(({ href, label, hint, Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className="u-lift group flex items-center justify-between rounded-xl border border-hair bg-night px-4 py-3.5 text-left transition-colors hover:border-hair-strong hover:bg-night-2"
               >
                 <div className="flex items-center gap-3">
                   <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-gold/20 bg-gold/[0.06] text-gold">
@@ -104,10 +99,8 @@ export function DashboardHome({
                     <p className="text-[11px] text-mist-dim">{hint}</p>
                   </div>
                 </div>
-                <span className="inline-flex items-center gap-1 rounded-md border border-gold/25 px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-gold-soft opacity-80 transition-opacity group-hover:opacity-100">
-                  <IconSpark width={9} height={9} /> Automate
-                </span>
-              </button>
+                <IconArrow width={16} height={16} className="text-mist-dim transition-colors group-hover:text-gold-soft" />
+              </Link>
             ))}
           </div>
         </section>

@@ -22,7 +22,7 @@ import {
  * on mobile it collapses behind a top bar and slides in as a drawer.
  */
 
-export type NavKey = "home" | "research" | "stores" | "ads" | "evolution" | "emails" | "billing" | "settings";
+export type NavKey = "home" | "research" | "stores" | "ads" | "evolution" | "billing" | "settings";
 
 const NAV: { key: NavKey; label: string; href: string; Icon: typeof IconHome }[] = [
   { key: "home", label: "Home", href: "/dashboard", Icon: IconHome },
@@ -122,13 +122,13 @@ export function AppSidebar({
         </nav>
 
         <div className="space-y-0.5 px-3 pb-3">
-          <Link
-            href="/support"
+          <a
+            href="mailto:urivosupport@gmail.com"
             onClick={close}
             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] text-mist transition-colors hover:bg-white/[0.035] hover:text-ivory"
           >
             <IconHelp /> Support
-          </Link>
+          </a>
           {row("settings", "Settings", "/dashboard/settings", IconSettings)}
         </div>
 

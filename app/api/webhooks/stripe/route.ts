@@ -90,6 +90,7 @@ async function fulfil(event: Stripe.Event, session: Stripe.Checkout.Session) {
 
   await recordPaidOrder(supabaseAdmin(), {
     eventId: event.id,
+    eventType: event.type,
     storeId,
     session,
     lines,
