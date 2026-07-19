@@ -30,6 +30,10 @@ const serverEnvSchema = z.object({
   HIGGSFIELD_IMAGE_QUALITY: z.enum(["720p", "1080p"]).optional(),
   GOOGLE_AI_API_KEY: z.string().min(1).optional(),
   GOOGLE_AI_IMAGE_MODEL: z.string().min(1).optional(),
+  // Stripe — storefront commerce via Connect (merchants receive their own
+  // money) and platform billing. Checkout degrades gracefully when unset.
+  STRIPE_SECRET_KEY: z.string().min(1).optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
   // Upstash Redis — rate limiting across instances (Phase 5). Falls back to
   // in-memory when unset.
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),

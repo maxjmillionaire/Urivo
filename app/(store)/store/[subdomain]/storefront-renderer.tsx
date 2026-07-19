@@ -10,6 +10,18 @@ import {
   type StoreLogo,
   type LogoPosition,
 } from "@/lib/storefront/design-system";
+import { toCents } from "@/lib/commerce/types";
+import { StoreCartProvider, AddToCart, CartButton } from "./cart/store-cart";
+
+/** Build the client cart payload (display snapshot) from a catalogue product. */
+function cartProduct(p: RenderProduct) {
+  return {
+    productId: p.id,
+    title: p.title,
+    priceCents: toCents(Number(p.price_eur)),
+    image: p.image_url ?? null,
+  };
+}
 
 /*
  * The generative storefront RENDERER.
@@ -247,11 +259,7 @@ function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
       {storeName}
     </span>
   );
-  const cart = (
-    <span className="uv-chip" style={{ color: "var(--ink)" }}>
-      Cart · 0
-    </span>
-  );
+  const cart = <CartButton className="uv-navlink" />;
 
   if (ds.layout.nav === "centered") {
     return (
@@ -291,7 +299,7 @@ function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
       <header>
         <div className="uv-wrap" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.8rem 0" }}>
           {brand}
-          <a className="uv-navlink" style={{ fontSize: ".76rem" }}>Cart (0)</a>
+          <CartButton className="uv-navlink" />
         </div>
       </header>
     );
@@ -400,7 +408,7 @@ function ProductCard({ ds, product, index, logo }: { ds: StoreDesignSystem; prod
           <h3 className="uv-h" style={{ color: "#fff", fontSize: "1.05rem" }}>{product.title}</h3>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: ".4rem" }}>
             <span style={{ color: "#fff", opacity: 0.85, fontSize: ".9rem" }}>{price(product.price_eur)}</span>
-            <button className="uv-btn uv-overlay-cta" style={{ padding: ".55rem 1rem", fontSize: ".64rem" }}>Add</button>
+            <AddToCart product={cartProduct(product)} label="Add" className="uv-btn uv-overlay-cta" style={{ padding: ".55rem 1rem", fontSize: ".64rem" }} />
           </div>
         </div>
       </article>
@@ -418,7 +426,7 @@ function ProductCard({ ds, product, index, logo }: { ds: StoreDesignSystem; prod
           <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{price(product.price_eur)}</span>
         </div>
         {product.description && <p style={{ marginTop: ".5rem", fontSize: ".86rem", color: "var(--muted)", lineHeight: 1.55 }}>{product.description}</p>}
-        <button className="uv-btn" style={{ marginTop: "1rem", width: "100%" }}>Add to cart</button>
+        <AddToCart product={cartProduct(product)} className="uv-btn" style={{ marginTop: "1rem", width: "100%" }} />
       </article>
     );
   }
@@ -432,6 +440,9 @@ function ProductCard({ ds, product, index, logo }: { ds: StoreDesignSystem; prod
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: ".8rem" }}>
           <h3 className="uv-h" style={{ fontSize: ".96rem", fontWeight: 500 }}>{product.title}</h3>
           <span style={{ fontSize: ".9rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{price(product.price_eur)}</span>
+        </div>
+        <div style={{ marginTop: ".7rem" }}>
+          <AddToCart product={cartProduct(product)} className="uv-link" style={{ background: "none", cursor: "pointer" }} />
         </div>
       </article>
     );
@@ -449,7 +460,7 @@ function ProductCard({ ds, product, index, logo }: { ds: StoreDesignSystem; prod
       </div>
       {product.description && <p style={{ marginTop: ".55rem", fontSize: ".9rem", color: "var(--muted)", lineHeight: 1.6 }}>{product.description}</p>}
       <div style={{ marginTop: "1rem" }}>
-        <button className="uv-link" style={{ background: "none", cursor: "pointer" }}>Add to cart</button>
+        <AddToCart product={cartProduct(product)} className="uv-link" style={{ background: "none", cursor: "pointer" }} />
       </div>
     </article>
   );
@@ -660,11 +671,15 @@ export function StorefrontRenderer({
   ds,
   catalog,
   logo,
+  subdomain,
+  currency = "eur",
 }: {
   storeName: string;
   ds: StoreDesignSystem;
   catalog: RenderProduct[];
   logo?: StoreLogo | null;
+  subdomain: string;
+  currency?: string;
 }) {
   const fontsHref = googleFontsUrl(ds);
   // A hero image lifts the split/fullbleed heroes; use the first product photo.
@@ -695,9 +710,11 @@ export function StorefrontRenderer({
       {fontsHref && <link rel="stylesheet" href={fontsHref} />}
       <style dangerouslySetInnerHTML={{ __html: scopedCss(ds) }} />
       <div id="uv-store" style={buildVars(ds)}>
-        {hasAnnouncement && <Announcement ds={ds} />}
-        <Nav storeName={storeName} ds={ds} />
-        {body.map(render)}
+        <StoreCartProvider subdomain={subdomain} currency={currency}>
+          {hasAnnouncement && <Announcement ds={ds} />}
+          <Nav storeName={storeName} ds={ds} />
+          {body.map(render)}
+        </StoreCartProvider>
       </div>
     </>
   );

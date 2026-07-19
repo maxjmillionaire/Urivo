@@ -22,7 +22,7 @@ const loadStore = cache(async (subdomain: string) => {
   const supabase = await supabaseServer();
   const { data: store } = await supabase
     .from("stores")
-    .select("id, store_name, theme_config")
+    .select("id, store_name, theme_config, currency")
     .eq("subdomain", subdomain)
     .eq("is_active", true)
     .single();
@@ -110,7 +110,14 @@ export default async function StorefrontPage({ params }: Props) {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }} />
-      <StorefrontRenderer storeName={store.store_name} ds={ds} catalog={products} logo={logo} />
+      <StorefrontRenderer
+        storeName={store.store_name}
+        ds={ds}
+        catalog={products}
+        logo={logo}
+        subdomain={subdomain}
+        currency={(store as { currency?: string }).currency ?? "eur"}
+      />
     </>
   );
 }

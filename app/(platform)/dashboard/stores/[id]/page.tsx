@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/storefront";
 import { parseLogo } from "@/lib/storefront/design-system";
@@ -60,14 +61,22 @@ export default async function StoreDetailPage({
           <h1 className="mt-2 text-[28px] font-semibold tracking-tight text-ivory">{store.store_name}</h1>
           <p className="mt-1.5 font-mono text-xs text-mist-dim">{store.subdomain}.urivo.ai</p>
         </div>
-        <a
-          href={storeUrl(store.subdomain)}
-          target="_blank"
-          rel="noreferrer"
-          className="u-lift self-start rounded-xl border border-hair bg-panel px-5 py-2.5 text-sm font-semibold text-ivory hover:border-hair-strong hover:bg-panel-2"
-        >
-          View live
-        </a>
+        <div className="flex items-center gap-2.5 self-start">
+          <Link
+            href={`/dashboard/stores/${store.id}/orders`}
+            className="u-lift rounded-xl border border-hair bg-panel px-5 py-2.5 text-sm font-semibold text-ivory transition-colors hover:border-hair-strong hover:bg-panel-2"
+          >
+            Orders
+          </Link>
+          <a
+            href={storeUrl(store.subdomain)}
+            target="_blank"
+            rel="noreferrer"
+            className="u-lift rounded-xl border border-hair bg-panel px-5 py-2.5 text-sm font-semibold text-ivory hover:border-hair-strong hover:bg-panel-2"
+          >
+            View live
+          </a>
+        </div>
       </header>
 
       <StoreManager
