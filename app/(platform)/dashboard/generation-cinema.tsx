@@ -381,8 +381,11 @@ function BracketCard({ node, state }: { node: Node; state: CardState }) {
         </div>
         <div className="flex flex-1 flex-col justify-center px-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-[0.14em] text-mist">Candidate {node.letter}</span>
-            {champion && <span className="text-[8px] uppercase tracking-wider text-gold">Winner</span>}
+            <span
+              className={`whitespace-nowrap text-[9px] uppercase tracking-[0.14em] ${champion ? "font-semibold text-gold" : "text-mist"}`}
+            >
+              {champion ? "Winner" : `Candidate ${node.letter}`}
+            </span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="text-[8px] uppercase tracking-wider text-mist-dim">Fitness</span>
