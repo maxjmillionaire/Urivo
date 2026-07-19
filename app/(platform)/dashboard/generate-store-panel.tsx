@@ -17,16 +17,27 @@ import { track } from "@/lib/analytics";
  * instead. Both are honest and both reveal the same real store.
  */
 
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(false);
+/*
+ * Prefer the calm, vertical Generation Studio when the viewer asked for reduced
+ * motion OR is on a narrow screen — the horizontal tournament bracket of the
+ * Cinema needs width to breathe, so phones get the Studio instead. Both reveal
+ * the same real store.
+ */
+function usePreferStudio() {
+  const [studio, setStudio] = useState(false);
   useEffect(() => {
-    const m = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const on = () => setReduced(m.matches);
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const narrow = window.matchMedia("(max-width: 1023px)");
+    const on = () => setStudio(reduce.matches || narrow.matches);
     on();
-    m.addEventListener("change", on);
-    return () => m.removeEventListener("change", on);
+    reduce.addEventListener("change", on);
+    narrow.addEventListener("change", on);
+    return () => {
+      reduce.removeEventListener("change", on);
+      narrow.removeEventListener("change", on);
+    };
   }, []);
-  return reduced;
+  return studio;
 }
 
 const SUBDOMAIN_RE = /^[a-z0-9](?:[a-z0-9-]{1,61})[a-z0-9]$/;
@@ -54,7 +65,7 @@ export function GenerateStorePanel({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const reducedMotion = usePrefersReducedMotion();
+  const preferStudio = usePreferStudio();
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [subdomain, setSubdomain] = useState("");
@@ -392,7 +403,7 @@ export function GenerateStorePanel({
 
       {/* The focused, full-screen creation experience */}
       {studio &&
-        (reducedMotion ? (
+        (preferStudio ? (
           <GenerationStudio
             prompt={studio.prompt}
             result={result}

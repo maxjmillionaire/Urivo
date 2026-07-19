@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getConsent, setConsent } from "@/lib/analytics";
 
@@ -17,10 +17,27 @@ import { getConsent, setConsent } from "@/lib/analytics";
  */
 export function ConsentBanner() {
   const [show, setShow] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (getConsent() === null) setShow(true);
   }, []);
+
+  // Reserve space so the fixed banner never covers page content (e.g. the login
+  // footer links on short mobile screens). Cleared on dismiss.
+  useEffect(() => {
+    if (!show) return;
+    const apply = () => {
+      const h = ref.current?.offsetHeight ?? 0;
+      document.body.style.paddingBottom = `${h}px`;
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    return () => {
+      window.removeEventListener("resize", apply);
+      document.body.style.paddingBottom = "";
+    };
+  }, [show]);
 
   if (!show) return null;
 
@@ -31,6 +48,7 @@ export function ConsentBanner() {
 
   return (
     <div
+      ref={ref}
       role="dialog"
       aria-label="Cookie consent"
       className="u-glass fixed inset-x-0 bottom-0 z-50 border-t border-hair"

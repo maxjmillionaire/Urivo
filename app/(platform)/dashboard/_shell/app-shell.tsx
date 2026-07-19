@@ -1,5 +1,6 @@
 import { AppSidebar, type NavKey } from "./app-sidebar";
 import { AppRail, type RailStore } from "./app-rail";
+import { MobileRail } from "./mobile-rail";
 
 /*
  * The stable product frame: fixed left nav, fixed right companion rail, a
@@ -37,6 +38,7 @@ export function AppShell({
         </main>
       </div>
       <AppRail store={store} />
+      <MobileRail store={store} />
     </div>
   );
 }

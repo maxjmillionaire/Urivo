@@ -42,7 +42,7 @@ export default function UpdatePasswordPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-night px-6 py-16 text-ivory">
+    <main className="relative flex min-h-[100svh] items-start justify-center overflow-x-hidden bg-night px-6 pb-16 pt-12 text-ivory sm:items-center sm:py-16">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"

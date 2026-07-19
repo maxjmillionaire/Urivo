@@ -142,6 +142,13 @@ function scopedCss(ds: StoreDesignSystem): string {
 #uv-store a{ color:inherit; text-decoration:none; }
 #uv-store .uv-navlink{ font-size:.74rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); transition:color .2s ease; }
 #uv-store .uv-navlink:hover{ color:var(--ink); }
+/* Mobile: collapse the header text links to a clean brand + cart. Every link
+   points at the collection anyway, which sits just below the hero. */
+@media (max-width: 640px){
+  #uv-store header nav{ gap:0 !important; }
+  #uv-store header a.uv-navlink{ display:none; }
+  #uv-store header .uv-wrap{ padding-top:1.1rem; padding-bottom:1.1rem; }
+}
 #uv-store .uv-btn{
   display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
   padding:.95rem 1.9rem; border-radius:var(--btn-radius); border:none; cursor:pointer;
