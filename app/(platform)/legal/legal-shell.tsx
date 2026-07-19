@@ -21,7 +21,7 @@ export function LegalShell({
           <Image src={logo} alt="Urivo" width={22} height={22} className="rounded-md" /> Urivo
         </Link>
         <h1 className="mt-8 text-4xl font-semibold tracking-tight text-ivory">{title}</h1>
-        <div className="mt-8 space-y-5 text-sm leading-relaxed text-mist [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-ivory [&_strong]:font-semibold [&_strong]:text-ivory">
+        <div className="mt-8 space-y-5 text-sm leading-relaxed text-mist [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-ivory [&_strong]:font-semibold [&_strong]:text-ivory [&_a]:text-gold-soft [&_a]:underline [&_a]:underline-offset-2 [&_a:hover]:text-gold">
           {children}
         </div>
       </div>
