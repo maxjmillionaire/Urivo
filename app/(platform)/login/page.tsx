@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { track } from "@/lib/analytics";
 import logo from "@/assets/brand/urivo-logo.png";
 
 type Mode = "signin" | "signup" | "reset";
@@ -77,6 +78,7 @@ function LoginForm() {
           options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
         });
         if (error) throw error;
+        track("sign_up", { method: "email" });
         if (data.session) {
           router.push("/dashboard");
           router.refresh();
@@ -90,6 +92,7 @@ function LoginForm() {
         password,
       });
       if (error) throw error;
+      track("sign_in", { method: "email" });
       router.push("/dashboard");
       router.refresh();
     } catch (err) {

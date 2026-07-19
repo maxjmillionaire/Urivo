@@ -267,12 +267,12 @@ function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
         <div className="uv-wrap" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "1rem", padding: "1.4rem 0" }}>
           <nav style={{ display: "flex", gap: "1.6rem" }}>
             {links.slice(0, 2).map((l) => (
-              <a key={l} className="uv-navlink">{l}</a>
+              <a key={l} href="#uv-shop" className="uv-navlink">{l}</a>
             ))}
           </nav>
           <div style={{ justifySelf: "center" }}>{brand}</div>
           <div style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: "1.4rem" }}>
-            <a className="uv-navlink">Reviews</a>
+            <a href="#uv-shop" className="uv-navlink">Reviews</a>
             {cart}
           </div>
         </div>
@@ -286,7 +286,7 @@ function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
           {brand}
           <nav style={{ display: "flex", gap: "1.8rem" }}>
             {[...links, "Reviews"].map((l) => (
-              <a key={l} className="uv-navlink">{l}</a>
+              <a key={l} href="#uv-shop" className="uv-navlink">{l}</a>
             ))}
           </nav>
           {cart}
@@ -311,7 +311,7 @@ function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
         {brand}
         <nav style={{ display: "flex", alignItems: "center", gap: "1.9rem" }}>
           {[...links, "Reviews"].map((l) => (
-            <a key={l} className="uv-navlink">{l}</a>
+            <a key={l} href="#uv-shop" className="uv-navlink">{l}</a>
           ))}
           {cart}
         </nav>
@@ -336,8 +336,8 @@ function Hero({ storeName, ds, heroImage, logo }: { storeName: string; ds: Store
               <h1 style={{ fontSize: "var(--h1)", marginTop: "1.2rem" }}>{storeName}</h1>
               <p style={{ marginTop: "1.4rem", maxWidth: "34ch", color: "var(--muted)", fontSize: "1.05rem" }}>{tagline}.</p>
               <div style={{ marginTop: "2.2rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-                <button className="uv-btn">Shop the collection</button>
-                <button className="uv-btn-ghost">Our story</button>
+                <a href="#uv-shop" className="uv-btn">Shop the collection</a>
+                <a href="#uv-shop" className="uv-btn-ghost">Our story</a>
               </div>
             </div>
             <div style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: "var(--radius)", overflow: "hidden" }} className="uv-card">
@@ -363,7 +363,7 @@ function Hero({ storeName, ds, heroImage, logo }: { storeName: string; ds: Store
           <p className="uv-eyebrow">{eyebrow}</p>
           <h1 style={{ fontSize: "var(--h1)", marginTop: "1rem", maxWidth: "16ch" }}>{storeName}</h1>
           <p style={{ marginTop: "1.3rem", maxWidth: "40ch", color: "var(--muted)", fontSize: "1.1rem" }}>{tagline}.</p>
-          <button className="uv-btn" style={{ marginTop: "2rem" }}>Shop now</button>
+          <a href="#uv-shop" className="uv-btn" style={{ marginTop: "2rem", display: "inline-block" }}>Shop now</a>
         </div>
       </section>
     );
@@ -376,7 +376,7 @@ function Hero({ storeName, ds, heroImage, logo }: { storeName: string; ds: Store
         <h1 style={{ fontSize: "var(--h1)", marginTop: "1.4rem", marginLeft: "auto", marginRight: "auto", maxWidth: "14ch" }}>{storeName}</h1>
         <p style={{ marginTop: "1.6rem", maxWidth: "48ch", marginLeft: "auto", marginRight: "auto", color: "var(--muted)", fontSize: "1.12rem" }}>{tagline}.</p>
         <div style={{ marginTop: "2.4rem" }}>
-          <button className="uv-btn">Explore</button>
+          <a href="#uv-shop" className="uv-btn">Explore</a>
         </div>
       </section>
     );
@@ -388,7 +388,7 @@ function Hero({ storeName, ds, heroImage, logo }: { storeName: string; ds: Store
       <p className="uv-eyebrow">{eyebrow}</p>
       <h1 style={{ fontSize: "var(--h1)", marginTop: "1.3rem", maxWidth: "18ch" }}>{storeName}</h1>
       <p style={{ marginTop: "1.5rem", maxWidth: "44ch", color: "var(--muted)", fontSize: "1.1rem", fontStyle: ds.fonts.headingKey === "playfair" ? "italic" : "normal" }}>{tagline}.</p>
-      <button className="uv-btn" style={{ marginTop: "2.2rem" }}>Shop the collection</button>
+      <a href="#uv-shop" className="uv-btn" style={{ marginTop: "2.2rem", display: "inline-block" }}>Shop the collection</a>
     </section>
   );
 }
@@ -477,7 +477,7 @@ function Collection({ ds, catalog, logo }: { ds: StoreDesignSystem; catalog: Ren
   }
   const cols = ds.layout.card === "minimal" ? 4 : ds.layout.card === "overlay" ? 3 : 3;
   return (
-    <section className="uv-wrap" style={{ paddingTop: "calc(var(--pad-y) * .5)", paddingBottom: "var(--pad-y)" }}>
+    <section id="uv-shop" className="uv-wrap" style={{ paddingTop: "calc(var(--pad-y) * .5)", paddingBottom: "var(--pad-y)", scrollMarginTop: "5rem" }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "2.4rem" }}>
         <h2 className="uv-h" style={{ fontSize: "var(--h2)" }}>The collection</h2>
         <span className="uv-eyebrow">{catalog.length} pieces</span>

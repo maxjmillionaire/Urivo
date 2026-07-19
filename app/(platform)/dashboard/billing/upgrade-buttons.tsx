@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { track } from "@/lib/analytics";
 
 /*
  * Upgrade CTA. Calls the checkout entry point; until Stripe is wired
@@ -19,6 +20,7 @@ export function UpgradeButton({
   const [note, setNote] = useState<string | null>(null);
 
   async function upgrade() {
+    track("upgrade_clicked", { plan });
     setBusy(true);
     setNote(null);
     try {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GenerationStudio, type StudioResult } from "./generation-studio";
 import { GenerationCinema } from "./generation-cinema";
+import { track } from "@/lib/analytics";
 
 /*
  * Store generation entry point. Collects the idea + address, then flashes to the
@@ -158,6 +159,7 @@ export function GenerateStorePanel({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    track("generate_submitted");
     if (prompt.trim().length < 8) {
       setError("Tell us a little more about your idea.");
       return;
@@ -182,6 +184,7 @@ export function GenerateStorePanel({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Generation failed. Please try again.");
+      track("store_generated", { subdomain: subdomain.trim().toLowerCase() });
       setResult({
         storeName: data.storeName,
         tagline: data.tagline,
