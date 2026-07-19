@@ -1,46 +1,44 @@
 import type { Metadata } from "next";
 import { LegalShell, Placeholder } from "../legal/legal-shell";
 
-export const metadata: Metadata = { title: "AGB — Urivo" };
+export const metadata: Metadata = { title: "Terms of Service — Urivo" };
 
-export default function AGB() {
+export default function Terms() {
   return (
-    <LegalShell title="Allgemeine Geschäftsbedingungen">
-      <h2>1. Geltungsbereich</h2>
+    <LegalShell title="Terms of Service">
+      <h2>1. Scope</h2>
       <p>
-        Diese AGB gelten für die Nutzung der Urivo-Plattform, einer
-        SaaS-Anwendung zur KI-gestützten Erstellung und Verwaltung von
-        Online-Storefronts.
+        These terms govern the use of the Urivo platform, a SaaS application for the
+        AI-assisted creation and management of online storefronts.
       </p>
 
-      <h2>2. Leistungen</h2>
+      <h2>2. Services</h2>
       <p>
-        Urivo stellt Funktionen zur Marktrecherche, Markenerstellung,
-        Storefront-Generierung und -Verwaltung bereit. Die Nutzung erfolgt über
-        ein Kredit- und Abomodell.
+        Urivo provides features for market research, brand creation, storefront
+        generation and management. Access is offered through a credit and
+        subscription model.
       </p>
 
-      <h2>3. Preise &amp; Abrechnung</h2>
+      <h2>3. Pricing &amp; billing</h2>
       <p>
-        Es gelten die auf urivo.ai angegebenen Preise (Core, Pro sowie ein
-        kostenloser Tarif). Während des Launch-Zeitraums gebuchte Abonnements
-        behalten ihren Launch-Preis für die Laufzeit des Abonnements. Die
-        Abrechnung erfolgt über Stripe.
+        The prices shown on urivo.ai apply (Core, Pro, and a free plan).
+        Subscriptions taken out during the launch period keep their launch price for
+        the lifetime of the subscription. Billing is handled through Stripe.
       </p>
 
-      <h2>4. Widerruf</h2>
-      <Placeholder note="Widerrufsbelehrung für Verbraucher inkl. Muster-Widerrufsformular ergänzen" />
+      <h2>4. Right of withdrawal</h2>
+      <Placeholder note="Add the consumer right-of-withdrawal notice, including the model withdrawal form" />
 
-      <h2>5. Kündigung</h2>
-      <p>Abonnements sind jederzeit zum Ende des Abrechnungszeitraums kündbar.</p>
+      <h2>5. Cancellation</h2>
+      <p>Subscriptions can be cancelled at any time, effective at the end of the billing period.</p>
 
-      <h2>6. Haftung &amp; Inhalte</h2>
+      <h2>6. Liability &amp; content</h2>
       <p>
-        Für generierte Inhalte ist der jeweilige Händler verantwortlich. Urivo
-        übernimmt keine Gewähr für die rechtliche Zulässigkeit der vom Nutzer
-        veröffentlichten Store-Inhalte.
+        Each merchant is responsible for the content they generate. Urivo gives no
+        warranty as to the legal admissibility of the store content published by the
+        user.
       </p>
-      <Placeholder note="Haftungsbeschränkung, Gewährleistung und Gerichtsstand durch Rechtsberatung final prüfen lassen" />
+      <Placeholder note="Have the limitation of liability, warranty and place of jurisdiction reviewed by legal counsel" />
     </LegalShell>
   );
 }

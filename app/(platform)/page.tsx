@@ -256,9 +256,9 @@ export default function Home() {
             <p className="text-sm text-mist">© {new Date().getFullYear()} Urivo</p>
           </div>
           <div className="flex gap-6 text-sm font-medium text-mist">
-            <Link href="/impressum" className="hover:text-ivory">Impressum</Link>
-            <Link href="/datenschutz" className="hover:text-ivory">Datenschutz</Link>
-            <Link href="/agb" className="hover:text-ivory">AGB</Link>
+            <Link href="/impressum" className="hover:text-ivory">Legal Notice</Link>
+            <Link href="/datenschutz" className="hover:text-ivory">Privacy Policy</Link>
+            <Link href="/agb" className="hover:text-ivory">Terms of Service</Link>
           </div>
         </div>
       </footer>
