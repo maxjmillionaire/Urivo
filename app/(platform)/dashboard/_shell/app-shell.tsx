@@ -32,7 +32,9 @@ export function AppShell({
       />
       <AppSidebar active={active} email={email} avatarUrl={avatarUrl} />
       <div className="relative lg:pl-[240px] lg:pr-[340px]">
-        <div className="u-enter mx-auto max-w-4xl px-5 pb-12 pt-20 sm:px-8 lg:pt-9">{children}</div>
+        <main id="main" className="u-enter mx-auto max-w-4xl px-5 pb-12 pt-20 sm:px-8 lg:pt-9">
+          {children}
+        </main>
       </div>
       <AppRail store={store} />
     </div>

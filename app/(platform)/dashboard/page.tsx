@@ -5,6 +5,7 @@ import { parseTheme } from "@/lib/storefront";
 import { AppShell } from "./_shell/app-shell";
 import { DashboardHome } from "./_shell/dashboard-home";
 import type { RailStore } from "./_shell/app-rail";
+import { sendWelcomeIfFirstTime } from "@/lib/email/welcome";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,9 @@ export default async function DashboardPage() {
       products: (topProducts ?? []).map((p) => ({ title: p.title, priceEUR: Number(p.price_eur) })),
     };
   }
+
+  // First dashboard visit → send the one-time welcome email (best-effort).
+  await sendWelcomeIfFirstTime(user.id, profile?.email ?? user.email ?? null, profile?.full_name ?? null);
 
   const plan = profile?.plan ?? "free";
   const planLabel = plan === "core" ? "Core" : plan === "pro" ? "Pro" : "Free";

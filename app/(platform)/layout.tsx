@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "@/app/globals.css";
 import { ConsentBanner } from "./consent-banner";
+import { Toaster } from "./_ui/toast";
 
 /*
  * Root layout for Urivo's OWN product surfaces (marketing, auth, dashboard).
@@ -47,8 +48,15 @@ export default function PlatformLayout({
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="bg-night font-sans text-ivory antialiased">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-panel focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-ivory focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-gold/50"
+        >
+          Skip to content
+        </a>
         {children}
         <ConsentBanner />
+        <Toaster />
       </body>
     </html>
   );

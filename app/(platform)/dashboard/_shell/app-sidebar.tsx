@@ -10,7 +10,6 @@ import {
   IconResearch,
   IconMegaphone,
   IconEvolution,
-  IconMail,
   IconCard,
   IconSettings,
   IconHelp,
@@ -31,7 +30,6 @@ const NAV: { key: NavKey; label: string; href: string; Icon: typeof IconHome }[]
   { key: "stores", label: "Stores", href: "/dashboard#stores", Icon: IconStore },
   { key: "ads", label: "Ad Studio", href: "/dashboard/ads", Icon: IconMegaphone },
   { key: "evolution", label: "Evolution Lab", href: "/dashboard/evolution", Icon: IconEvolution },
-  { key: "emails", label: "Emails", href: "/dashboard/emails", Icon: IconMail },
   { key: "billing", label: "Billing", href: "/dashboard/billing", Icon: IconCard },
 ];
 
