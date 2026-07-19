@@ -9,10 +9,32 @@ import { ConsentBanner } from "./consent-banner";
  * Generated merchant storefronts live under the separate (store) root layout and
  * deliberately inherit none of this — no Urivo theme, no Urivo consent banner.
  */
+const APP_URL = process.env.APP_URL ?? "https://urivo.ai";
+
 export const metadata: Metadata = {
-  title: "Urivo — The AI Commerce Operating System",
+  metadataBase: new URL(APP_URL),
+  title: {
+    default: "Urivo — The AI Commerce Operating System",
+    template: "%s — Urivo",
+  },
   description:
     "Research markets, build a premium brand, and launch a complete online store — with AI, in minutes. Founder pricing opens 23 July.",
+  applicationName: "Urivo",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: "Urivo",
+    title: "Urivo — The AI Commerce Operating System",
+    description:
+      "Research markets, build a premium brand, and launch a complete online store — with AI, in minutes.",
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Urivo — The AI Commerce Operating System",
+    description:
+      "Research markets, build a premium brand, and launch a complete online store — with AI, in minutes.",
+  },
 };
 
 export const viewport: Viewport = {
