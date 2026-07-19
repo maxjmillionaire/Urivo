@@ -30,6 +30,16 @@ function usePrefersReducedMotion() {
 
 const SUBDOMAIN_RE = /^[a-z0-9](?:[a-z0-9-]{1,61})[a-z0-9]$/;
 
+type AvailabilityState =
+  | { status: "idle" | "checking" | "available" | "invalid" }
+  | { status: "taken"; reason: "taken" | "reserved" | "invalid" };
+
+interface NameSuggestion {
+  name: string;
+  subdomain: string;
+  rationale?: string;
+}
+
 export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,6 +48,66 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
   const [prompt, setPrompt] = useState("");
   const [subdomain, setSubdomain] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // Store-name skill: live availability + brandable, available-only suggestions.
+  const [availability, setAvailability] = useState<AvailabilityState>({ status: "idle" });
+  const [ideas, setIdeas] = useState<NameSuggestion[]>([]);
+  const [ideasBusy, setIdeasBusy] = useState(false);
+  const [ideasError, setIdeasError] = useState<string | null>(null);
+
+  // Debounced, live availability as the founder types the address.
+  useEffect(() => {
+    const value = subdomain.trim().toLowerCase();
+    if (!open || value.length === 0) {
+      setAvailability({ status: "idle" });
+      return;
+    }
+    if (!SUBDOMAIN_RE.test(value)) {
+      setAvailability({ status: "invalid" });
+      return;
+    }
+    setAvailability({ status: "checking" });
+    const ctrl = new AbortController();
+    const id = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/store-name/check?subdomain=${encodeURIComponent(value)}`, { signal: ctrl.signal });
+        const data = await res.json();
+        if (data.available) setAvailability({ status: "available" });
+        else setAvailability({ status: "taken", reason: data.reason });
+      } catch {
+        if (!ctrl.signal.aborted) setAvailability({ status: "idle" });
+      }
+    }, 400);
+    return () => {
+      ctrl.abort();
+      clearTimeout(id);
+    };
+  }, [subdomain, open]);
+
+  async function getNameIdeas() {
+    if (ideasBusy) return;
+    setIdeasError(null);
+    if (prompt.trim().length < 4) {
+      setIdeasError("Add a line about your idea first — then I'll find names.");
+      return;
+    }
+    setIdeasBusy(true);
+    try {
+      const res = await fetch("/api/store-name/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: prompt.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Couldn't find names just now.");
+      setIdeas(data.suggestions ?? []);
+      if ((data.suggestions ?? []).length === 0) setIdeasError("Every name I found was taken — try a more specific idea.");
+    } catch (err) {
+      setIdeasError(err instanceof Error ? err.message : "Couldn't find names just now.");
+    } finally {
+      setIdeasBusy(false);
+    }
+  }
 
   // Arriving from Market Research with a prefilled idea → open the form ready.
   useEffect(() => {
@@ -61,6 +131,9 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
     setPrompt("");
     setSubdomain("");
     setError(null);
+    setAvailability({ status: "idle" });
+    setIdeas([]);
+    setIdeasError(null);
   }
 
   async function submit(e: React.FormEvent) {
@@ -184,10 +257,32 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
                 />
               </div>
               <div>
-                <label htmlFor="gen-subdomain" className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-mist">
-                  Store address
-                </label>
-                <div className="flex items-center rounded-xl border border-hair bg-night transition-colors focus-within:border-gold/50 focus-within:ring-1 focus-within:ring-gold/20">
+                <div className="mb-2 flex items-center justify-between">
+                  <label htmlFor="gen-subdomain" className="block text-xs font-semibold uppercase tracking-[0.12em] text-mist">
+                    Store address
+                  </label>
+                  <button
+                    type="button"
+                    onClick={getNameIdeas}
+                    disabled={ideasBusy}
+                    className="u-press inline-flex items-center gap-1 text-[11px] font-semibold text-gold-soft transition-colors hover:text-gold disabled:opacity-50"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
+                      <path d="M12 8.5 13 11l2.5 1-2.5 1-1 2.5-1-2.5L8.5 12 11 11 12 8.5Z" />
+                    </svg>
+                    {ideasBusy ? "Finding names…" : "Find me a name"}
+                  </button>
+                </div>
+                <div
+                  className={`flex items-center rounded-xl border bg-night transition-colors focus-within:ring-1 ${
+                    availability.status === "available"
+                      ? "border-live/50 focus-within:border-live/60 focus-within:ring-live/20"
+                      : availability.status === "taken"
+                        ? "border-alert/50 focus-within:border-alert/60 focus-within:ring-alert/20"
+                        : "border-hair focus-within:border-gold/50 focus-within:ring-gold/20"
+                  }`}
+                >
                   <input
                     id="gen-subdomain"
                     type="text"
@@ -195,11 +290,62 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
                     value={subdomain}
                     onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
                     placeholder="yourbrand"
+                    aria-describedby="gen-subdomain-status"
                     className="w-full bg-transparent px-4 py-3 text-sm text-ivory placeholder:text-mist-dim focus:outline-none"
                   />
-                  <span className="whitespace-nowrap pr-4 font-mono text-xs text-mist-dim">.urivo.ai</span>
+                  <span className="flex items-center gap-2 whitespace-nowrap pr-4">
+                    {availability.status === "checking" && <span className="h-2 w-2 animate-pulse rounded-full bg-mist" />}
+                    {availability.status === "available" && (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="text-live" aria-hidden><path d="M20 6 9 17l-5-5" /></svg>
+                    )}
+                    {availability.status === "taken" && (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-alert" aria-hidden><path d="M18 6 6 18M6 6l12 12" /></svg>
+                    )}
+                    <span className="font-mono text-xs text-mist-dim">.urivo.ai</span>
+                  </span>
                 </div>
+                <p id="gen-subdomain-status" className="mt-1.5 min-h-4 text-[11px] leading-tight" aria-live="polite">
+                  {availability.status === "checking" && <span className="text-mist-dim">Checking availability…</span>}
+                  {availability.status === "available" && <span className="text-live">Available — {subdomain}.urivo.ai is yours.</span>}
+                  {availability.status === "taken" && availability.reason === "reserved" && <span className="text-alert">That address is reserved. Try another or tap “Find me a name”.</span>}
+                  {availability.status === "taken" && availability.reason !== "reserved" && <span className="text-alert">Taken — try another or tap “Find me a name”.</span>}
+                  {availability.status === "invalid" && <span className="text-mist-dim">3–63 letters, numbers or hyphens.</span>}
+                </p>
               </div>
+
+              {/* Name skill — only genuinely-available, brandable names */}
+              {(ideas.length > 0 || ideasError) && (
+                <div className="u-enter rounded-xl border border-hair bg-night/60 p-4">
+                  {ideasError ? (
+                    <p className="text-xs text-mist">{ideasError}</p>
+                  ) : (
+                    <>
+                      <p className="mb-2.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-soft">
+                        Available names, picked for you
+                      </p>
+                      <div className="grid gap-1.5 sm:grid-cols-2">
+                        {ideas.map((s) => (
+                          <button
+                            key={s.subdomain}
+                            type="button"
+                            onClick={() => setSubdomain(s.subdomain)}
+                            title={s.rationale}
+                            className={`u-press group flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${
+                              subdomain === s.subdomain ? "border-gold/50 bg-gold/[0.06]" : "border-hair bg-panel/50 hover:border-hair-strong"
+                            }`}
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-medium text-ivory">{s.name}</span>
+                              <span className="block truncate font-mono text-[10px] text-mist-dim">{s.subdomain}.urivo.ai</span>
+                            </span>
+                            <span className="shrink-0 rounded-full border border-live/30 bg-live/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-live">Free</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               <button
                 type="submit"
                 disabled={!canGenerate}
