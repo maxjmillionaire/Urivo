@@ -395,7 +395,7 @@ function Hero({ storeName, ds, heroImage, logo }: { storeName: string; ds: Store
 
 /* ------------------------------ PRODUCT CARDS ------------------------------ */
 
-function ProductCard({ ds, product, index, logo }: { ds: StoreDesignSystem; product: RenderProduct; index: number; logo?: StoreLogo | null }) {
+function ProductCard({ ds, product, index, logo, href }: { ds: StoreDesignSystem; product: RenderProduct; index: number; logo?: StoreLogo | null; href: string }) {
   const variant = ds.layout.card;
   const cardLogo = logo && product.show_logo !== false ? logo : null;
 
@@ -405,7 +405,7 @@ function ProductCard({ ds, product, index, logo }: { ds: StoreDesignSystem; prod
         <Plane ds={ds} index={index} src={product.image_url} alt={product.title} logo={cardLogo} />
         <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, transparent 45%, ${rgba(ds.palette.ink, 0.55)})` }} />
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "1.2rem" }}>
-          <h3 className="uv-h" style={{ color: "#fff", fontSize: "1.05rem" }}>{product.title}</h3>
+          <h3 className="uv-h" style={{ color: "#fff", fontSize: "1.05rem" }}><a href={href}>{product.title}</a></h3>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: ".4rem" }}>
             <span style={{ color: "#fff", opacity: 0.85, fontSize: ".9rem" }}>{price(product.price_eur)}</span>
             <AddToCart product={cartProduct(product)} label="Add" className="uv-btn uv-overlay-cta" style={{ padding: ".55rem 1rem", fontSize: ".64rem" }} />
@@ -422,7 +422,7 @@ function ProductCard({ ds, product, index, logo }: { ds: StoreDesignSystem; prod
           <Plane ds={ds} index={index} src={product.image_url} alt={product.title} logo={cardLogo} />
         </div>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "1rem", marginTop: "1rem" }}>
-          <h3 className="uv-h" style={{ fontSize: "1.02rem" }}>{product.title}</h3>
+          <h3 className="uv-h" style={{ fontSize: "1.02rem" }}><a href={href}>{product.title}</a></h3>
           <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{price(product.price_eur)}</span>
         </div>
         {product.description && <p style={{ marginTop: ".5rem", fontSize: ".86rem", color: "var(--muted)", lineHeight: 1.55 }}>{product.description}</p>}
@@ -438,7 +438,7 @@ function ProductCard({ ds, product, index, logo }: { ds: StoreDesignSystem; prod
           <Plane ds={ds} index={index} src={product.image_url} alt={product.title} logo={cardLogo} />
         </div>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: ".8rem" }}>
-          <h3 className="uv-h" style={{ fontSize: ".96rem", fontWeight: 500 }}>{product.title}</h3>
+          <h3 className="uv-h" style={{ fontSize: ".96rem", fontWeight: 500 }}><a href={href}>{product.title}</a></h3>
           <span style={{ fontSize: ".9rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{price(product.price_eur)}</span>
         </div>
         <div style={{ marginTop: ".7rem" }}>
@@ -455,7 +455,7 @@ function ProductCard({ ds, product, index, logo }: { ds: StoreDesignSystem; prod
         <Plane ds={ds} index={index} src={product.image_url} alt={product.title} logo={cardLogo} />
       </div>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "1rem", marginTop: "1.1rem" }}>
-        <h3 className="uv-h" style={{ fontSize: "1.12rem" }}>{product.title}</h3>
+        <h3 className="uv-h" style={{ fontSize: "1.12rem" }}><a href={href}>{product.title}</a></h3>
         <span style={{ fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{price(product.price_eur)}</span>
       </div>
       {product.description && <p style={{ marginTop: ".55rem", fontSize: ".9rem", color: "var(--muted)", lineHeight: 1.6 }}>{product.description}</p>}
@@ -466,7 +466,7 @@ function ProductCard({ ds, product, index, logo }: { ds: StoreDesignSystem; prod
   );
 }
 
-function Collection({ ds, catalog, logo }: { ds: StoreDesignSystem; catalog: RenderProduct[]; logo?: StoreLogo | null }) {
+function Collection({ ds, catalog, logo, storeBase }: { ds: StoreDesignSystem; catalog: RenderProduct[]; logo?: StoreLogo | null; storeBase: string }) {
   if (catalog.length === 0) {
     return (
       <section className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
@@ -490,7 +490,7 @@ function Collection({ ds, catalog, logo }: { ds: StoreDesignSystem; catalog: Ren
         }}
       >
         {catalog.map((product, i) => (
-          <ProductCard key={product.id} ds={ds} product={product} index={i} logo={logo} />
+          <ProductCard key={product.id} ds={ds} product={product} index={i} logo={logo} href={`${storeBase}/product/${product.id}`} />
         ))}
       </div>
     </section>
@@ -649,7 +649,7 @@ function Footer({ ds, storeName }: { ds: StoreDesignSystem; storeName: string })
               <p className="uv-eyebrow">{h}</p>
               <ul style={{ listStyle: "none", padding: 0, margin: "1rem 0 0", display: "grid", gap: ".6rem" }}>
                 {items.map((it) => (
-                  <li key={it}><a className="uv-navlink" style={{ textTransform: "none", letterSpacing: 0, fontSize: ".88rem" }}>{it}</a></li>
+                  <li key={it}><a href="#uv-shop" className="uv-navlink" style={{ textTransform: "none", letterSpacing: 0, fontSize: ".88rem" }}>{it}</a></li>
                 ))}
               </ul>
             </div>
@@ -684,6 +684,10 @@ export function StorefrontRenderer({
   const fontsHref = googleFontsUrl(ds);
   // A hero image lifts the split/fullbleed heroes; use the first product photo.
   const heroImage = catalog.find((p) => p.image_url)?.image_url ?? null;
+  // Base path for internal store links: on localhost the store lives under
+  // /store/{sub}; on a real subdomain it lives at the root.
+  const rootDomain = (process.env.ROOT_DOMAIN ?? "localhost:3000").toLowerCase();
+  const storeBase = rootDomain.startsWith("localhost") ? `/store/${subdomain}` : "";
 
   const render = (key: SectionKey) => {
     switch (key) {
@@ -691,7 +695,7 @@ export function StorefrontRenderer({
       case "hero": return <Hero key={key} storeName={storeName} ds={ds} heroImage={heroImage} logo={logo} />;
       case "marquee": return <Marquee key={key} ds={ds} storeName={storeName} />;
       case "trust": return <Trust key={key} ds={ds} />;
-      case "collection": return <Collection key={key} ds={ds} catalog={catalog} logo={logo} />;
+      case "collection": return <Collection key={key} ds={ds} catalog={catalog} logo={logo} storeBase={storeBase} />;
       case "story": return <Story key={key} ds={ds} storeName={storeName} />;
       case "highlights": return <Highlights key={key} ds={ds} />;
       case "newsletter": return <Newsletter key={key} ds={ds} storeName={storeName} />;

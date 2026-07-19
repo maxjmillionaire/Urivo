@@ -25,8 +25,15 @@ export async function middleware(request: NextRequest) {
   ) {
     const subdomain = host.slice(0, -(rootDomain.length + 1));
     if (subdomain !== "www" && SUBDOMAIN_PATTERN.test(subdomain)) {
+      const p = request.nextUrl.pathname;
+      // API, framework and already-mapped paths pass straight through so that
+      // storefront sub-pages (product, order/success) and the checkout API work
+      // on a real subdomain — not just the home page.
+      if (p.startsWith("/api") || p.startsWith("/_next") || p.startsWith("/store/")) {
+        return NextResponse.next();
+      }
       const url = request.nextUrl.clone();
-      url.pathname = `/store/${subdomain}`;
+      url.pathname = `/store/${subdomain}${p === "/" ? "" : p}`;
       return NextResponse.rewrite(url);
     }
     // Malformed subdomain: fall through to the main site untouched.

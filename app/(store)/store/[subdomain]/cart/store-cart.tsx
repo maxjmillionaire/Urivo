@@ -150,6 +150,49 @@ export function AddToCart({
   );
 }
 
+export function BuyBox({
+  product,
+}: {
+  product: { productId: string; title: string; priceCents: number; image: string | null };
+}) {
+  const { add } = useCart();
+  const [qty, setQty] = useState(1);
+  const [added, setAdded] = useState(false);
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "1rem" }}>
+      <div style={{ display: "inline-flex", alignItems: "center", border: "1px solid var(--line)", borderRadius: "var(--btn-radius)" }}>
+        <button type="button" aria-label="Decrease quantity" onClick={() => setQty((q) => Math.max(1, q - 1))} style={stepStyle}>–</button>
+        <span style={{ minWidth: "2.5ch", textAlign: "center", fontVariantNumeric: "tabular-nums" }}>{qty}</span>
+        <button type="button" aria-label="Increase quantity" onClick={() => setQty((q) => Math.min(20, q + 1))} style={stepStyle}>+</button>
+      </div>
+      <button
+        type="button"
+        className="uv-btn"
+        style={{ flex: 1, minWidth: "12rem" }}
+        onClick={() => {
+          add(product, qty);
+          setAdded(true);
+          setTimeout(() => setAdded(false), 1200);
+        }}
+      >
+        {added ? "Added ✓" : "Add to cart"}
+      </button>
+    </div>
+  );
+}
+
+const stepStyle: React.CSSProperties = {
+  width: "2.6rem",
+  height: "2.8rem",
+  display: "grid",
+  placeItems: "center",
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  color: "var(--ink)",
+  fontSize: "1.1rem",
+};
+
 export function CartButton({ className }: { className?: string }) {
   const { count, setOpen } = useCart();
   return (
