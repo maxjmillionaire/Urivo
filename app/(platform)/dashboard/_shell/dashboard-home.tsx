@@ -138,14 +138,36 @@ export function DashboardHome({
         </div>
 
         {stores.length === 0 ? (
-          <div className="u-float mt-4 rounded-2xl border border-dashed border-hair-strong bg-panel/40 p-12 text-center">
-            <h3 className="mx-auto max-w-md text-2xl font-semibold tracking-tight text-ivory">
+          <div className="u-float mt-4 overflow-hidden rounded-2xl border border-hair bg-panel/60 p-10 text-center sm:p-14">
+            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-gold/20 bg-gold/[0.06] text-gold">
+              <IconSpark width={22} height={22} />
+            </span>
+            <h3 className="mx-auto mt-6 max-w-md text-[26px] font-semibold tracking-tight text-ivory">
               Your first store is one sentence away.
             </h3>
-            <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-mist">
-              Describe what you want to sell — Urivo designs the brand, writes the catalog and builds
-              a live storefront in under a minute.
+            <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-mist">
+              Describe what you want to sell — Urivo researches the market, designs the brand, writes the
+              catalog and builds a live storefront in under a minute.
             </p>
+            <div className="mx-auto mt-7 flex max-w-md flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] font-medium uppercase tracking-[0.1em] text-mist-dim">
+              <span className="inline-flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-gold" /> A unique brand</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-gold" /> Real product photos</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-gold" /> Live in a minute</span>
+            </div>
+            <div className="mt-8 flex justify-center">
+              <GenerateStorePanel
+                canGenerate={canGenerate}
+                autoOpenFromIdea={false}
+                triggerLabel="Generate your first store"
+                triggerClassName="u-gold u-lift inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-sm font-semibold"
+              />
+            </div>
+            {!canGenerate && (
+              <p className="mt-4 text-xs text-mist-dim">
+                You&apos;ll need credits to generate —{" "}
+                <Link href="/dashboard/billing" className="text-gold-soft underline-offset-4 hover:underline">see plans</Link>.
+              </p>
+            )}
           </div>
         ) : (
           <div className="u-float mt-4 overflow-hidden rounded-2xl border border-hair bg-panel/70">

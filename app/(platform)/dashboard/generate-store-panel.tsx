@@ -40,7 +40,17 @@ interface NameSuggestion {
   rationale?: string;
 }
 
-export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
+export function GenerateStorePanel({
+  canGenerate,
+  autoOpenFromIdea = true,
+  triggerLabel = "Generate store",
+  triggerClassName,
+}: {
+  canGenerate: boolean;
+  autoOpenFromIdea?: boolean;
+  triggerLabel?: string;
+  triggerClassName?: string;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reducedMotion = usePrefersReducedMotion();
@@ -54,6 +64,14 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
   const [ideas, setIdeas] = useState<NameSuggestion[]>([]);
   const [ideasBusy, setIdeasBusy] = useState(false);
   const [ideasError, setIdeasError] = useState<string | null>(null);
+
+  // Close the idea modal on Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   // Debounced, live availability as the founder types the address.
   useEffect(() => {
@@ -111,6 +129,7 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
 
   // Arriving from Market Research with a prefilled idea → open the form ready.
   useEffect(() => {
+    if (!autoOpenFromIdea) return;
     const idea = searchParams.get("idea");
     if (idea) {
       setPrompt(idea.slice(0, 500));
@@ -197,25 +216,34 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
           reset();
           setOpen(true);
         }}
-        className="u-gold u-lift inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold"
+        className={triggerClassName ?? "u-gold u-lift inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold"}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
           <path d="M12 8.5 13 11l2.5 1-2.5 1-1 2.5-1-2.5L8.5 12 11 11 12 8.5Z" />
         </svg>
-        Generate store
+        {triggerLabel}
       </button>
 
       {/* Idea form */}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/70 px-6 backdrop-blur-sm">
-          <div className="u-float u-glass w-full max-w-lg rounded-2xl border border-hair p-8 sm:p-10">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-night/70 px-6 backdrop-blur-sm"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gen-modal-title"
+            onClick={(e) => e.stopPropagation()}
+            className="u-float u-glass w-full max-w-lg rounded-2xl border border-hair p-8 sm:p-10"
+          >
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mist">
                   New storefront
                 </p>
-                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-ivory">
+                <h2 id="gen-modal-title" className="mt-3 text-3xl font-semibold tracking-tight text-ivory">
                   What would you like to sell?
                 </h2>
               </div>
@@ -249,6 +277,7 @@ export function GenerateStorePanel({ canGenerate }: { canGenerate: boolean }) {
                   id="gen-prompt"
                   rows={3}
                   required
+                  autoFocus
                   maxLength={500}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}

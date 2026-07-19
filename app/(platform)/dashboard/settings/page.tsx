@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { AppShell } from "../_shell/app-shell";
 import { loadRailStore } from "../_shell/rail-data";
-import { PasswordForm, DeleteAccount } from "./settings-form";
+import { ProfileForm, EmailForm, NotificationsForm, PasswordForm, DeleteAccount } from "./settings-form";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +14,13 @@ export default async function SettingsPage() {
   if (!user) redirect("/login");
 
   const [{ data: profile }, rail] = await Promise.all([
-    supabase.from("profiles").select("email, full_name").eq("id", user.id).single(),
+    supabase.from("profiles").select("email, full_name, marketing_opt_in").eq("id", user.id).single(),
     loadRailStore(user.id),
   ]);
 
   const isEmailUser = user.app_metadata?.provider === "email";
+  const currentEmail = profile?.email ?? user.email ?? "";
+  const marketingOptIn = (profile as { marketing_opt_in?: boolean } | null)?.marketing_opt_in ?? true;
 
   return (
     <AppShell active="settings" email={profile?.email ?? user.email ?? null} store={rail}>
@@ -29,16 +31,23 @@ export default async function SettingsPage() {
 
       <section className="u-float mt-7 rounded-2xl border border-hair bg-panel/70 p-6">
         <h2 className="text-lg font-semibold text-ivory">Profile</h2>
-        <dl className="mt-4 space-y-3 text-sm">
-          <div className="flex justify-between border-b border-hair pb-3">
-            <dt className="text-mist">Name</dt>
-            <dd className="font-medium text-ivory">{profile?.full_name ?? "—"}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-mist">Email</dt>
-            <dd className="font-medium text-ivory">{profile?.email ?? user.email}</dd>
-          </div>
-        </dl>
+        <div className="mt-4">
+          <ProfileForm initialName={profile?.full_name ?? ""} />
+        </div>
+      </section>
+
+      <section className="u-float mt-6 rounded-2xl border border-hair bg-panel/70 p-6">
+        <h2 className="text-lg font-semibold text-ivory">Email address</h2>
+        <div className="mt-4">
+          <EmailForm currentEmail={currentEmail} />
+        </div>
+      </section>
+
+      <section className="u-float mt-6 rounded-2xl border border-hair bg-panel/70 p-6">
+        <h2 className="text-lg font-semibold text-ivory">Notifications</h2>
+        <div className="mt-4">
+          <NotificationsForm initialOptIn={marketingOptIn} />
+        </div>
       </section>
 
       {isEmailUser && (
