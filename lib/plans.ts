@@ -127,6 +127,20 @@ export function getPlan(key: string | null | undefined): PlanConfig {
   return PLANS.free;
 }
 
+/** Launch pricing window — founder pricing is live between these dates. */
+const LAUNCH_START = new Date("2026-07-23T00:00:00Z");
+const LAUNCH_END = new Date("2026-08-15T23:59:59Z");
+
+export function isLaunchWindow(now: Date = new Date()): boolean {
+  return now >= LAUNCH_START && now <= LAUNCH_END;
+}
+
+/** The effective monthly price for a plan right now (launch or regular). */
+export function monthlyPrice(key: string | null | undefined, now: Date = new Date()): number {
+  const p = getPlan(key);
+  return isLaunchWindow(now) ? p.price.launch : p.price.regular;
+}
+
 export function planName(key: string | null | undefined): string {
   return getPlan(key).name;
 }

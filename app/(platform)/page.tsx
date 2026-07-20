@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import logo from "@/assets/brand/urivo-logo.png";
-import { PLANS, formatPrice } from "@/lib/plans";
+import { PLANS, formatPrice, isLaunchWindow } from "@/lib/plans";
 
 /*
  * Marketing landing — Midnight (dark slate-navy, warm ivory, metallic gold).
@@ -9,12 +9,6 @@ import { PLANS, formatPrice } from "@/lib/plans";
  * Tiers are read from the plans source of truth so the deck, the landing page
  * and the product never drift.
  */
-
-const LAUNCH_START = new Date("2026-07-23T00:00:00Z");
-const LAUNCH_END = new Date("2026-08-15T23:59:59Z");
-function isLaunchWindow(now = new Date()): boolean {
-  return now >= LAUNCH_START && now <= LAUNCH_END;
-}
 
 const TIERS = [PLANS.free, PLANS.core, PLANS.pro].map((p) => ({
   name: p.name,

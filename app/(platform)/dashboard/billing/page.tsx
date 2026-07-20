@@ -4,15 +4,10 @@ import { getCreditBalance, getCreditLedger } from "@/lib/credits";
 import { AppShell } from "../_shell/app-shell";
 import { loadRailStore } from "../_shell/rail-data";
 import { UpgradeButton, ManageSubscriptionButton } from "./upgrade-buttons";
-import { PLANS, planName, formatPrice } from "@/lib/plans";
+import { CreditPacks } from "./credit-packs";
+import { PLANS, planName, formatPrice, isLaunchWindow } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
-
-const LAUNCH_START = new Date("2026-07-23T00:00:00Z");
-const LAUNCH_END = new Date("2026-08-15T23:59:59Z");
-function isLaunchWindow(now = new Date()): boolean {
-  return now >= LAUNCH_START && now <= LAUNCH_END;
-}
 
 export default async function BillingPage() {
   const supabase = await supabaseServer();
@@ -125,6 +120,22 @@ export default async function BillingPage() {
           </div>
         </section>
       )}
+
+      <section className="mt-8">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-lg font-semibold tracking-tight text-ivory">Buy credits</h2>
+          <p className="text-xs text-mist">One-time top-ups · no subscription</p>
+        </div>
+        <div className="mt-5">
+          <CreditPacks />
+        </div>
+        {plan === "free" && (
+          <p className="mx-auto mt-4 max-w-lg text-center text-xs leading-relaxed text-mist-dim">
+            Top-ups are handy in a pinch — but a plan is the better deal: Founder gives you{" "}
+            {PLANS.core.monthlyCredits} credits every month for less per credit than any pack.
+          </p>
+        )}
+      </section>
 
       <section className="mt-8">
         <h2 className="text-lg font-semibold tracking-tight text-ivory">Credit history</h2>

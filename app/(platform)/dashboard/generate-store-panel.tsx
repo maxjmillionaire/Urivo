@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GenerationStudio, type StudioResult } from "./generation-studio";
 import { GenerationCinema } from "./generation-cinema";
+import { OutOfCredits } from "./out-of-credits";
 import { track } from "@/lib/analytics";
 
 /*
@@ -250,15 +251,17 @@ export function GenerateStorePanel({
             aria-modal="true"
             aria-labelledby="gen-modal-title"
             onClick={(e) => e.stopPropagation()}
-            className="u-float u-glass w-full max-w-lg rounded-2xl border border-hair p-8 sm:p-10"
+            className={`u-float u-glass w-full rounded-2xl border border-hair p-8 sm:p-10 ${
+              canGenerate ? "max-w-lg" : "max-w-2xl"
+            }`}
           >
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mist">
-                  New storefront
+                  {canGenerate ? "New storefront" : "Credits"}
                 </p>
                 <h2 id="gen-modal-title" className="mt-3 text-3xl font-semibold tracking-tight text-ivory">
-                  What would you like to sell?
+                  {canGenerate ? "What would you like to sell?" : "You're out of credits"}
                 </h2>
               </div>
               <button
@@ -271,11 +274,10 @@ export function GenerateStorePanel({
               </button>
             </div>
 
-            {!canGenerate && (
-              <p className="mt-6 rounded-xl border border-gold/25 bg-gold/[0.06] px-4 py-3 text-sm text-gold-soft">
-                You don&apos;t have enough credits for a new store. Upgrade to keep building.
-              </p>
-            )}
+            {!canGenerate ? (
+              <OutOfCredits showHeader={false} />
+            ) : (
+            <>
             {error && (
               <p role="alert" className="mt-6 rounded-xl border border-alert/20 bg-alert/5 px-4 py-3 text-sm text-alert">
                 {error}
@@ -397,6 +399,8 @@ export function GenerateStorePanel({
                 Generate my store
               </button>
             </form>
+            </>
+            )}
           </div>
         </div>
       )}
