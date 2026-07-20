@@ -4,6 +4,7 @@ import { getCreditBalance, getCreditLedger } from "@/lib/credits";
 import { AppShell } from "../_shell/app-shell";
 import { loadRailStore } from "../_shell/rail-data";
 import { UpgradeButton, ManageSubscriptionButton } from "./upgrade-buttons";
+import { PLANS, planName, formatPrice } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export default async function BillingPage() {
 
   const plan = profile?.plan ?? "free";
   const launch = isLaunchWindow();
-  const planLabel = plan === "core" ? "Core" : plan === "pro" ? "Pro" : "Free";
+  const planLabel = planName(plan);
   const priceOrigin =
     profile?.price_type === "launch"
       ? "Founder pricing — locked for the life of your subscription"
@@ -64,37 +65,44 @@ export default async function BillingPage() {
         <section className="mt-8">
           <h2 className="text-lg font-semibold tracking-tight text-ivory">Upgrade</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="u-float relative flex flex-col rounded-2xl border border-gold/30 bg-panel/70 p-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-ivory">Core</h3>
-                <span className="u-gold rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider">Most popular</span>
-              </div>
-              <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-3xl font-semibold tracking-tight text-ivory">{launch ? "€49" : "€79"}</span>
-                {launch && <span className="text-mist line-through">€79</span>}
-                <span className="text-sm text-mist">/ mo</span>
-              </div>
-              <p className="mt-5 flex-1 text-sm leading-relaxed text-mist">
-                Monthly credits, multiple storefronts, unlimited products, analytics.
-              </p>
-              <div className="mt-6">
-                <UpgradeButton plan="core" label="Choose Core" highlight />
-              </div>
-            </div>
-            <div className="u-float flex flex-col rounded-2xl border border-hair bg-panel/70 p-6">
-              <h3 className="text-xl font-semibold text-ivory">Pro</h3>
-              <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-3xl font-semibold tracking-tight text-ivory">{launch ? "€199" : "€299"}</span>
-                {launch && <span className="text-mist line-through">€299</span>}
-                <span className="text-sm text-mist">/ mo</span>
-              </div>
-              <p className="mt-5 flex-1 text-sm leading-relaxed text-mist">
-                Higher credit allowance, custom domains, priority generation.
-              </p>
-              <div className="mt-6">
-                <UpgradeButton plan="pro" label="Choose Pro" />
-              </div>
-            </div>
+            {([PLANS.core, PLANS.pro] as const).map((p) => {
+              const popular = p.key === "core";
+              return (
+                <div
+                  key={p.key}
+                  className={`u-float relative flex flex-col rounded-2xl bg-panel/70 p-6 ${
+                    popular ? "border border-gold/30" : "border border-hair"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-semibold text-ivory">{p.name}</h3>
+                    {popular && (
+                      <span className="u-gold rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider">
+                        Most popular
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="text-3xl font-semibold tracking-tight text-ivory">
+                      {formatPrice(launch ? p.price.launch : p.price.regular)}
+                    </span>
+                    {launch && <span className="text-mist line-through">{formatPrice(p.price.regular)}</span>}
+                    <span className="text-sm text-mist">/ mo</span>
+                  </div>
+                  <ul className="mt-5 flex-1 space-y-2.5">
+                    {p.highlights.map((h) => (
+                      <li key={h} className="flex items-start gap-2.5 text-sm text-mist">
+                        <span className="mt-0.5 text-gold-soft">✓</span>
+                        <span>{h}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-6">
+                    <UpgradeButton plan={p.key as "core" | "pro"} label={`Choose ${p.name}`} highlight={popular} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { requireStoreOwner } from "@/lib/tenant";
+import { getPlanForUser } from "@/lib/plan-access";
 import { StoreUpdateSchema } from "@/lib/validation";
 
 export const runtime = "nodejs";
@@ -59,7 +60,20 @@ export async function PATCH(
 
   const update: Record<string, unknown> = { theme_config: nextTheme };
   if (body.storeName !== undefined) update.store_name = body.storeName;
-  if (body.isActive !== undefined) update.is_active = body.isActive;
+  if (body.isActive !== undefined) {
+    // Publishing (going live) is a paid capability. Unpublishing is always allowed.
+    if (body.isActive === true) {
+      const plan = await getPlanForUser(owner.userId);
+      if (!plan.features.publish) {
+        return fail(
+          403,
+          "UPGRADE_REQUIRED",
+          "Publishing your store is available on Founder and Elite. Upgrade to take it live.",
+        );
+      }
+    }
+    update.is_active = body.isActive;
+  }
 
   // RLS ("stores: own all") enforces ownership again at the row level.
   const { data, error } = await supabase

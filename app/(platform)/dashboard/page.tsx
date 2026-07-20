@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getCreditBalance } from "@/lib/credits";
 import { parseTheme } from "@/lib/storefront";
+import { planName } from "@/lib/plans";
 import { AppShell } from "./_shell/app-shell";
 import { DashboardHome } from "./_shell/dashboard-home";
 import type { RailStore } from "./_shell/app-rail";
@@ -63,7 +64,7 @@ export default async function DashboardPage() {
   await sendWelcomeIfFirstTime(user.id, profile?.email ?? user.email ?? null, profile?.full_name ?? null);
 
   const plan = profile?.plan ?? "free";
-  const planLabel = plan === "core" ? "Core" : plan === "pro" ? "Pro" : "Free";
+  const planLabel = planName(plan);
 
   return (
     <AppShell active="home" email={profile?.email ?? user.email ?? null} store={rail}>

@@ -1,4 +1,5 @@
 import { supabaseServer } from "@/lib/supabase/server";
+import { canAskUrivo } from "@/lib/plans";
 import { AppSidebar, type NavKey } from "./app-sidebar";
 import { AppRail, type RailStore } from "./app-rail";
 import { MobileRail } from "./mobile-rail";
@@ -72,8 +73,8 @@ export async function AppShell({
           {children}
         </main>
       </div>
-      <AppRail store={store} />
-      <MobileRail store={store} />
+      <AppRail store={store} canAsk={canAskUrivo(account.plan)} />
+      <MobileRail store={store} canAsk={canAskUrivo(account.plan)} />
     </div>
   );
 }

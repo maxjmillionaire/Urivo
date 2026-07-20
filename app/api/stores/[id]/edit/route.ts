@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireStoreOwner } from "@/lib/tenant";
+import { getPlanForUser } from "@/lib/plan-access";
 import { rateLimit } from "@/lib/ratelimit";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
@@ -40,10 +41,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       : fail(404, "NOT_FOUND", "Store not found.");
   }
 
+  // The AI Store Assistant is a paid capability (Founder and Elite).
+  const plan = await getPlanForUser(owner.userId);
+  if (!plan.features.askUrivo) {
+    return fail(
+      403,
+      "UPGRADE_REQUIRED",
+      "The AI Store Assistant is available on Founder and Elite. Upgrade to edit with Urivo.",
+    );
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return fail(503, "AI_UNAVAILABLE", "Ask Urivo isn't available just yet. Please try again shortly.");
 
-  const limit = await rateLimit(`edit:${owner.userId}`, 20, 60_000);
+  const limit = await rateLimit(`edit:${owner.userId}`, plan.askPerMinute, 60_000);
   if (!limit.success) {
     return NextResponse.json(
       { error: "RATE_LIMITED", message: "You're sending messages very quickly. Give it a second." },

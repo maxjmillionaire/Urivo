@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { IconSpark, IconArrow } from "./icons";
 
@@ -34,7 +35,15 @@ const SUGGESTIONS_EMPTY = ["Help me name my brand", "What should I sell first?",
 let idSeq = 0;
 const nextId = () => `m${++idSeq}-${Date.now()}`;
 
-export function AskUrivo({ hasStore, storeId }: { hasStore: boolean; storeId: string | null }) {
+export function AskUrivo({
+  hasStore,
+  storeId,
+  canAsk = true,
+}: {
+  hasStore: boolean;
+  storeId: string | null;
+  canAsk?: boolean;
+}) {
   const router = useRouter();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
@@ -172,6 +181,32 @@ export function AskUrivo({ hasStore, storeId }: { hasStore: boolean; storeId: st
 
   const suggestions = hasStore ? SUGGESTIONS_STORE : SUGGESTIONS_EMPTY;
   const hasTranscript = messages.length > 0;
+
+  if (!canAsk) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center gap-1.5 px-5 pb-2 pt-4">
+          <IconSpark className="text-gold" width={13} height={13} />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mist">Ask Urivo</span>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col justify-center px-5 pb-5">
+          <div className="u-float rounded-2xl border border-gold/20 bg-panel/60 p-5 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-soft">Founder &amp; Elite</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-ivory">
+              The AI Store Assistant describes a change and applies it to your live store — copy,
+              palette, layout, products.
+            </p>
+            <Link
+              href="/dashboard/billing"
+              className="u-gold u-lift mt-4 inline-flex rounded-xl px-5 py-2.5 text-xs font-semibold"
+            >
+              Unlock Ask Urivo
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

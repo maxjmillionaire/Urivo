@@ -18,7 +18,7 @@ export interface RailStore {
   products?: { title: string; priceEUR: number }[];
 }
 
-export function AppRail({ store }: { store: RailStore | null }) {
+export function AppRail({ store, canAsk = true }: { store: RailStore | null; canAsk?: boolean }) {
   return (
     <aside className="u-glass fixed inset-y-0 right-0 z-20 hidden w-[340px] flex-col border-l border-hair lg:flex">
       {/* Header */}
@@ -82,7 +82,7 @@ export function AppRail({ store }: { store: RailStore | null }) {
       </div>
 
       {/* Ask Urivo — interactive, grounded conversation + live editing */}
-      <AskUrivo hasStore={!!store} storeId={store?.id ?? null} />
+      <AskUrivo hasStore={!!store} storeId={store?.id ?? null} canAsk={canAsk} />
     </aside>
   );
 }

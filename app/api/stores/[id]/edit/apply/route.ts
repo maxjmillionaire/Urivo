@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireStoreOwner } from "@/lib/tenant";
+import { getPlanForUser } from "@/lib/plan-access";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
 import { parseTheme } from "@/lib/storefront";
@@ -116,6 +117,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       : fail(404, "NOT_FOUND", "Store not found.");
   }
 
+  // The AI Store Assistant is a paid capability (Founder and Elite).
+  const userPlan = await getPlanForUser(owner.userId);
+  if (!userPlan.features.askUrivo) {
+    return fail(
+      403,
+      "UPGRADE_REQUIRED",
+      "The AI Store Assistant is available on Founder and Elite. Upgrade to edit with Urivo.",
+    );
+  }
+
   let body: z.infer<typeof BodySchema>;
   try {
     body = BodySchema.parse(await request.json());
@@ -154,7 +165,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       };
       if (plan.design.name) storeUpdate.store_name = plan.design.name;
     }
-    if (typeof plan.setLive === "boolean") storeUpdate.is_active = plan.setLive;
+    if (typeof plan.setLive === "boolean") {
+      // Going live is a paid capability; unpublishing is always allowed.
+      if (plan.setLive === true && !userPlan.features.publish) {
+        return fail(
+          403,
+          "UPGRADE_REQUIRED",
+          "Publishing your store is available on Founder and Elite. Upgrade to take it live.",
+        );
+      }
+      storeUpdate.is_active = plan.setLive;
+    }
     if (Object.keys(storeUpdate).length > 0) {
       const { error } = await admin.from("stores").update(storeUpdate).eq("id", id);
       if (error) throw error;

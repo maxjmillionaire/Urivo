@@ -1,7 +1,18 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { runEvolution, GEN_SIZES, type EvolutionRun } from "@/lib/evolution/engine";
+import { runEvolution, GEN_SIZES, type EvolutionRun, type Scores } from "@/lib/evolution/engine";
+
+/** Advanced-tier readout: the winning storefront's seven fitness signals. */
+const DIMENSIONS: [keyof Scores, string][] = [
+  ["conversion", "Conversion"],
+  ["trust", "Trust"],
+  ["premium", "Premium feel"],
+  ["brand", "Brand fit"],
+  ["readability", "Readability"],
+  ["balance", "Visual balance"],
+  ["purchase", "Purchase clarity"],
+];
 
 /*
  * The Evolution Laboratory (spec 6.6). Watch ~100 storefront variants compete,
@@ -51,7 +62,7 @@ function layout(run: EvolutionRun): { positions: Map<string, Pos>; byGen: Pos[][
   return { positions, byGen };
 }
 
-export function EvolutionLab() {
+export function EvolutionLab({ tier = "standard" }: { tier?: "standard" | "advanced" }) {
   const [prompt, setPrompt] = useState("A minimalist Scandinavian home fragrance brand");
   const [run, setRun] = useState<EvolutionRun | null>(null);
   const [visibleGen, setVisibleGen] = useState(0); // how many generation rows revealed
@@ -205,6 +216,40 @@ export function EvolutionLab() {
           </div>
         )}
       </div>
+
+      {/* Advanced (Elite) — the winning storefront's full fitness breakdown */}
+      {tier === "advanced" && phase === "done" && run && (
+        <div className="u-float mt-6 rounded-2xl border border-hair bg-panel/70 p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mist">
+                Advanced Evolution · winner breakdown
+              </p>
+            </div>
+            <p className="text-xs text-mist">7 fitness signals</p>
+          </div>
+          <div className="mt-5 grid gap-x-8 gap-y-4 sm:grid-cols-2">
+            {DIMENSIONS.map(([key, label]) => {
+              const v = run.winner.scores[key];
+              return (
+                <div key={key}>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[13px] text-ivory">{label}</span>
+                    <span className="text-[13px] font-semibold tabular-nums u-gold-text">{v.toFixed(1)}</span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${Math.max(0, Math.min(100, v))}%`, backgroundImage: "var(--grad-gold)" }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <p className="mt-4 text-center text-xs text-mist">
         Continuous optimization never stops — Urivo keeps running experiments

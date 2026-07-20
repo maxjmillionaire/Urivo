@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCreditBalance, STORE_GENERATION_COST } from "@/lib/credits";
+import { getPlanForUser } from "@/lib/plan-access";
 import { rateLimit } from "@/lib/ratelimit";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
@@ -52,8 +53,10 @@ export async function POST(request: NextRequest) {
     return fail(401, "UNAUTHORIZED", "Please sign in to generate a store.");
   }
 
-  // Rate limit: generation is expensive. 5 per minute per user.
-  const limit = await rateLimit(`generate:${user.id}`, 5, 60_000);
+  // Rate limit: generation is expensive. The per-minute lane scales with the
+  // plan's priority — higher tiers wait less (Founder/Elite get a wider lane).
+  const plan = await getPlanForUser(user.id);
+  const limit = await rateLimit(`generate:${user.id}`, plan.generationsPerMinute, 60_000);
   if (!limit.success) {
     return NextResponse.json(
       {

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { planName } from "@/lib/plans";
 import { IconSettings, IconCard } from "./icons";
 
 /*
@@ -16,8 +17,6 @@ export type Account = {
   plan: string | null;
   avatarUrl: string | null;
 };
-
-const PLAN_LABEL: Record<string, string> = { free: "Free", core: "Core", pro: "Pro" };
 
 function IconLogout({ className }: { className?: string }) {
   return (
@@ -36,7 +35,7 @@ export function AccountMenu({ account }: { account: Account }) {
   const name = account.name?.trim() || null;
   const display = name || account.email || "Your account";
   const initial = (name || account.email || "U").slice(0, 1).toUpperCase();
-  const planLabel = PLAN_LABEL[account.plan ?? "free"] ?? "Free";
+  const planLabel = planName(account.plan);
 
   useEffect(() => {
     if (!open) return;

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/storefront";
+import { getPlanForUser } from "@/lib/plan-access";
 import { rateLimit } from "@/lib/ratelimit";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
@@ -77,7 +78,18 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return fail(401, "UNAUTHORIZED", "Please sign in to use Ask Urivo.");
 
-  const limit = await rateLimit(`ask:${user.id}`, 20, 60_000);
+  // The AI Store Assistant is a paid capability (Founder and Elite).
+  const plan = await getPlanForUser(user.id);
+  if (!plan.features.askUrivo) {
+    return fail(
+      403,
+      "UPGRADE_REQUIRED",
+      "The AI Store Assistant is available on Founder and Elite. Upgrade to chat with Urivo.",
+    );
+  }
+
+  // Priority made concrete: higher tiers get a wider per-minute lane.
+  const limit = await rateLimit(`ask:${user.id}`, plan.askPerMinute, 60_000);
   if (!limit.success) {
     return NextResponse.json(
       { error: "RATE_LIMITED", message: "You're sending messages very quickly. Give it a second." },
