@@ -12,7 +12,17 @@ import type { RailStore } from "./app-rail";
  * sheet holding the live-store header and the full Ask Urivo conversation, so
  * the agent is one tap away on every screen. Desktop keeps the fixed rail.
  */
-export function MobileRail({ store, canAsk = true }: { store: RailStore | null; canAsk?: boolean }) {
+export function MobileRail({
+  store,
+  canAsk = true,
+  outOfCredits = false,
+  plan,
+}: {
+  store: RailStore | null;
+  canAsk?: boolean;
+  outOfCredits?: boolean;
+  plan?: string | null;
+}) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -94,7 +104,7 @@ export function MobileRail({ store, canAsk = true }: { store: RailStore | null; 
         )}
 
         {/* Ask Urivo fills the rest */}
-        {open && <AskUrivo hasStore={!!store} storeId={store?.id ?? null} canAsk={canAsk} />}
+        {open && <AskUrivo hasStore={!!store} storeId={store?.id ?? null} canAsk={canAsk} outOfCredits={outOfCredits} plan={plan} />}
       </div>
     </div>
   );

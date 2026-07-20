@@ -1,5 +1,6 @@
 import { supabaseServer } from "@/lib/supabase/server";
 import { canAskUrivo } from "@/lib/plans";
+import { getCreditBalance, STORE_GENERATION_COST } from "@/lib/credits";
 import { AppSidebar, type NavKey } from "./app-sidebar";
 import { AppRail, type RailStore } from "./app-rail";
 import { MobileRail } from "./mobile-rail";
@@ -42,18 +43,20 @@ export async function AppShell({
     avatarUrl: avatarUrl ?? metaAvatar ?? null,
   };
 
+  let outOfCredits = false;
+
   if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("full_name, email, plan")
-      .eq("id", user.id)
-      .single();
+    const [{ data: profile }, balance] = await Promise.all([
+      supabase.from("profiles").select("full_name, email, plan").eq("id", user.id).single(),
+      getCreditBalance(user.id).catch(() => 0),
+    ]);
     account = {
       name: profile?.full_name ?? metaName ?? null,
       email: profile?.email ?? email ?? user.email ?? null,
       plan: profile?.plan ?? "free",
       avatarUrl: avatarUrl ?? metaAvatar ?? null,
     };
+    outOfCredits = balance < STORE_GENERATION_COST;
   }
 
   return (
@@ -73,8 +76,8 @@ export async function AppShell({
           {children}
         </main>
       </div>
-      <AppRail store={store} canAsk={canAskUrivo(account.plan)} />
-      <MobileRail store={store} canAsk={canAskUrivo(account.plan)} />
+      <AppRail store={store} canAsk={canAskUrivo(account.plan)} outOfCredits={outOfCredits} plan={account.plan} />
+      <MobileRail store={store} canAsk={canAskUrivo(account.plan)} outOfCredits={outOfCredits} plan={account.plan} />
     </div>
   );
 }

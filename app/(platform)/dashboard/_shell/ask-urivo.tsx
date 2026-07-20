@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { nextPlan } from "@/lib/plans";
 import { IconSpark, IconArrow } from "./icons";
 
 /*
@@ -39,12 +40,17 @@ export function AskUrivo({
   hasStore,
   storeId,
   canAsk = true,
+  outOfCredits = false,
+  plan,
 }: {
   hasStore: boolean;
   storeId: string | null;
   canAsk?: boolean;
+  outOfCredits?: boolean;
+  plan?: string | null;
 }) {
   const router = useRouter();
+  const [creditNudge, setCreditNudge] = useState(true);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -208,8 +214,45 @@ export function AskUrivo({
     );
   }
 
+  const nudgePlan = nextPlan(plan);
+  const showCreditNudge = canAsk && outOfCredits && creditNudge;
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* Out-of-credits nudge — Lovable-style: upgrade, or top up, in one tap */}
+      {showCreditNudge && (
+        <div className="absolute inset-x-3 top-11 z-30 u-float rounded-xl border border-gold/25 bg-[#0f1a2e] p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.7)]">
+          <button
+            type="button"
+            onClick={() => setCreditNudge(false)}
+            aria-label="Dismiss"
+            className="absolute right-2.5 top-2.5 text-mist-dim transition-colors hover:text-ivory"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-soft">Out of credits</p>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-ivory">
+            You&apos;re out of credits. Keep building — pick one:
+          </p>
+          <div className="mt-3 space-y-2">
+            {nudgePlan && (
+              <Link
+                href="/dashboard/billing"
+                className="u-gold u-lift block rounded-lg px-3 py-2 text-center text-xs font-semibold"
+              >
+                Upgrade to {nudgePlan.name}
+              </Link>
+            )}
+            <Link
+              href="/dashboard/billing"
+              className="u-lift block rounded-lg border border-hair bg-panel px-3 py-2 text-center text-xs font-semibold text-ivory hover:border-hair-strong hover:bg-panel-2"
+            >
+              Buy more credits
+            </Link>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between px-5 pb-2 pt-4">
         <div className="flex items-center gap-1.5">
           <IconSpark className="text-gold" width={13} height={13} />

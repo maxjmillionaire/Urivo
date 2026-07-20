@@ -145,6 +145,14 @@ export function planName(key: string | null | undefined): string {
   return getPlan(key).name;
 }
 
+/** The next tier up from a plan (free→Founder, core→Elite), or null at the top. */
+export function nextPlan(key: string | null | undefined): PlanConfig | null {
+  const k = getPlan(key).key;
+  if (k === "free") return PLANS.core;
+  if (k === "core") return PLANS.pro;
+  return null;
+}
+
 export function isPaid(key: string | null | undefined): boolean {
   return getPlan(key).key !== "free";
 }
