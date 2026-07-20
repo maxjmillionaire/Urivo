@@ -21,12 +21,12 @@ export interface RailStore {
 export function AppRail({
   store,
   canAsk = true,
-  outOfCredits = false,
+  credits = 0,
   plan,
 }: {
   store: RailStore | null;
   canAsk?: boolean;
-  outOfCredits?: boolean;
+  credits?: number;
   plan?: string | null;
 }) {
   return (
@@ -92,7 +92,7 @@ export function AppRail({
       </div>
 
       {/* Ask Urivo — interactive, grounded conversation + live editing */}
-      <AskUrivo hasStore={!!store} storeId={store?.id ?? null} canAsk={canAsk} outOfCredits={outOfCredits} plan={plan} />
+      <AskUrivo hasStore={!!store} storeId={store?.id ?? null} canAsk={canAsk} credits={credits} plan={plan} />
     </aside>
   );
 }

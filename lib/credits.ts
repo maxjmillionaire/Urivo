@@ -10,6 +10,40 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const STORE_GENERATION_COST = 10;
 
+/** Thrown by spendCredits when the user can't afford an action. */
+export class InsufficientCreditsError extends Error {
+  constructor() {
+    super("INSUFFICIENT_CREDITS");
+    this.name = "InsufficientCreditsError";
+  }
+}
+
+/*
+ * Spend credits for an AI action (server-authoritative, via the spend_credits
+ * RPC). Deducts atomically under a row lock, returns the new balance, and throws
+ * InsufficientCreditsError if the caller can't afford it. Charge AFTER the work
+ * succeeds so a failed action never costs the user (spec 6.2 §19).
+ */
+export async function spendCredits(
+  userId: string,
+  amount: number,
+  reason: string,
+  source = "ai",
+): Promise<number> {
+  if (amount <= 0) return getCreditBalance(userId);
+  const { data, error } = await supabaseAdmin().rpc("spend_credits", {
+    p_user_id: userId,
+    p_amount: amount,
+    p_reason: reason,
+    p_source: source,
+  });
+  if (error) {
+    if ((error.message || "").includes("INSUFFICIENT_CREDITS")) throw new InsufficientCreditsError();
+    throw new Error(`Failed to spend credits: ${error.message}`);
+  }
+  return typeof data === "number" ? data : 0;
+}
+
 export async function getCreditBalance(userId: string): Promise<number> {
   const { data, error } = await supabaseAdmin().rpc("credit_balance", {
     p_user_id: userId,

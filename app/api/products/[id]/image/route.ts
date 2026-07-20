@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getCreditBalance, spendCredits } from "@/lib/credits";
+import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { rateLimit } from "@/lib/ratelimit";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
@@ -65,6 +67,11 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     return fail(503, "IMAGE_UNAVAILABLE", "Image generation isn't set up yet. Add a Higgsfield API key to enable it.");
   }
 
+  const balance = await getCreditBalance(auth.user.id).catch(() => 0);
+  if (balance < CREDIT_COSTS.productImage) {
+    return fail(402, "INSUFFICIENT_CREDITS", "You're out of credits. Upgrade or top up to regenerate images.");
+  }
+
   const limit = await rateLimit(`product-image:${auth.user.id}`, 20, 60_000);
   if (!limit.success) {
     return NextResponse.json(
@@ -101,6 +108,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   if (error) {
     return fail(500, "INTERNAL", "Generated the image but couldn't save it. Please try again.");
   }
+
+  await spendCredits(auth.user.id, CREDIT_COSTS.productImage, "Product image", "image").catch((e) =>
+    captureException(e, { requestId, userId: auth.user.id, route: "product-image:charge" }),
+  );
 
   return NextResponse.json({ success: true, imageUrl });
 }

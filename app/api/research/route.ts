@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
+import { getCreditBalance, spendCredits } from "@/lib/credits";
+import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { rateLimit } from "@/lib/ratelimit";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
@@ -12,8 +14,8 @@ export const maxDuration = 120;
 
 /*
  * Market Research endpoint. Authenticated + rate-limited. Returns a structured,
- * validated market report. No credits are charged — this is top-of-funnel and
- * meant to be used freely before a founder commits credits to a generation.
+ * validated market report. Costs credits (a full AI report); charged only after
+ * a successful run so a failed report never costs the founder (spec 6.2 §19).
  */
 
 const BodySchema = z.object({
@@ -47,9 +49,17 @@ export async function POST(request: NextRequest) {
     return fail(400, "INVALID_INPUT", message);
   }
 
+  const balance = await getCreditBalance(user.id).catch(() => 0);
+  if (balance < CREDIT_COSTS.marketResearch) {
+    return fail(402, "INSUFFICIENT_CREDITS", "You're out of credits. Upgrade or top up to run market research.");
+  }
+
   const requestId = newRequestId();
   try {
     const report = await runMarketResearch({ prompt: body.prompt });
+    await spendCredits(user.id, CREDIT_COSTS.marketResearch, "Market research", "research").catch((e) =>
+      captureException(e, { requestId, userId: user.id, route: "research:charge" }),
+    );
     return NextResponse.json({ success: true, report });
   } catch (err) {
     const code = err instanceof Error ? err.message : "AI_FAILED";

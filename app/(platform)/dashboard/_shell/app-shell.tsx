@@ -1,6 +1,6 @@
 import { supabaseServer } from "@/lib/supabase/server";
 import { canAskUrivo } from "@/lib/plans";
-import { getCreditBalance, STORE_GENERATION_COST } from "@/lib/credits";
+import { getCreditBalance } from "@/lib/credits";
 import { AppSidebar, type NavKey } from "./app-sidebar";
 import { AppRail, type RailStore } from "./app-rail";
 import { MobileRail } from "./mobile-rail";
@@ -43,7 +43,7 @@ export async function AppShell({
     avatarUrl: avatarUrl ?? metaAvatar ?? null,
   };
 
-  let outOfCredits = false;
+  let credits = 0;
 
   if (user) {
     const [{ data: profile }, balance] = await Promise.all([
@@ -56,7 +56,7 @@ export async function AppShell({
       plan: profile?.plan ?? "free",
       avatarUrl: avatarUrl ?? metaAvatar ?? null,
     };
-    outOfCredits = balance < STORE_GENERATION_COST;
+    credits = balance;
   }
 
   return (
@@ -76,8 +76,8 @@ export async function AppShell({
           {children}
         </main>
       </div>
-      <AppRail store={store} canAsk={canAskUrivo(account.plan)} outOfCredits={outOfCredits} plan={account.plan} />
-      <MobileRail store={store} canAsk={canAskUrivo(account.plan)} outOfCredits={outOfCredits} plan={account.plan} />
+      <AppRail store={store} canAsk={canAskUrivo(account.plan)} credits={credits} plan={account.plan} />
+      <MobileRail store={store} canAsk={canAskUrivo(account.plan)} credits={credits} plan={account.plan} />
     </div>
   );
 }

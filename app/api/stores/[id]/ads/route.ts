@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { requireStoreOwner } from "@/lib/tenant";
+import { getCreditBalance, spendCredits } from "@/lib/credits";
+import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { rateLimit } from "@/lib/ratelimit";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
@@ -14,7 +16,7 @@ export const maxDuration = 120;
 
 /*
  * Ad Studio — generate channel strategy + ad creative for a store. Auth +
- * ownership + rate-limited. No credit charge (marketing surface).
+ * ownership + rate-limited. Costs credits; charged only after a successful run.
  */
 
 function fail(status: number, error: string, message: string) {
@@ -32,6 +34,11 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return fail(503, "AI_UNAVAILABLE", "Ad Studio isn't available just yet. Please try again shortly.");
+
+  const balance = await getCreditBalance(owner.userId).catch(() => 0);
+  if (balance < CREDIT_COSTS.adStudio) {
+    return fail(402, "INSUFFICIENT_CREDITS", "You're out of credits. Upgrade or top up to build an ad plan.");
+  }
 
   const limit = await rateLimit(`ads:${owner.userId}`, 10, 60_000);
   if (!limit.success) {
@@ -65,6 +72,9 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         priceEUR: Number(p.price_eur),
       })),
     });
+    await spendCredits(owner.userId, CREDIT_COSTS.adStudio, "Ad Studio plan", "ads").catch((e) =>
+      captureException(e, { requestId, userId: owner.userId, route: "ads:charge" }),
+    );
     return NextResponse.json({ success: true, plan });
   } catch (err) {
     const code = err instanceof Error ? err.message : "AI_FAILED";

@@ -15,12 +15,12 @@ import type { RailStore } from "./app-rail";
 export function MobileRail({
   store,
   canAsk = true,
-  outOfCredits = false,
+  credits = 0,
   plan,
 }: {
   store: RailStore | null;
   canAsk?: boolean;
-  outOfCredits?: boolean;
+  credits?: number;
   plan?: string | null;
 }) {
   const [open, setOpen] = useState(false);
@@ -104,7 +104,7 @@ export function MobileRail({
         )}
 
         {/* Ask Urivo fills the rest */}
-        {open && <AskUrivo hasStore={!!store} storeId={store?.id ?? null} canAsk={canAsk} outOfCredits={outOfCredits} plan={plan} />}
+        {open && <AskUrivo hasStore={!!store} storeId={store?.id ?? null} canAsk={canAsk} credits={credits} plan={plan} />}
       </div>
     </div>
   );

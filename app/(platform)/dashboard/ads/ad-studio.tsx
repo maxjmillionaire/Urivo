@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
+import { CREDIT_COSTS } from "@/lib/credit-costs";
 
 /*
  * Ad Studio client. Generates a channel strategy + platform-ready creative for
@@ -76,7 +77,9 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
       <div className="u-float flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-hair bg-panel/70 p-5">
         <div>
           <p className="text-sm font-medium text-ivory">{store.name}</p>
-          <p className="text-xs text-mist-dim">Generate a fresh strategy + ad set for this store.</p>
+          <p className="text-xs text-mist-dim">
+            Generate a fresh strategy + ad set for this store · {CREDIT_COSTS.adStudio} credits
+          </p>
         </div>
         <button
           onClick={run}

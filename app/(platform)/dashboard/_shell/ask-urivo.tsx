@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { nextPlan } from "@/lib/plans";
+import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { IconSpark, IconArrow } from "./icons";
+
+const MESSAGE_COST = CREDIT_COSTS.askMessage;
 
 /*
  * Interactive "Ask Urivo" — the conversational half of the companion rail.
@@ -40,17 +43,23 @@ export function AskUrivo({
   hasStore,
   storeId,
   canAsk = true,
-  outOfCredits = false,
+  credits = 0,
   plan,
 }: {
   hasStore: boolean;
   storeId: string | null;
   canAsk?: boolean;
-  outOfCredits?: boolean;
+  credits?: number;
   plan?: string | null;
 }) {
   const router = useRouter();
   const [creditNudge, setCreditNudge] = useState(true);
+  const [creditsLeft, setCreditsLeft] = useState(credits);
+
+  // Keep the local balance in sync when the server value changes (navigation).
+  useEffect(() => setCreditsLeft(credits), [credits]);
+
+  const outOfCredits = creditsLeft < MESSAGE_COST;
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -83,7 +92,9 @@ export function AskUrivo({
       } catch {
         /* non-JSON */
       }
-      throw new Error(message);
+      const err = new Error(message);
+      if (res.status === 402) (err as Error & { code?: string }).code = "INSUFFICIENT_CREDITS";
+      throw err;
     }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -108,7 +119,11 @@ export function AskUrivo({
         signal,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Ask Urivo is unavailable right now. Please try again.");
+      if (!res.ok) {
+        const err = new Error(data?.message || "Ask Urivo is unavailable right now. Please try again.");
+        if (res.status === 402) (err as Error & { code?: string }).code = "INSUFFICIENT_CREDITS";
+        throw err;
+      }
       setMessages((prev) =>
         prev.map((m) => (m.id === assistantId ? { ...m, content: data.reply || "Done.", edit: data.edit ?? null } : m)),
       );
@@ -120,6 +135,11 @@ export function AskUrivo({
     async (text: string) => {
       const content = text.trim();
       if (!content || busy) return;
+      // Every message costs credits — block and nudge when the balance is empty.
+      if (creditsLeft < MESSAGE_COST) {
+        setCreditNudge(true);
+        return;
+      }
       setError(null);
       const userMsg: Msg = { id: nextId(), role: "user", content };
       const assistantMsg: Msg = { id: nextId(), role: "assistant", content: "" };
@@ -133,8 +153,13 @@ export function AskUrivo({
       try {
         if (storeId) await editPropose(history, assistantMsg.id, controller.signal);
         else await streamChat(history, assistantMsg.id, controller.signal);
+        setCreditsLeft((c) => Math.max(0, c - MESSAGE_COST));
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
+        if ((err as Error & { code?: string }).code === "INSUFFICIENT_CREDITS") {
+          setCreditsLeft(0);
+          setCreditNudge(true);
+        }
         setError(err instanceof Error ? err.message : "Something went wrong.");
         setMessages((prev) => prev.filter((m) => m.id !== assistantMsg.id));
       } finally {
@@ -143,7 +168,7 @@ export function AskUrivo({
         taRef.current?.focus();
       }
     },
-    [messages, busy, storeId, editPropose, streamChat],
+    [messages, busy, storeId, editPropose, streamChat, creditsLeft],
   );
 
   const applyEdit = useCallback(
@@ -322,10 +347,16 @@ export function AskUrivo({
             className="w-full resize-none bg-transparent px-3.5 pt-3 text-sm text-ivory placeholder:text-mist-dim focus:outline-none disabled:opacity-60"
           />
           <div className="flex items-center justify-between px-2.5 pb-2.5">
-            <span className="pl-1 text-[10px] text-mist-dim">{busy ? "Urivo is thinking…" : "Enter to send"}</span>
+            <span className="pl-1 text-[10px] text-mist-dim">
+              {busy
+                ? "Urivo is thinking…"
+                : outOfCredits
+                  ? "Out of credits"
+                  : `${MESSAGE_COST} credit · ${creditsLeft} left`}
+            </span>
             <button
               onClick={() => void send(draft)}
-              disabled={busy || !draft.trim()}
+              disabled={busy || !draft.trim() || outOfCredits}
               className="u-gold flex h-7 w-7 items-center justify-center rounded-lg transition-transform active:scale-[0.92] disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Send"
             >

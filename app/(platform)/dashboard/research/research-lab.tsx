@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CREDIT_COSTS } from "@/lib/credit-costs";
 
 /*
  * Market Research lab. A founder describes a niche; Urivo returns a market read,
@@ -92,7 +93,7 @@ export function ResearchLab() {
             className="w-full resize-none bg-transparent px-4 pt-3.5 text-sm text-ivory placeholder:text-mist-dim focus:outline-none disabled:opacity-60"
           />
           <div className="flex items-center justify-between px-3 pb-3">
-            <span className="text-[10px] text-mist-dim">⌘↵ to research</span>
+            <span className="text-[10px] text-mist-dim">⌘↵ to research · {CREDIT_COSTS.marketResearch} credits</span>
             <button
               onClick={() => run(prompt)}
               disabled={busy || prompt.trim().length < 4}

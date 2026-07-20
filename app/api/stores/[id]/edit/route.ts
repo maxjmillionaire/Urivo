@@ -4,6 +4,8 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireStoreOwner } from "@/lib/tenant";
 import { getPlanForUser } from "@/lib/plan-access";
+import { getCreditBalance, spendCredits } from "@/lib/credits";
+import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { rateLimit } from "@/lib/ratelimit";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
@@ -54,6 +56,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return fail(503, "AI_UNAVAILABLE", "Ask Urivo isn't available just yet. Please try again shortly.");
 
+  // Every Ask Urivo message costs credits. Verify up front; charge after success.
+  const balance = await getCreditBalance(owner.userId).catch(() => 0);
+  if (balance < CREDIT_COSTS.askMessage) {
+    return fail(402, "INSUFFICIENT_CREDITS", "You're out of credits. Upgrade or top up to keep editing with Urivo.");
+  }
+
   const limit = await rateLimit(`edit:${owner.userId}`, plan.askPerMinute, 60_000);
   if (!limit.success) {
     return NextResponse.json(
@@ -94,6 +102,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         priceEUR: Number(p.price_eur),
       })),
     }, body.messages);
+    // Charge for the completed message (spec 6.2 §19: a failed call never costs).
+    await spendCredits(owner.userId, CREDIT_COSTS.askMessage, "Ask Urivo message", "ask").catch((e) =>
+      captureException(e, { requestId, userId: owner.userId, route: "store-edit:charge" }),
+    );
     return NextResponse.json({ reply: result.reply, edit: result.edit });
   } catch (err) {
     const code = err instanceof Error ? err.message : "AI_FAILED";

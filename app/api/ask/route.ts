@@ -3,6 +3,8 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/storefront";
 import { getPlanForUser } from "@/lib/plan-access";
+import { getCreditBalance, spendCredits } from "@/lib/credits";
+import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { rateLimit } from "@/lib/ratelimit";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
@@ -111,6 +113,12 @@ export async function POST(request: NextRequest) {
     return fail(503, "AI_UNAVAILABLE", "Ask Urivo isn't available just yet. Please try again shortly.");
   }
 
+  // Every Ask Urivo message costs credits. Verify up front; charge after success.
+  const balance = await getCreditBalance(user.id).catch(() => 0);
+  if (balance < CREDIT_COSTS.askMessage) {
+    return fail(402, "INSUFFICIENT_CREDITS", "You're out of credits. Upgrade or top up to keep chatting with Urivo.");
+  }
+
   const requestId = newRequestId();
   let store: StoreContext | null = null;
   try {
@@ -123,10 +131,12 @@ export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let ok = false;
       try {
         for await (const chunk of streamAssistantReply(apiKey, body.messages, store)) {
           controller.enqueue(encoder.encode(chunk));
         }
+        ok = true;
       } catch (err) {
         captureException(err, { requestId, userId: user.id, route: "ask" });
         controller.enqueue(
@@ -134,6 +144,14 @@ export async function POST(request: NextRequest) {
         );
       } finally {
         controller.close();
+      }
+      // Charge only for a message that actually completed (spec 6.2 §19).
+      if (ok) {
+        try {
+          await spendCredits(user.id, CREDIT_COSTS.askMessage, "Ask Urivo message", "ask");
+        } catch (err) {
+          captureException(err, { requestId, userId: user.id, route: "ask:charge" });
+        }
       }
     },
   });
