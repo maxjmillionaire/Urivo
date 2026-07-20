@@ -25,6 +25,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("signin");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
@@ -68,6 +69,11 @@ function LoginForm() {
         return;
       }
       if (mode === "signup") {
+        const fullName = name.trim();
+        if (!fullName) {
+          setBanner({ kind: "error", text: "Please enter your name so we can personalize your workspace." });
+          return;
+        }
         if (!passwordValid) {
           setBanner({ kind: "error", text: "Your password does not meet the requirements yet." });
           return;
@@ -75,7 +81,10 @@ function LoginForm() {
         const { data, error } = await supabase.auth.signUp({
           email: email.toLowerCase().trim(),
           password,
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            data: { full_name: fullName },
+          },
         });
         if (error) throw error;
         track("sign_up", { method: "email" });
@@ -195,6 +204,24 @@ function LoginForm() {
           )}
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+            {mode === "signup" && (
+              <div>
+                <label htmlFor="name" className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-mist">
+                  Your name
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  required
+                  autoComplete="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className={inputClass}
+                  placeholder="Max Basner"
+                />
+              </div>
+            )}
+
             <div>
               <label htmlFor="email" className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-mist">
                 Email address
