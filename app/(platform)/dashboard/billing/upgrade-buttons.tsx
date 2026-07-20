@@ -60,3 +60,45 @@ export function UpgradeButton({
     </div>
   );
 }
+
+/*
+ * Manage subscription — opens the Stripe Customer Portal (update payment,
+ * change plan, or cancel). Same graceful Phase-2 degradation as upgrade.
+ */
+export function ManageSubscriptionButton() {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  async function manage() {
+    track("manage_subscription_clicked", {});
+    setBusy(true);
+    setNote(null);
+    try {
+      const res = await fetch("/api/billing/portal", { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setNote(data.message || "Subscription management is not available right now.");
+    } catch {
+      setNote("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={manage}
+        disabled={busy}
+        className="u-lift rounded-xl border border-hair bg-panel px-5 py-2.5 text-sm font-semibold text-ivory hover:border-hair-strong hover:bg-panel-2 disabled:opacity-60"
+      >
+        {busy ? "One moment…" : "Manage subscription"}
+      </button>
+      {note && <p className="mt-3 text-xs text-mist">{note}</p>}
+    </div>
+  );
+}

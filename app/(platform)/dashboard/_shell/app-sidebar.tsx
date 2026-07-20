@@ -16,6 +16,7 @@ import {
   IconMenu,
   IconClose,
 } from "./icons";
+import { AccountMenu, type Account } from "./account-menu";
 
 /*
  * Left navigation — stable furniture across the product. Fixed on desktop;
@@ -35,12 +36,10 @@ const NAV: { key: NavKey; label: string; href: string; Icon: typeof IconHome }[]
 
 export function AppSidebar({
   active,
-  email,
-  avatarUrl,
+  account,
 }: {
   active: NavKey;
-  email?: string | null;
-  avatarUrl?: string | null;
+  account: Account;
 }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -132,17 +131,7 @@ export function AppSidebar({
           {row("settings", "Settings", "/dashboard/settings", IconSettings)}
         </div>
 
-        <div className="flex items-center gap-3 border-t border-hair px-4 py-4">
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt="" className="h-8 w-8 rounded-lg object-cover" />
-          ) : (
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-navymark text-xs font-semibold text-gold-soft">
-              {(email ?? "U").slice(0, 1).toUpperCase()}
-            </span>
-          )}
-          <span className="truncate text-xs text-mist">{email ?? "you@urivo.ai"}</span>
-        </div>
+        <AccountMenu account={account} />
       </aside>
     </>
   );

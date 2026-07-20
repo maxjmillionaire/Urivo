@@ -3,7 +3,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { getCreditBalance, getCreditLedger } from "@/lib/credits";
 import { AppShell } from "../_shell/app-shell";
 import { loadRailStore } from "../_shell/rail-data";
-import { UpgradeButton } from "./upgrade-buttons";
+import { UpgradeButton, ManageSubscriptionButton } from "./upgrade-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +95,25 @@ export default async function BillingPage() {
                 <UpgradeButton plan="pro" label="Choose Pro" />
               </div>
             </div>
+          </div>
+        </section>
+      )}
+
+      {plan !== "free" && (
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold tracking-tight text-ivory">Manage subscription</h2>
+          <div className="u-float mt-4 flex flex-col gap-4 rounded-2xl border border-hair bg-panel/70 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-ivory">
+                Update your payment method, change plan, or cancel anytime.
+              </p>
+              <p className="mt-1 text-xs text-mist">
+                {profile?.subscription_status === "canceled"
+                  ? "Your subscription is set to end — you keep access until the period closes."
+                  : "You're in control. Cancelling stays effective until the end of your paid period."}
+              </p>
+            </div>
+            <ManageSubscriptionButton />
           </div>
         </section>
       )}
