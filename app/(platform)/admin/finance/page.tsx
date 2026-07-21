@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
@@ -48,11 +49,16 @@ export default async function FinanceDashboardPage() {
               Real cost from the usage ledger · {periodLabel} (month to date)
             </p>
           </div>
-          <p className="text-right text-xs text-white/40">
-            All figures net of VAT · FX 1&nbsp;USD = {EUR_PER_USD.toFixed(3)}&nbsp;€
-            <br />
-            (1&nbsp;€ = {USD_PER_EUR.toFixed(2)}&nbsp;$)
-          </p>
+          <div className="text-right text-xs text-white/40">
+            <Link href="/admin/referrals" className="text-amber-300/90 hover:text-amber-200">
+              → Creator referrals
+            </Link>
+            <p className="mt-2">
+              All figures net of VAT · FX 1&nbsp;USD = {EUR_PER_USD.toFixed(3)}&nbsp;€
+              <br />
+              (1&nbsp;€ = {USD_PER_EUR.toFixed(2)}&nbsp;$)
+            </p>
+          </div>
         </header>
 
         {/* Headline KPIs */}
