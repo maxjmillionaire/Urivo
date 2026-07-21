@@ -44,8 +44,14 @@ begin
 end;
 $$;
 
--- Only the service role may spend credits (never the browser).
-revoke all on function public.spend_credits(uuid, integer, text, text) from public, anon, authenticated;
+-- Only the service role may spend credits (never the browser). Mirror the
+-- pattern in 0002: revoke the default PUBLIC grant, then grant to service_role
+-- explicitly (our API layer calls this with the service-role key). Without the
+-- grant, every spend would fail with "permission denied for function".
+revoke execute on function public.spend_credits(uuid, integer, text, text)
+    from public, anon, authenticated;
+grant execute on function public.spend_credits(uuid, integer, text, text)
+    to service_role;
 
 -- ------------------------------------------------------------
 -- Widen the credit_ledger.source vocabulary for the new economy.
