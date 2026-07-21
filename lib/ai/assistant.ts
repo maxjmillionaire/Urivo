@@ -1,5 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { AI_INPUT_BUDGET, boundHistory, clampText } from "./limits";
 
 /*
  * "Ask Urivo" — the in-product assistant behind the companion rail.
@@ -14,7 +15,6 @@ import Anthropic from "@anthropic-ai/sdk";
 export const ASSISTANT_MODEL = "claude-opus-4-8";
 export const ASSISTANT_PROMPT_VERSION = "v1";
 
-const MAX_TURNS = 20; // bound history sent upstream
 const MAX_TOKENS = 700;
 
 export interface AssistantMessage {
@@ -71,7 +71,17 @@ export async function* streamAssistantReply(
   store: StoreContext | null,
 ): AsyncGenerator<string, void, unknown> {
   const client = new Anthropic({ apiKey });
-  const turns = history.slice(-MAX_TURNS);
+  // Hard-bound the input: cap turn count AND total characters, then clamp each
+  // message. Combined with max_tokens on the output, this fixes the worst-case
+  // cost of a message so it can never exceed the credit it charges (spec 6.2).
+  const turns = boundHistory(
+    history,
+    AI_INPUT_BUDGET.askMaxTurns,
+    AI_INPUT_BUDGET.askHistoryChars,
+  ).map((m) => ({
+    role: m.role,
+    content: clampText(m.content, AI_INPUT_BUDGET.askPerMessageChars),
+  }));
 
   const stream = client.messages.stream({
     model: ASSISTANT_MODEL,

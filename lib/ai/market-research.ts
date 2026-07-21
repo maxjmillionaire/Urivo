@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
+import { AI_INPUT_BUDGET, clampText } from "./limits";
 
 /*
  * Market Research / Product Discovery (front of the funnel).
@@ -104,7 +105,7 @@ export async function runMarketResearch(input: ResearchInput): Promise<ResearchR
     messages: [
       {
         role: "user",
-        content: `Research this market and find the wedge and the winning products:\n\n${input.prompt.trim()}`,
+        content: `Research this market and find the wedge and the winning products:\n\n${clampText(input.prompt.trim(), AI_INPUT_BUDGET.promptChars)}`,
       },
     ],
   });

@@ -16,6 +16,7 @@ import {
   SECTION_KEYS,
   type StoreDesignSystem,
 } from "@/lib/storefront/design-system";
+import { AI_INPUT_BUDGET, boundHistory, clampText } from "./limits";
 
 /*
  * "Ask Urivo" store editor. Given the merchant's live store and an instruction,
@@ -153,7 +154,17 @@ export async function proposeStoreEdit(
       { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
       { type: "text", text: contextBlock(store) },
     ],
-    messages: history.slice(-16).map((m) => ({ role: m.role, content: m.content })),
+    // Hard-bound the conversation input (turns + total chars) so a long history
+    // can't inflate cost past the credit it charges (spec 6.2). Output is capped
+    // by max_tokens above; this caps the other end.
+    messages: boundHistory(
+      history,
+      AI_INPUT_BUDGET.editorMaxTurns,
+      AI_INPUT_BUDGET.editorHistoryChars,
+    ).map((m) => ({
+      role: m.role,
+      content: clampText(m.content, AI_INPUT_BUDGET.askPerMessageChars),
+    })),
   });
 
   if (response.stop_reason === "refusal") throw new Error("AI_REFUSED");

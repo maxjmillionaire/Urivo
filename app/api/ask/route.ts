@@ -34,7 +34,7 @@ const BodySchema = z.object({
       }),
     )
     .min(1)
-    .max(40),
+    .max(24),
 });
 
 function fail(status: number, error: string, message: string) {

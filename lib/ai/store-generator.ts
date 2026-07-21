@@ -18,6 +18,7 @@ import {
   SECTION_KEYS,
   type StoreDesignSystem,
 } from "@/lib/storefront/design-system";
+import { AI_INPUT_BUDGET, clampText } from "./limits";
 
 /*
  * Store generation orchestrator (specs 1, 6.3, 6.5).
@@ -153,7 +154,7 @@ export async function generateStore(input: StoreGenerationInput): Promise<Genera
     messages: [
       {
         role: "user",
-        content: `Design a completely original storefront for this business. Commit fully to a design language that fits it:\n\n${input.prompt.trim()}`,
+        content: `Design a completely original storefront for this business. Commit fully to a design language that fits it:\n\n${clampText(input.prompt.trim(), AI_INPUT_BUDGET.promptChars)}`,
       },
     ],
   });
