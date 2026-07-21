@@ -16,14 +16,18 @@ bottom. Hit `/api/health` after each block to confirm wiring.
      `service_role` key.
 2. **Anthropic key** — platform.claude.com → API keys. Without this, no AI
      works at all (generation, Ask Urivo, research, ads).
-3. **Set env vars** (see `.env.example`) in your host (Vercel → Project →
-     Settings → Environment Variables). Minimum to function:
+3. **Set env vars** (see `.env.example`) on **Railway** → your service →
+     Variables. Minimum to function:
    - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
      `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `ROOT_DOMAIN`, `APP_URL`.
    - Strongly recommended: `HIGGSFIELD_API_KEY`/`_SECRET` (product photos),
      `UPSTASH_REDIS_REST_URL`/`_TOKEN` (real rate limiting),
      `RESEND_API_KEY`/`EMAIL_FROM` (emails), `SENTRY_DSN` (error alerts).
-4. **Deploy** (Vercel). Point the domain / `ROOT_DOMAIN` at it.
+4. **Deploy on Railway** (connect the GitHub repo → deploy the branch). Use
+     Railway's temporary URL first; then manage DNS in **Cloudflare** (incl. the
+     wildcard `*.urivo.ai` for storefronts) pointing at Railway, and set
+     `ROOT_DOMAIN` / `APP_URL` to the real domain. Domain via a registrar
+     (Cloudflare), not Railway.
 5. **Verify:** open `/api/health` → `launchReady: true` and every `required`
      flag `true`. Fix any `false` before continuing.
 
