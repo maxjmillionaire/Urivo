@@ -16,6 +16,8 @@ export interface StudioResult {
   storeName: string;
   tagline: string;
   storeUrl: string;
+  /** true when the store went live on generation (paid); false = draft/preview. */
+  published: boolean;
   palette: { background: string; structure: string; accent: string };
   products: { title: string; priceEUR: number }[];
   creditsRemaining: number;
@@ -169,12 +171,19 @@ export function GenerationStudio({
           <StagePreview result={result} />
           {done && result && (
             <div className="u-enter mt-6">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-mist">Your store is live</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-mist">
+                {result.published ? "Your store is live" : "Your store is ready to preview"}
+              </p>
               <h2 className="mt-2 text-3xl font-semibold tracking-tight text-ivory">{result.storeName}</h2>
               <p className="mt-2 max-w-md text-sm leading-relaxed text-mist">{result.tagline}</p>
+              {!result.published && (
+                <p className="mt-3 max-w-md text-xs leading-relaxed text-gold-soft">
+                  Only you can see it for now. Upgrade to publish it to a live urivo.ai address.
+                </p>
+              )}
               <div className="mt-6 flex flex-wrap gap-3">
                 <button onClick={() => onOpenStore(result.storeUrl)} className="u-gold u-lift rounded-xl px-5 py-3 text-sm font-semibold">
-                  Open your store
+                  {result.published ? "Open your store" : "Preview your store"}
                 </button>
                 <button onClick={onClose} className="u-lift rounded-xl border border-hair bg-panel px-5 py-3 text-sm font-medium text-ivory transition-colors hover:border-hair-strong active:scale-[0.98]">
                   Back to dashboard

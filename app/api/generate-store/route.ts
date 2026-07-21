@@ -194,6 +194,15 @@ export async function POST(request: NextRequest) {
   }
 
   const result = rpcResult as { store_id: string; credits_remaining: number };
+
+  // Publishing (going live) is a paid capability. Stores are created live by
+  // default, so on a plan that can't publish we start the new store as a draft —
+  // the owner can preview and edit it, and upgrade to take it public.
+  const published = plan.features.publish;
+  if (!published) {
+    await admin.from("stores").update({ is_active: false }).eq("id", result.store_id);
+  }
+
   const rootDomain = process.env.ROOT_DOMAIN ?? "localhost:3000";
   const storeUrl = rootDomain.startsWith("localhost")
     ? `/store/${body.subdomain}`
@@ -204,6 +213,7 @@ export async function POST(request: NextRequest) {
     storeId: result.store_id,
     subdomain: body.subdomain,
     storeUrl,
+    published,
     storeName: generated.brand.name,
     tagline: generated.brand.tagline,
     palette: {

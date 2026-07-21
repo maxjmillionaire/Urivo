@@ -47,11 +47,13 @@ export function StoreManager({
   initialProducts,
   initialTheme,
   initialLogo,
+  canPublish = true,
 }: {
   storeId: string;
   initialProducts: Product[];
   initialTheme: Theme;
   initialLogo: StoreLogo | null;
+  canPublish?: boolean;
 }) {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -232,7 +234,7 @@ export function StoreManager({
           <div>
             <p className="text-sm font-medium text-ivory">{theme.storeName}</p>
             <p className="text-xs text-mist-dim">
-              {theme.tagline || "No tagline"} · {theme.isActive ? "Live" : "Paused"}
+              {theme.tagline || "No tagline"} · {theme.isActive ? "Live" : canPublish ? "Paused" : "Draft"}
             </p>
           </div>
         </div>
@@ -452,7 +454,7 @@ export function StoreManager({
       {editing && (
         <ProductModal product={editing === "new" ? null : editing} onClose={() => setEditing(null)} onSave={saveProduct} />
       )}
-      {themeOpen && <ThemeEditor theme={theme} onClose={() => setThemeOpen(false)} onSave={saveTheme} />}
+      {themeOpen && <ThemeEditor theme={theme} onClose={() => setThemeOpen(false)} onSave={saveTheme} canPublish={canPublish} />}
     </>
   );
 }
@@ -522,10 +524,12 @@ function ThemeEditor({
   theme,
   onClose,
   onSave,
+  canPublish,
 }: {
   theme: Theme;
   onClose: () => void;
   onSave: (next: Theme) => Promise<void>;
+  canPublish: boolean;
 }) {
   const [draft, setDraft] = useState<Theme>(theme);
   const [busy, setBusy] = useState(false);
@@ -580,15 +584,31 @@ function ThemeEditor({
           {swatch("background", "Background")}
           {swatch("structure", "Text / structure")}
           {swatch("accent", "Accent")}
-          <label className="flex items-center gap-3 pt-2 text-sm text-ivory">
-            <input
-              type="checkbox"
-              checked={draft.isActive}
-              onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })}
-              className="h-4 w-4 accent-gold"
-            />
-            Store is live
-          </label>
+          {canPublish ? (
+            <label className="flex items-center gap-3 pt-2 text-sm text-ivory">
+              <input
+                type="checkbox"
+                checked={draft.isActive}
+                onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })}
+                className="h-4 w-4 accent-gold"
+              />
+              Store is live
+            </label>
+          ) : (
+            <div className="mt-2 rounded-xl border border-gold/25 bg-gold/[0.05] p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-soft">Draft</p>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-ivory">
+                Publishing to a live urivo.ai address is available on Founder and Elite. You can
+                preview and refine your store as much as you like.
+              </p>
+              <a
+                href="/dashboard/billing"
+                className="u-gold u-lift mt-3 inline-flex rounded-lg px-4 py-2 text-xs font-semibold"
+              >
+                Upgrade to publish
+              </a>
+            </div>
+          )}
         </form>
         <button type="button" onClick={submit} disabled={busy || invalid} className="u-gold u-lift mt-6 w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-60">
           {busy ? "Saving…" : "Save changes"}

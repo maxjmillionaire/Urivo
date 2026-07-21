@@ -24,6 +24,7 @@ export interface CinemaResult {
   storeName: string;
   tagline: string;
   storeUrl: string;
+  published: boolean;
   palette: { background: string; structure: string; accent: string };
   products: { title: string; priceEUR: number }[];
   creditsRemaining: number;
@@ -474,7 +475,7 @@ function Reveal({
         </div>
         <div className="mt-8 flex flex-col gap-3" style={{ animation: "urivo-rise 800ms var(--ease-urivo) 1300ms both" }}>
           <button type="button" onClick={() => onOpenStore(result.storeUrl)} className="u-gold u-lift rounded-lg px-6 py-3.5 text-[11px] font-semibold uppercase tracking-[0.22em]">
-            Open your store
+            {result.published ? "Open your store" : "Preview your store"}
           </button>
           <button type="button" onClick={onClose} className="text-[10px] uppercase tracking-[0.2em] text-mist transition-colors hover:text-ivory">
             Back to workspace · {result.creditsRemaining} credits left

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getCreditBalance } from "@/lib/credits";
 import { parseTheme } from "@/lib/storefront";
-import { planName } from "@/lib/plans";
+import { planName, canPublish as planCanPublish } from "@/lib/plans";
 import { AppShell } from "./_shell/app-shell";
 import { DashboardHome } from "./_shell/dashboard-home";
 import type { RailStore } from "./_shell/app-rail";
@@ -76,6 +76,7 @@ export default async function DashboardPage() {
         liveStores={stores.filter((s) => s.is_active).length}
         productCount={productCount}
         canGenerate={(balance ?? 0) >= 10}
+        canPublish={planCanPublish(plan)}
         stores={stores.map((s) => ({
           id: s.id,
           name: s.store_name,

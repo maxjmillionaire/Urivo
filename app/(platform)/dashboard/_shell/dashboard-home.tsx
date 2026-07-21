@@ -24,6 +24,7 @@ export interface DashboardHomeProps {
   productCount: number;
   stores: HomeStore[];
   canGenerate: boolean;
+  canPublish: boolean;
 }
 
 const TASKS = [
@@ -42,6 +43,7 @@ export function DashboardHome({
   productCount,
   stores,
   canGenerate,
+  canPublish,
 }: DashboardHomeProps) {
   const stat = (label: string, value: string, sub: string, gold?: boolean) => (
     <div className="px-5 py-4">
@@ -140,12 +142,12 @@ export function DashboardHome({
             </h3>
             <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-mist">
               Describe what you want to sell — Urivo researches the market, designs the brand, writes the
-              catalog and builds a live storefront in under a minute.
+              catalog and builds a complete storefront in under a minute.
             </p>
             <div className="mx-auto mt-7 flex max-w-md flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] font-medium uppercase tracking-[0.1em] text-mist-dim">
               <span className="inline-flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-gold" /> A unique brand</span>
               <span className="inline-flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-gold" /> Real product photos</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-gold" /> Live in a minute</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-gold" /> Ready in a minute</span>
             </div>
             <div className="mt-8 flex justify-center">
               <GenerateStorePanel
@@ -186,7 +188,7 @@ export function DashboardHome({
                       }`}
                     >
                       {s.isLive && <span className="h-1.5 w-1.5 rounded-full bg-live" />}
-                      {s.isLive ? "Live" : "Paused"}
+                      {s.isLive ? "Live" : canPublish ? "Paused" : "Draft"}
                     </span>
                     <Link
                       href={`/dashboard/stores/${s.id}`}

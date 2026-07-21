@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
+import { getPlanForUser } from "@/lib/plan-access";
 import { parseTheme } from "@/lib/storefront";
 import { parseLogo } from "@/lib/storefront/design-system";
 import { auditStoreSeo } from "@/lib/seo";
@@ -41,7 +42,7 @@ export default async function StoreDetailPage({
 
   if (!store || store.user_id !== user.id) notFound();
 
-  const [{ data: products }, { data: profile }, rail] = await Promise.all([
+  const [{ data: products }, { data: profile }, rail, plan] = await Promise.all([
     supabase
       .from("products")
       .select("id, title, description, price_eur, inventory_count, image_url")
@@ -49,8 +50,10 @@ export default async function StoreDetailPage({
       .order("position", { ascending: true }),
     supabase.from("profiles").select("email").eq("id", user.id).single(),
     loadRailStore(user.id),
+    getPlanForUser(user.id),
   ]);
 
+  const canPublish = plan.features.publish;
   const theme = parseTheme(store.theme_config);
 
   return (
@@ -74,13 +77,14 @@ export default async function StoreDetailPage({
             rel="noreferrer"
             className="u-lift rounded-xl border border-hair bg-panel px-5 py-2.5 text-sm font-semibold text-ivory hover:border-hair-strong hover:bg-panel-2"
           >
-            View live
+            {store.is_active ? "View live" : "Preview"}
           </a>
         </div>
       </header>
 
       <StoreManager
         storeId={store.id}
+        canPublish={canPublish}
         initialProducts={(products ?? []).map((p) => ({
           id: p.id,
           title: p.title,

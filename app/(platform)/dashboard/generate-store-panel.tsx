@@ -201,6 +201,7 @@ export function GenerateStorePanel({
         storeName: data.storeName,
         tagline: data.tagline,
         storeUrl: data.storeUrl,
+        published: data.published ?? true,
         palette: data.palette,
         products: data.products ?? [],
         creditsRemaining: data.creditsRemaining,

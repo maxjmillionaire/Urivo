@@ -17,15 +17,17 @@ interface Props {
 
 // Deduped per request: metadata, viewport and the page all resolve the same
 // store from one query.
+// No is_active filter: RLS lets the public read active stores and the OWNER read
+// their own draft. So a null result means "not found or someone else's draft"
+// (→ 404), and a returned inactive store is the owner previewing before publish.
 const loadStore = cache(async (subdomain: string) => {
   if (!SUBDOMAIN_PATTERN.test(subdomain)) return null;
   const supabase = await supabaseServer();
   const { data: store } = await supabase
     .from("stores")
-    .select("id, store_name, theme_config, currency")
+    .select("id, store_name, theme_config, currency, is_active")
     .eq("subdomain", subdomain)
-    .eq("is_active", true)
-    .single();
+    .maybeSingle();
   return store ?? null;
 });
 
@@ -56,6 +58,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: store.store_name,
     description,
+    // A draft (owner preview) must never be indexed.
+    ...(store.is_active ? {} : { robots: { index: false, follow: false } }),
     alternates: { canonical: url },
     openGraph: {
       type: "website",
@@ -88,6 +92,7 @@ export default async function StorefrontPage({ params }: Props) {
   const store = await loadStore(subdomain);
   if (!store) notFound();
 
+  const isPreview = !store.is_active;
   const products = await loadProducts(store.id);
 
   // New stores persist a full `designSystem`; older ones are adapted from their
@@ -109,6 +114,35 @@ export default async function StorefrontPage({ params }: Props) {
 
   return (
     <>
+      {isPreview && (
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 50,
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
+            padding: "0.6rem 1rem",
+            background: "#0b1220",
+            color: "#f4f1e8",
+            fontSize: "13px",
+            fontFamily: "system-ui, sans-serif",
+            borderBottom: "1px solid rgba(232,205,128,0.3)",
+          }}
+        >
+          <strong style={{ color: "#e8cd80" }}>Preview</strong>
+          <span style={{ opacity: 0.85 }}>Only you can see this. Publish to take it live.</span>
+          <a
+            href="/dashboard/billing"
+            style={{ color: "#e8cd80", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: "3px" }}
+          >
+            Upgrade to publish
+          </a>
+        </div>
+      )}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }} />
       <StorefrontRenderer
         storeName={store.store_name}
