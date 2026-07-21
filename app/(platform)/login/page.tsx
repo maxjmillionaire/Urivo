@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { track } from "@/lib/analytics";
 import logo from "@/assets/brand/urivo-logo.png";
@@ -28,6 +28,11 @@ function LoginForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [codeState, setCodeState] = useState<{
+    status: "idle" | "checking" | "invalid" | "inactive" | "valid";
+    creatorName?: string;
+  }>({ status: "idle" });
   const [pending, setPending] = useState(false);
   const [banner, setBanner] = useState<{ kind: "error" | "success"; text: string } | null>(
     searchParams.get("error") === "auth"
@@ -37,6 +42,32 @@ function LoginForm() {
 
   const checks = useMemo(() => passwordChecks(password), [password]);
   const passwordValid = Object.values(checks).every(Boolean);
+
+  // Real-time creator-code validation (debounced). Optional field — a bad code
+  // never blocks signup; it simply won't attribute.
+  useEffect(() => {
+    if (mode !== "signup") return;
+    const c = code.trim();
+    if (!c) {
+      setCodeState({ status: "idle" });
+      return;
+    }
+    setCodeState({ status: "checking" });
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/referral/validate?code=${encodeURIComponent(c)}`);
+        const data = (await res.json()) as { status: string; creatorName?: string };
+        const status =
+          data.status === "valid" || data.status === "invalid" || data.status === "inactive"
+            ? data.status
+            : "idle";
+        setCodeState({ status, creatorName: data.creatorName });
+      } catch {
+        setCodeState({ status: "idle" });
+      }
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [code, mode]);
 
   async function handleGoogle() {
     setBanner(null);
@@ -83,7 +114,12 @@ function LoginForm() {
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/auth/callback`,
-            data: { full_name: fullName },
+            data: {
+              full_name: fullName,
+              // Carried into auth metadata; the server attributes it to the
+              // creator on first dashboard load (validated, first-touch).
+              ...(code.trim() ? { referral_code: code.trim().toUpperCase() } : {}),
+            },
           },
         });
         if (error) throw error;
@@ -263,6 +299,49 @@ function LoginForm() {
                       ),
                     )}
                   </ul>
+                )}
+              </div>
+            )}
+
+            {mode === "signup" && (
+              <div>
+                <label
+                  htmlFor="code"
+                  className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-[0.12em] text-mist"
+                >
+                  <span>Creator code</span>
+                  <span className="font-normal normal-case tracking-normal text-mist-dim">Optional</span>
+                </label>
+                <input
+                  id="code"
+                  type="text"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  maxLength={24}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  className={inputClass}
+                  placeholder="e.g. MAX10"
+                  aria-describedby="code-status"
+                />
+                {code.trim() && codeState.status !== "idle" && (
+                  <p
+                    id="code-status"
+                    role="status"
+                    className={`mt-2 text-xs ${
+                      codeState.status === "valid"
+                        ? "text-live"
+                        : codeState.status === "checking"
+                          ? "text-mist-dim"
+                          : "text-alert"
+                    }`}
+                  >
+                    {codeState.status === "checking" && "Checking…"}
+                    {codeState.status === "valid" &&
+                      `✓ ${codeState.creatorName ? `${codeState.creatorName}'s code applied` : "Code applied"}`}
+                    {codeState.status === "invalid" && "We couldn't find that code — you can still continue."}
+                    {codeState.status === "inactive" && "This code is no longer active — you can still continue."}
+                  </p>
                 )}
               </div>
             )}

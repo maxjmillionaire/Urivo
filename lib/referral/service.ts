@@ -1,5 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { captureException } from "@/lib/monitoring";
 import {
   normalizeCode,
   isValidCodeFormat,
@@ -105,6 +106,62 @@ export async function getCreatorByCode(rawCode: string): Promise<Creator | null>
     .eq("status", "active")
     .maybeSingle();
   return data ? toCreator(data as CreatorRow) : null;
+}
+
+export type CodeStatus = "empty" | "invalid" | "inactive" | "valid";
+
+export interface CodeLookup {
+  status: CodeStatus;
+  /** Creator display name, only when the code is valid + active. */
+  creatorName: string | null;
+}
+
+/**
+ * Real-time code lookup for the signup field. Distinguishes not-found (invalid)
+ * from found-but-inactive, so the UI can message each precisely. Read-only.
+ */
+export async function lookupCode(rawCode: string): Promise<CodeLookup> {
+  const code = normalizeCode(rawCode);
+  if (!code) return { status: "empty", creatorName: null };
+  if (!isValidCodeFormat(code)) return { status: "invalid", creatorName: null };
+  const { data } = await supabaseAdmin()
+    .from("creators")
+    .select("name, status")
+    .eq("code", code)
+    .maybeSingle();
+  if (!data) return { status: "invalid", creatorName: null };
+  if (data.status !== "active") return { status: "inactive", creatorName: null };
+  return { status: "valid", creatorName: data.name };
+}
+
+/**
+ * Attribute a newly signed-up user to the creator code they entered at signup.
+ * The code is carried in the user's auth metadata (referral_code); this runs on
+ * the first authenticated dashboard load — so it survives email confirmation and
+ * the OAuth round-trip. First-touch + validated: a bad code is ignored, and once
+ * attributed the creator can never change (referrals.customer_id is unique).
+ * Clears the metadata flag afterwards so it never re-runs. Best-effort.
+ */
+export async function reconcilePendingReferral(
+  userId: string,
+  metadata: Record<string, unknown> | null | undefined,
+): Promise<void> {
+  const code = typeof metadata?.referral_code === "string" ? metadata.referral_code : "";
+  if (!code.trim()) return;
+  try {
+    await recordReferral({ customerId: userId, code });
+  } catch (err) {
+    captureException(err, { route: "referral:reconcile", userId });
+  }
+  // Clear the pending code regardless of outcome (attribution is first-touch and
+  // idempotent; a bad code should not be retried). Preserve other metadata.
+  try {
+    const rest: Record<string, unknown> = { ...(metadata ?? {}) };
+    delete rest.referral_code;
+    await supabaseAdmin().auth.admin.updateUserById(userId, { user_metadata: rest });
+  } catch (err) {
+    captureException(err, { route: "referral:reconcile:clear", userId });
+  }
 }
 
 export interface CodeApplication {

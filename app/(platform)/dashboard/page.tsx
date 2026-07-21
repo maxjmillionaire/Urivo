@@ -7,6 +7,7 @@ import { AppShell } from "./_shell/app-shell";
 import { DashboardHome } from "./_shell/dashboard-home";
 import type { RailStore } from "./_shell/app-rail";
 import { sendWelcomeIfFirstTime } from "@/lib/email/welcome";
+import { reconcilePendingReferral } from "@/lib/referral/service";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,10 @@ export default async function DashboardPage() {
 
   // First dashboard visit → send the one-time welcome email (best-effort).
   await sendWelcomeIfFirstTime(user.id, profile?.email ?? user.email ?? null, profile?.full_name ?? null);
+
+  // Attribute a creator code entered at signup (first-touch, validated, then
+  // cleared). Runs here so it survives email confirmation / OAuth. Best-effort.
+  await reconcilePendingReferral(user.id, user.user_metadata);
 
   const plan = profile?.plan ?? "free";
   const planLabel = planName(plan);
