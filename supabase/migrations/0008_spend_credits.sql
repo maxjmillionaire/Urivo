@@ -46,3 +46,17 @@ $$;
 
 -- Only the service role may spend credits (never the browser).
 revoke all on function public.spend_credits(uuid, integer, text, text) from public, anon, authenticated;
+
+-- ------------------------------------------------------------
+-- Widen the credit_ledger.source vocabulary for the new economy.
+-- The original CHECK only allowed system/subscription/generation/admin/referral;
+-- the credit-costs overhaul introduces per-action sources (ask, research, ads,
+-- image), a generic 'ai' fallback, and 'credit_pack' for one-time top-ups.
+-- Without this, every AI charge and every pack grant would fail the constraint.
+-- ------------------------------------------------------------
+alter table public.credit_ledger drop constraint if exists credit_ledger_source_check;
+alter table public.credit_ledger add constraint credit_ledger_source_check
+    check (source in (
+        'system', 'subscription', 'generation', 'admin', 'referral',
+        'ai', 'ask', 'research', 'ads', 'image', 'credit_pack'
+    ));

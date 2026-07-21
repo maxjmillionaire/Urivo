@@ -131,12 +131,18 @@ export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      let ok = false;
       try {
         for await (const chunk of streamAssistantReply(apiKey, body.messages, store)) {
           controller.enqueue(encoder.encode(chunk));
         }
-        ok = true;
+        // Charge for the completed message BEFORE closing the stream — after
+        // close() a serverless function may freeze before the charge runs.
+        // A failed message never reaches here, so it never costs (spec 6.2 §19).
+        try {
+          await spendCredits(user.id, CREDIT_COSTS.askMessage, "Ask Urivo message", "ask");
+        } catch (err) {
+          captureException(err, { requestId, userId: user.id, route: "ask:charge" });
+        }
       } catch (err) {
         captureException(err, { requestId, userId: user.id, route: "ask" });
         controller.enqueue(
@@ -144,14 +150,6 @@ export async function POST(request: NextRequest) {
         );
       } finally {
         controller.close();
-      }
-      // Charge only for a message that actually completed (spec 6.2 §19).
-      if (ok) {
-        try {
-          await spendCredits(user.id, CREDIT_COSTS.askMessage, "Ask Urivo message", "ask");
-        } catch (err) {
-          captureException(err, { requestId, userId: user.id, route: "ask:charge" });
-        }
       }
     },
   });
