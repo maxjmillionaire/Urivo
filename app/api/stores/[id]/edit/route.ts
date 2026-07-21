@@ -44,13 +44,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       : fail(404, "NOT_FOUND", "Store not found.");
   }
 
-  // The AI Store Assistant is a paid capability (Founder and Elite).
+  // The AI Store Assistant is a paid capability (Founder and Pro).
   const plan = await getPlanForUser(owner.userId);
   if (!plan.features.askUrivo) {
     return fail(
       403,
       "UPGRADE_REQUIRED",
-      "The AI Store Assistant is available on Founder and Elite. Upgrade to edit with Urivo.",
+      "The AI Store Assistant is available on Founder and Pro. Upgrade to edit with Urivo.",
     );
   }
 

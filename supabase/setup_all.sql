@@ -1,7 +1,7 @@
 -- ============================================================
 -- URIVO — Complete database setup (one-shot).
 -- Paste this whole file into Supabase → SQL Editor → New query → Run.
--- It applies migrations 0001–0010 in order. Safe to run once on a fresh project.
+-- It applies migrations 0001–0013 in order. Safe to run once on a fresh project.
 -- ============================================================
 
 
@@ -641,3 +641,266 @@ create policy "ai_usage_ledger: own read" on public.ai_usage_ledger
 -- 0010_welcome_credits_20.sql — (welcome amount already 20 above; trigger
 -- body identical to 0001 aside from the amount, so nothing to re-apply here.)
 -- ============================================================
+
+
+-- ============================================================
+-- 0011_finance_reporting.sql
+-- ============================================================
+-- ------------------------------------------------------------
+-- 0011 — Finance reporting RPCs (server-side aggregation)
+--
+-- The admin finance dashboard reads aggregates, not rows. Aggregating in
+-- Postgres (rather than pulling the ledger into the app) keeps the dashboard
+-- fast and bounded as ai_usage_ledger grows into the millions. All functions
+-- are SECURITY DEFINER and reachable only from the service role — the API layer
+-- gates them behind an admin check before ever calling.
+-- ------------------------------------------------------------
+
+-- Whole-business cost overview since a cutoff (typically the month start).
+create or replace function public.finance_overview(p_since timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select jsonb_build_object(
+        'since', p_since,
+        'action_count', (select count(*) from public.ai_usage_ledger where created_at >= p_since),
+        'total_cost_usd', (select coalesce(sum(total_cost_usd), 0) from public.ai_usage_ledger where created_at >= p_since),
+        'anthropic_cost_usd', (select coalesce(sum(anthropic_cost_usd), 0) from public.ai_usage_ledger where created_at >= p_since),
+        'image_cost_usd', (select coalesce(sum(image_cost_usd), 0) from public.ai_usage_ledger where created_at >= p_since),
+        'input_tokens', (select coalesce(sum(input_tokens), 0) from public.ai_usage_ledger where created_at >= p_since),
+        'output_tokens', (select coalesce(sum(output_tokens), 0) from public.ai_usage_ledger where created_at >= p_since),
+        'images', (select coalesce(sum(images), 0) from public.ai_usage_ledger where created_at >= p_since),
+        'active_users', (select count(distinct user_id) from public.ai_usage_ledger where created_at >= p_since),
+        'by_feature', (
+            select coalesce(jsonb_agg(f order by f.cost_usd desc), '[]'::jsonb) from (
+                select feature,
+                       count(*) as actions,
+                       coalesce(sum(credits), 0) as credits,
+                       coalesce(sum(total_cost_usd), 0) as cost_usd,
+                       coalesce(sum(input_tokens), 0) as input_tokens,
+                       coalesce(sum(output_tokens), 0) as output_tokens,
+                       coalesce(sum(images), 0) as images
+                from public.ai_usage_ledger
+                where created_at >= p_since
+                group by feature
+            ) f
+        ),
+        'credits_burned', (select coalesce(-sum(delta), 0) from public.credit_ledger where delta < 0 and created_at >= p_since),
+        'credits_granted', (select coalesce(sum(delta), 0) from public.credit_ledger where delta > 0 and created_at >= p_since)
+    );
+$$;
+
+-- The costliest users since a cutoff — "who is costing us the most, exactly".
+create or replace function public.finance_top_users(p_since timestamptz, p_limit integer)
+returns table (user_id uuid, email text, actions bigint, credits bigint, cost_usd numeric)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select u.user_id, p.email, u.actions, u.credits, u.cost_usd
+    from (
+        select user_id,
+               count(*) as actions,
+               coalesce(sum(credits), 0)::bigint as credits,
+               coalesce(sum(total_cost_usd), 0) as cost_usd
+        from public.ai_usage_ledger
+        where created_at >= p_since
+        group by user_id
+    ) u
+    join public.profiles p on p.id = u.user_id
+    order by u.cost_usd desc
+    limit greatest(p_limit, 1);
+$$;
+
+-- Subscriber distribution by plan + status — the revenue-side proxy until Stripe.
+create or replace function public.finance_plan_distribution()
+returns table (plan text, subscription_status text, users bigint)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select plan, subscription_status, count(*)::bigint
+    from public.profiles
+    group by plan, subscription_status;
+$$;
+
+-- Reporting is service-role only (the API layer admin-gates before calling).
+revoke execute on function public.finance_overview(timestamptz) from public, anon, authenticated;
+revoke execute on function public.finance_top_users(timestamptz, integer) from public, anon, authenticated;
+revoke execute on function public.finance_plan_distribution() from public, anon, authenticated;
+grant execute on function public.finance_overview(timestamptz) to service_role;
+grant execute on function public.finance_top_users(timestamptz, integer) to service_role;
+grant execute on function public.finance_plan_distribution() to service_role;
+
+
+-- ============================================================
+-- 0012_referrals.sql
+-- ============================================================
+-- ------------------------------------------------------------
+-- 0012 — Creator referral system (attribution + commission)
+--
+-- A scalable affiliate system, built now so Stripe (Phase 2) plugs into the
+-- existing structure without schema changes. Codes, not links: a customer types
+-- a creator's code (e.g. MAX10) at checkout.
+--
+-- Business rules (final, CEO):
+--   • During the launch offer: the code gives NO extra discount (the customer
+--     already has the launch price) — it is used purely for attribution +
+--     commission tracking.
+--   • After the launch offer: the code gives 10% off the FIRST purchase.
+--   • The creator earns 25% commission on the customer's FIRST successful
+--     payment only — no recurring commission.
+--
+-- Money columns are EUR (net). Stripe later calls the service layer to set
+-- first_payment_* and the commission; nothing here presumes Stripe.
+-- ------------------------------------------------------------
+
+-- One row per creator/affiliate. A creator may or may not be a platform user.
+create table public.creators (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid references public.profiles (id) on delete set null,
+    name text not null check (char_length(name) between 1 and 120),
+    email text,
+    -- The referral code the customer types. Stored uppercase, globally unique.
+    code text unique not null
+        check (code = upper(code) and char_length(code) between 3 and 24),
+    -- Commission on the first successful payment (0.25 = 25%). Per-creator so
+    -- special deals are possible without code changes.
+    commission_rate numeric(5, 4) not null default 0.25 check (commission_rate >= 0 and commission_rate <= 1),
+    status text not null default 'active' check (status in ('active', 'inactive')),
+    created_at timestamptz not null default now()
+);
+
+create index idx_creators_code on public.creators (code);
+create index idx_creators_user on public.creators (user_id);
+
+-- One row per referred customer (first-touch: a customer is attributed once).
+-- Permanently stores everything the CEO listed: creator, code, customer, first
+-- payment status, commission status, commission-paid flag.
+create table public.referrals (
+    id uuid primary key default gen_random_uuid(),
+    creator_id uuid not null references public.creators (id) on delete cascade,
+    code text not null,
+    customer_id uuid not null references public.profiles (id) on delete cascade,
+    -- Discount the customer actually received via the code (0 during launch,
+    -- 0.10 post-launch first purchase).
+    discount_rate numeric(5, 4) not null default 0 check (discount_rate >= 0 and discount_rate <= 1),
+    -- First payment lifecycle (Stripe sets this in Phase 2).
+    first_payment_status text not null default 'pending'
+        check (first_payment_status in ('pending', 'paid', 'failed')),
+    first_payment_at timestamptz,
+    first_payment_amount_eur numeric(10, 2),
+    -- Commission lifecycle.
+    commission_status text not null default 'pending'
+        check (commission_status in ('pending', 'owed', 'paid', 'void')),
+    commission_amount_eur numeric(10, 2) not null default 0 check (commission_amount_eur >= 0),
+    commission_paid boolean not null default false,
+    commission_paid_at timestamptz,
+    created_at timestamptz not null default now(),
+    -- First-touch attribution: one creator per customer, forever.
+    unique (customer_id)
+);
+
+create index idx_referrals_creator on public.referrals (creator_id, created_at desc);
+create index idx_referrals_commission on public.referrals (commission_status);
+
+-- Both tables are internal. RLS on, no client policies → reachable only via the
+-- service role in the admin-gated API layer (same trust model as the ledgers).
+alter table public.creators enable row level security;
+alter table public.referrals enable row level security;
+
+-- ------------------------------------------------------------
+-- Reporting RPCs (server-side aggregation; service-role only).
+-- ------------------------------------------------------------
+
+-- Whole-program overview for the admin dashboard.
+create or replace function public.referral_overview()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select jsonb_build_object(
+        'total_creators', (select count(*) from public.creators),
+        'active_creators', (select count(*) from public.creators where status = 'active'),
+        'total_referrals', (select count(*) from public.referrals),
+        'first_payments', (select count(*) from public.referrals where first_payment_status = 'paid'),
+        'commissions_owed_eur', (select coalesce(sum(commission_amount_eur), 0)
+            from public.referrals where commission_status = 'owed'),
+        'commissions_paid_eur', (select coalesce(sum(commission_amount_eur), 0)
+            from public.referrals where commission_paid = true),
+        'referral_revenue_eur', (select coalesce(sum(first_payment_amount_eur), 0)
+            from public.referrals where first_payment_status = 'paid'),
+        'conversion_pct', (
+            select case when count(*) > 0
+                then round(100.0 * count(*) filter (where first_payment_status = 'paid') / count(*), 1)
+                else 0 end
+            from public.referrals
+        )
+    );
+$$;
+
+-- Leaderboard: best-performing creators.
+create or replace function public.referral_top_creators(p_limit integer)
+returns table (
+    creator_id uuid,
+    name text,
+    code text,
+    customers bigint,
+    first_payments bigint,
+    commission_owed_eur numeric,
+    commission_paid_eur numeric
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select c.id, c.name, c.code,
+           count(r.id) as customers,
+           count(r.id) filter (where r.first_payment_status = 'paid') as first_payments,
+           coalesce(sum(r.commission_amount_eur) filter (where r.commission_status = 'owed'), 0) as commission_owed_eur,
+           coalesce(sum(r.commission_amount_eur) filter (where r.commission_paid = true), 0) as commission_paid_eur
+    from public.creators c
+    left join public.referrals r on r.creator_id = c.id
+    group by c.id, c.name, c.code
+    order by count(r.id) filter (where r.first_payment_status = 'paid') desc, count(r.id) desc
+    limit greatest(p_limit, 1);
+$$;
+
+revoke execute on function public.referral_overview() from public, anon, authenticated;
+revoke execute on function public.referral_top_creators(integer) from public, anon, authenticated;
+grant execute on function public.referral_overview() to service_role;
+grant execute on function public.referral_top_creators(integer) to service_role;
+
+
+-- ============================================================
+-- 0013_referral_presentment_currency.sql
+-- ============================================================
+-- ------------------------------------------------------------
+-- 0013 — Multi-currency readiness for referral payments
+--
+-- EUR stays the accounting currency: referrals.first_payment_amount_eur and
+-- commission_amount_eur remain the normalised accounting truth. These two
+-- nullable columns let us ALSO record what the customer actually paid in their
+-- local checkout currency (Stripe presentment) once multi-currency checkout
+-- ships in Phase 2 — added now so that ships without a schema change.
+--
+--   first_payment_currency          — ISO 4217 code the customer was charged in
+--   first_payment_presentment_amount — the amount in that currency
+--
+-- Until Phase 2 both are simply null (or 'EUR'), and all accounting continues
+-- to run off the *_eur columns unchanged.
+-- ------------------------------------------------------------
+
+alter table public.referrals
+    add column if not exists first_payment_currency text
+        check (first_payment_currency is null or char_length(first_payment_currency) = 3),
+    add column if not exists first_payment_presentment_amount numeric(12, 2)
+        check (first_payment_presentment_amount is null or first_payment_presentment_amount >= 0);

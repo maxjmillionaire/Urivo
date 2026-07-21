@@ -13,7 +13,7 @@
  *    smart buyer is nudged toward subscribing, truthfully.
  *
  * Every pack's per-credit price stays ABOVE the subscription's, so packs can
- * never cannibalise Founder/Elite.
+ * never cannibalise Founder/Pro.
  */
 
 /** Mirror of lib/credits STORE_GENERATION_COST — kept here so this module stays

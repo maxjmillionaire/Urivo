@@ -2,7 +2,7 @@
  * Plans — the single source of truth for Urivo's subscription tiers.
  *
  * Internal database keys stay `free` / `core` / `pro` (stable, never migrated);
- * the customer-facing names are Free / Founder / Elite. Everything that treats a
+ * the customer-facing names are Free / Founder / Pro. Everything that treats a
  * tier differently — credits, generation priority, feature access, pricing — is
  * defined HERE and read everywhere else, so marketing (the pricing deck) and the
  * product can never drift apart.
@@ -96,7 +96,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
   },
   pro: {
     key: "pro",
-    name: "Elite",
+    name: "Pro",
     tagline: "The most credits, highest generation priority, and Advanced Evolution.",
     monthlyCredits: 600,
     signupCredits: 0,
@@ -145,7 +145,7 @@ export function planName(key: string | null | undefined): string {
   return getPlan(key).name;
 }
 
-/** The next tier up from a plan (free→Founder, core→Elite), or null at the top. */
+/** The next tier up from a plan (free→Founder, core→Pro), or null at the top. */
 export function nextPlan(key: string | null | undefined): PlanConfig | null {
   const k = getPlan(key).key;
   if (k === "free") return PLANS.core;

@@ -68,7 +68,7 @@ export async function PATCH(
         return fail(
           403,
           "UPGRADE_REQUIRED",
-          "Publishing your store is available on Founder and Elite. Upgrade to take it live.",
+          "Publishing your store is available on Founder and Pro. Upgrade to take it live.",
         );
       }
     }

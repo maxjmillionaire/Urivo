@@ -176,7 +176,14 @@ export async function recordReferral(input: {
  */
 export async function recordFirstPayment(input: {
   customerId: string;
+  /** Accounting amount (EUR-normalised). Commission is computed off this. */
   amountEur: number;
+  /**
+   * Optional localized checkout details (Stripe presentment, Phase 2). Stored
+   * alongside the EUR accounting amount; does not affect the commission. Until
+   * multi-currency checkout ships, callers omit this and everything is EUR.
+   */
+  presentment?: { currency: string; amount: number };
 }): Promise<{ recorded: boolean; commissionEur?: number; reason?: string }> {
   const admin = supabaseAdmin();
   const { data: referral } = await admin
@@ -200,6 +207,8 @@ export async function recordFirstPayment(input: {
       first_payment_status: "paid",
       first_payment_at: new Date().toISOString(),
       first_payment_amount_eur: input.amountEur,
+      first_payment_currency: input.presentment?.currency.toUpperCase() ?? "EUR",
+      first_payment_presentment_amount: input.presentment?.amount ?? input.amountEur,
       commission_status: "owed",
       commission_amount_eur: commissionEur,
     })

@@ -55,13 +55,13 @@ export default async function EvolutionPage() {
               style={{ background: "radial-gradient(60% 80% at 50% 0%, rgba(232,205,128,0.10), rgba(11,18,32,0) 60%)" }}
             />
             <p className="relative text-[11px] font-semibold uppercase tracking-[0.16em] text-gold-soft">
-              Founder &amp; Elite
+              Founder &amp; Pro
             </p>
             <h2 className="relative mx-auto mt-3 max-w-lg text-[22px] font-semibold leading-snug tracking-tight text-ivory">
               The Evolution Lab breeds a hundred storefronts and keeps only the winner.
             </h2>
             <p className="relative mx-auto mt-3 max-w-md text-sm leading-relaxed text-mist">
-              Upgrade to run evolution on any idea. Elite unlocks Advanced Evolution with the
+              Upgrade to run evolution on any idea. Pro unlocks Advanced Evolution with the
               winning store&apos;s full seven-signal fitness breakdown.
             </p>
             <Link

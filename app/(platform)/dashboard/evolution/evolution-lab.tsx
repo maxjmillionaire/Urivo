@@ -217,7 +217,7 @@ export function EvolutionLab({ tier = "standard" }: { tier?: "standard" | "advan
         )}
       </div>
 
-      {/* Advanced (Elite) — the winning storefront's full fitness breakdown */}
+      {/* Advanced (Pro) — the winning storefront's full fitness breakdown */}
       {tier === "advanced" && phase === "done" && run && (
         <div className="u-float mt-6 rounded-2xl border border-hair bg-panel/70 p-6">
           <div className="flex items-center justify-between">

@@ -222,7 +222,7 @@ export function AskUrivo({
         </div>
         <div className="flex min-h-0 flex-1 flex-col justify-center px-5 pb-5">
           <div className="u-float rounded-2xl border border-gold/20 bg-panel/60 p-5 text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-soft">Founder &amp; Elite</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-soft">Founder &amp; Pro</p>
             <p className="mt-2 text-[13px] leading-relaxed text-ivory">
               The AI Store Assistant describes a change and applies it to your live store — copy,
               palette, layout, products.

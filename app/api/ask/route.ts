@@ -83,13 +83,13 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return fail(401, "UNAUTHORIZED", "Please sign in to use Ask Urivo.");
 
-  // The AI Store Assistant is a paid capability (Founder and Elite).
+  // The AI Store Assistant is a paid capability (Founder and Pro).
   const plan = await getPlanForUser(user.id);
   if (!plan.features.askUrivo) {
     return fail(
       403,
       "UPGRADE_REQUIRED",
-      "The AI Store Assistant is available on Founder and Elite. Upgrade to chat with Urivo.",
+      "The AI Store Assistant is available on Founder and Pro. Upgrade to chat with Urivo.",
     );
   }
 

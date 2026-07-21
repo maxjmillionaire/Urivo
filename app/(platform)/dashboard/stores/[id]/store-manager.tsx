@@ -598,7 +598,7 @@ function ThemeEditor({
             <div className="mt-2 rounded-xl border border-gold/25 bg-gold/[0.05] p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-soft">Draft</p>
               <p className="mt-1.5 text-[13px] leading-relaxed text-ivory">
-                Publishing to a live urivo.ai address is available on Founder and Elite. You can
+                Publishing to a live urivo.ai address is available on Founder and Pro. You can
                 preview and refine your store as much as you like.
               </p>
               <a

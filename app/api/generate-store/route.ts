@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Rate limit: generation is expensive. The per-minute lane scales with the
-  // plan's priority — higher tiers wait less (Founder/Elite get a wider lane).
+  // plan's priority — higher tiers wait less (Founder/Pro get a wider lane).
   const plan = await getPlanForUser(user.id);
   const limit = await rateLimit(`generate:${user.id}`, plan.generationsPerMinute, 60_000);
   if (!limit.success) {
