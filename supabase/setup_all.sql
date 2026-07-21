@@ -1,7 +1,7 @@
 -- ============================================================
 -- URIVO — Complete database setup (one-shot).
 -- Paste this whole file into Supabase → SQL Editor → New query → Run.
--- It applies migrations 0001–0008 in order. Safe to run once on a fresh project.
+-- It applies migrations 0001–0010 in order. Safe to run once on a fresh project.
 -- ============================================================
 
 
@@ -173,7 +173,7 @@ begin
     );
 
     insert into public.credit_ledger (user_id, delta, reason, source)
-    values (new.id, 15, 'Free tier welcome credits', 'system');
+    values (new.id, 20, 'Free tier welcome credits', 'system');
 
     insert into public.audit_logs (user_id, action, resource, resource_id)
     values (new.id, 'signup', 'profile', new.id::text);
@@ -606,3 +606,38 @@ alter table public.credit_ledger add constraint credit_ledger_source_check
         'ai', 'ask', 'research', 'ads', 'image', 'credit_pack'
     ));
 
+
+-- ============================================================
+-- 0009_ai_usage_ledger.sql
+-- ============================================================
+create table public.ai_usage_ledger (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references public.profiles (id) on delete cascade,
+    feature text not null check (feature in (
+        'storeGeneration', 'askMessage', 'storeEdit',
+        'marketResearch', 'adStudio', 'productImage'
+    )),
+    credits integer not null default 0 check (credits >= 0),
+    input_tokens integer not null default 0 check (input_tokens >= 0),
+    output_tokens integer not null default 0 check (output_tokens >= 0),
+    images integer not null default 0 check (images >= 0),
+    model text,
+    anthropic_cost_usd numeric(12, 6) not null default 0 check (anthropic_cost_usd >= 0),
+    image_cost_usd numeric(12, 6) not null default 0 check (image_cost_usd >= 0),
+    total_cost_usd numeric(12, 6) not null default 0 check (total_cost_usd >= 0),
+    request_id text,
+    created_at timestamptz not null default now()
+);
+
+create index idx_ai_usage_user on public.ai_usage_ledger (user_id, created_at desc);
+create index idx_ai_usage_feature on public.ai_usage_ledger (feature, created_at desc);
+
+alter table public.ai_usage_ledger enable row level security;
+
+create policy "ai_usage_ledger: own read" on public.ai_usage_ledger
+    for select using (user_id = auth.uid());
+
+-- ============================================================
+-- 0010_welcome_credits_20.sql — (welcome amount already 20 above; trigger
+-- body identical to 0001 aside from the amount, so nothing to re-apply here.)
+-- ============================================================
