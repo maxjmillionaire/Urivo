@@ -11,7 +11,8 @@ import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
 import { parseTheme } from "@/lib/storefront";
 import { parseDesignSystem, themeToDesignSystem } from "@/lib/storefront/design-system";
-import { proposeStoreEdit } from "@/lib/ai/store-editor";
+import { proposeStoreEdit, EDITOR_MODEL } from "@/lib/ai/store-editor";
+import { recordAiUsage } from "@/lib/finance/ledger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const requestId = newRequestId();
   try {
-    const result = await proposeStoreEdit(apiKey, {
+    const { result, usage } = await proposeStoreEdit(apiKey, {
       name: store.store_name,
       tagline: ds.tagline ?? "",
       ds,
@@ -106,6 +107,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     await spendCredits(owner.userId, CREDIT_COSTS.askMessage, "Ask Urivo message", "ask").catch((e) =>
       captureException(e, { requestId, userId: owner.userId, route: "store-edit:charge" }),
     );
+    await recordAiUsage({
+      userId: owner.userId,
+      feature: "storeEdit",
+      credits: CREDIT_COSTS.askMessage,
+      usage,
+      model: EDITOR_MODEL,
+      requestId,
+    });
     return NextResponse.json({ reply: result.reply, edit: result.edit });
   } catch (err) {
     const code = err instanceof Error ? err.message : "AI_FAILED";

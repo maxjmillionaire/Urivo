@@ -19,6 +19,7 @@ import {
   type StoreDesignSystem,
 } from "@/lib/storefront/design-system";
 import { AI_INPUT_BUDGET, clampText } from "./limits";
+import type { TokenUsage } from "@/lib/finance/cost-model";
 
 /*
  * Store generation orchestrator (specs 1, 6.3, 6.5).
@@ -103,6 +104,8 @@ export interface GeneratedStore {
   brand: { name: string; tagline: string };
   designSystem: StoreDesignSystem;
   products: { title: string; description: string; priceEUR: number }[];
+  /** Real provider token usage, for the cost ledger. */
+  usage: TokenUsage;
 }
 
 const SYSTEM_PROMPT = `You are the Creative Director and copywriter for Urivo, a premium AI commerce platform. From a founder's idea you design a COMPLETE, ORIGINAL storefront: a brand, a curated catalogue, and — most importantly — a full design system unique to this brand.
@@ -177,5 +180,9 @@ export async function generateStore(input: StoreGenerationInput): Promise<Genera
     brand: result.data.brand,
     designSystem,
     products: result.data.products,
+    usage: {
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
+    },
   };
 }

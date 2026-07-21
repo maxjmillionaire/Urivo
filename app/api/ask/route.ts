@@ -10,8 +10,11 @@ import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
 import {
   streamAssistantReply,
+  ASSISTANT_MODEL,
   type StoreContext,
 } from "@/lib/ai/assistant";
+import { recordAiUsage } from "@/lib/finance/ledger";
+import type { TokenUsage } from "@/lib/finance/cost-model";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -132,7 +135,15 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const chunk of streamAssistantReply(apiKey, body.messages, store)) {
+        let usage: TokenUsage | null = null;
+        for await (const chunk of streamAssistantReply(
+          apiKey,
+          body.messages,
+          store,
+          (u) => {
+            usage = u;
+          },
+        )) {
           controller.enqueue(encoder.encode(chunk));
         }
         // Charge for the completed message BEFORE closing the stream — after
@@ -140,6 +151,14 @@ export async function POST(request: NextRequest) {
         // A failed message never reaches here, so it never costs (spec 6.2 §19).
         try {
           await spendCredits(user.id, CREDIT_COSTS.askMessage, "Ask Urivo message", "ask");
+          await recordAiUsage({
+            userId: user.id,
+            feature: "askMessage",
+            credits: CREDIT_COSTS.askMessage,
+            usage: usage ?? undefined,
+            model: ASSISTANT_MODEL,
+            requestId,
+          });
         } catch (err) {
           captureException(err, { requestId, userId: user.id, route: "ask:charge" });
         }

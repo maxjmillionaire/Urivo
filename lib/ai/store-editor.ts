@@ -17,6 +17,7 @@ import {
   type StoreDesignSystem,
 } from "@/lib/storefront/design-system";
 import { AI_INPUT_BUDGET, boundHistory, clampText } from "./limits";
+import type { TokenUsage } from "@/lib/finance/cost-model";
 
 /*
  * "Ask Urivo" store editor. Given the merchant's live store and an instruction,
@@ -139,11 +140,16 @@ function contextBlock(store: EditorStore): string {
 ${products}`;
 }
 
+export interface EditOutcome {
+  result: AIEdit;
+  usage: TokenUsage;
+}
+
 export async function proposeStoreEdit(
   apiKey: string,
   store: EditorStore,
   history: EditorMessage[],
-): Promise<AIEdit> {
+): Promise<EditOutcome> {
   const client = new Anthropic({ apiKey });
   const response = await client.messages.parse({
     model: EDITOR_MODEL,
@@ -172,5 +178,11 @@ export async function proposeStoreEdit(
   if (!parsed) throw new Error("AI_INVALID_OUTPUT");
   const result = AIEditSchema.safeParse(parsed);
   if (!result.success) throw new Error("AI_INVALID_OUTPUT");
-  return result.data;
+  return {
+    result: result.data,
+    usage: {
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
+    },
+  };
 }

@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
+import type { TokenUsage } from "@/lib/finance/cost-model";
 
 /*
  * Ad Studio — channel strategy + platform-ready ad creative for a store.
@@ -75,7 +76,12 @@ Produce:
 - strategy.targeting: 2–5 concrete audience/targeting angles.
 - creatives: 5–8 ready-to-run ads across the recommended platforms — each with platform, format, the angle, a headline, primary text, and a CTA. Respect each platform's format and length.`;
 
-export async function generateAdPlan(apiKey: string, store: AdStore): Promise<AdPlan> {
+export interface AdOutcome {
+  plan: AdPlan;
+  usage: TokenUsage;
+}
+
+export async function generateAdPlan(apiKey: string, store: AdStore): Promise<AdOutcome> {
   const client = new Anthropic({ apiKey });
   const products = store.products.length
     ? store.products.map((p) => `  - ${p.title} (€${p.priceEUR.toFixed(2)}): ${p.description}`).join("\n")
@@ -102,5 +108,11 @@ ${products}`;
   if (!parsed) throw new Error("AI_INVALID_OUTPUT");
   const result = AdSchema.safeParse(parsed);
   if (!result.success) throw new Error("AI_INVALID_OUTPUT");
-  return result.data;
+  return {
+    plan: result.data,
+    usage: {
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
+    },
+  };
 }

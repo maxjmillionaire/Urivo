@@ -6,7 +6,8 @@ import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { rateLimit } from "@/lib/ratelimit";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
-import { runMarketResearch } from "@/lib/ai/market-research";
+import { runMarketResearch, RESEARCH_MODEL } from "@/lib/ai/market-research";
+import { recordAiUsage } from "@/lib/finance/ledger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,10 +57,18 @@ export async function POST(request: NextRequest) {
 
   const requestId = newRequestId();
   try {
-    const report = await runMarketResearch({ prompt: body.prompt });
+    const { report, usage } = await runMarketResearch({ prompt: body.prompt });
     await spendCredits(user.id, CREDIT_COSTS.marketResearch, "Market research", "research").catch((e) =>
       captureException(e, { requestId, userId: user.id, route: "research:charge" }),
     );
+    await recordAiUsage({
+      userId: user.id,
+      feature: "marketResearch",
+      credits: CREDIT_COSTS.marketResearch,
+      usage,
+      model: RESEARCH_MODEL,
+      requestId,
+    });
     return NextResponse.json({ success: true, report });
   } catch (err) {
     const code = err instanceof Error ? err.message : "AI_FAILED";

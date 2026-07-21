@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
 import { AI_INPUT_BUDGET, clampText } from "./limits";
+import type { TokenUsage } from "@/lib/finance/cost-model";
 
 /*
  * Market Research / Product Discovery (front of the funnel).
@@ -90,8 +91,13 @@ export interface ResearchInput {
   prompt: string;
 }
 
+export interface ResearchOutcome {
+  report: ResearchResult;
+  usage: TokenUsage;
+}
+
 /** Produce a validated market-research report from a niche/idea prompt. */
-export async function runMarketResearch(input: ResearchInput): Promise<ResearchResult> {
+export async function runMarketResearch(input: ResearchInput): Promise<ResearchOutcome> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("AI_NOT_CONFIGURED");
 
@@ -115,5 +121,11 @@ export async function runMarketResearch(input: ResearchInput): Promise<ResearchR
   if (!parsed) throw new Error("AI_INVALID_OUTPUT");
   const result = ResearchSchema.safeParse(parsed);
   if (!result.success) throw new Error("AI_INVALID_OUTPUT");
-  return result.data;
+  return {
+    report: result.data,
+    usage: {
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
+    },
+  };
 }

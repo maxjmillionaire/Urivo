@@ -12,6 +12,7 @@ import {
   generateSingleProductImage,
   isImageGenerationConfigured,
 } from "@/lib/ai/image-generator";
+import { recordAiUsage } from "@/lib/finance/ledger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -112,6 +113,13 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   await spendCredits(auth.user.id, CREDIT_COSTS.productImage, "Product image", "image").catch((e) =>
     captureException(e, { requestId, userId: auth.user.id, route: "product-image:charge" }),
   );
+  await recordAiUsage({
+    userId: auth.user.id,
+    feature: "productImage",
+    credits: CREDIT_COSTS.productImage,
+    images: 1,
+    requestId,
+  });
 
   return NextResponse.json({ success: true, imageUrl });
 }

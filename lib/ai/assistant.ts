@@ -1,6 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { AI_INPUT_BUDGET, boundHistory, clampText } from "./limits";
+import type { TokenUsage } from "@/lib/finance/cost-model";
 
 /*
  * "Ask Urivo" — the in-product assistant behind the companion rail.
@@ -69,6 +70,7 @@ export async function* streamAssistantReply(
   apiKey: string,
   history: AssistantMessage[],
   store: StoreContext | null,
+  onUsage?: (usage: TokenUsage) => void,
 ): AsyncGenerator<string, void, unknown> {
   const client = new Anthropic({ apiKey });
   // Hard-bound the input: cap turn count AND total characters, then clamp each
@@ -93,12 +95,22 @@ export async function* streamAssistantReply(
     messages: turns.map((m) => ({ role: m.role, content: m.content })),
   });
 
+  let inputTokens = 0;
+  let outputTokens = 0;
   for await (const event of stream) {
-    if (
+    // Real token usage arrives on the stream: input at message_start, the
+    // cumulative output on each message_delta. Captured for the cost ledger.
+    if (event.type === "message_start") {
+      inputTokens = event.message.usage?.input_tokens ?? 0;
+      outputTokens = event.message.usage?.output_tokens ?? 0;
+    } else if (event.type === "message_delta") {
+      outputTokens = event.usage?.output_tokens ?? outputTokens;
+    } else if (
       event.type === "content_block_delta" &&
       event.delta.type === "text_delta"
     ) {
       yield event.delta.text;
     }
   }
+  onUsage?.({ inputTokens, outputTokens });
 }

@@ -8,7 +8,8 @@ import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
 import { parseTheme } from "@/lib/storefront";
 import { parseDesignSystem, themeToDesignSystem } from "@/lib/storefront/design-system";
-import { generateAdPlan } from "@/lib/ai/ad-studio";
+import { generateAdPlan, AD_MODEL } from "@/lib/ai/ad-studio";
+import { recordAiUsage } from "@/lib/finance/ledger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,7 +63,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
   const requestId = newRequestId();
   try {
-    const plan = await generateAdPlan(apiKey, {
+    const { plan, usage } = await generateAdPlan(apiKey, {
       name: store.store_name,
       tagline: ds.tagline ?? "",
       personality: ds.personality,
@@ -75,6 +76,14 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     await spendCredits(owner.userId, CREDIT_COSTS.adStudio, "Ad Studio plan", "ads").catch((e) =>
       captureException(e, { requestId, userId: owner.userId, route: "ads:charge" }),
     );
+    await recordAiUsage({
+      userId: owner.userId,
+      feature: "adStudio",
+      credits: CREDIT_COSTS.adStudio,
+      usage,
+      model: AD_MODEL,
+      requestId,
+    });
     return NextResponse.json({ success: true, plan });
   } catch (err) {
     const code = err instanceof Error ? err.message : "AI_FAILED";

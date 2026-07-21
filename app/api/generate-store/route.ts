@@ -13,6 +13,7 @@ import {
   STORE_GENERATOR_PROMPT_VERSION,
 } from "@/lib/ai/store-generator";
 import { generateStoreImagery } from "@/lib/ai/image-generator";
+import { recordAiUsage } from "@/lib/finance/ledger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -194,6 +195,18 @@ export async function POST(request: NextRequest) {
   }
 
   const result = rpcResult as { store_id: string; credits_remaining: number };
+
+  // Record the real cost of this generation (tokens + actual images produced)
+  // for the finance ledger. Best-effort — never blocks the response.
+  await recordAiUsage({
+    userId: user.id,
+    feature: "storeGeneration",
+    credits: STORE_GENERATION_COST,
+    usage: generated.usage,
+    images: imageUrls.filter(Boolean).length,
+    model: STORE_GENERATOR_MODEL,
+    requestId,
+  });
 
   // Publishing (going live) is a paid capability. Stores are created live by
   // default, so on a plan that can't publish we start the new store as a draft —
