@@ -8,7 +8,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
  * client roles in migration 0002).
  */
 
-export const STORE_GENERATION_COST = 10;
+export const STORE_GENERATION_COST = 20;
 
 /** Thrown by spendCredits when the user can't afford an action. */
 export class InsufficientCreditsError extends Error {

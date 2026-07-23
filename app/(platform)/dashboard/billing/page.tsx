@@ -6,6 +6,7 @@ import { loadRailStore } from "../_shell/rail-data";
 import { UpgradeButton, ManageSubscriptionButton } from "./upgrade-buttons";
 import { CreditPacks } from "./credit-packs";
 import { PLANS, planName, formatPrice, isLaunchWindow } from "@/lib/plans";
+import { CREDIT_COSTS } from "@/lib/credit-costs";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ export default async function BillingPage() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mist">Credits</p>
           </div>
           <p className="mt-3 text-[32px] font-semibold leading-none tracking-tight u-gold-text tabular-nums">{balance}</p>
-          <p className="mt-3 text-xs text-mist-dim">Each store costs 10 credits</p>
+          <p className="mt-3 text-xs text-mist-dim">Each store costs {CREDIT_COSTS.storeGeneration} credits</p>
         </div>
       </section>
 

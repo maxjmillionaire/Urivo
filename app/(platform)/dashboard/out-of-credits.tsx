@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PLANS, monthlyPrice } from "@/lib/plans";
 import { CREDIT_PACKS } from "@/lib/credit-packs";
+import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { CreditPacks } from "./billing/credit-packs";
 
 /*
@@ -9,7 +10,7 @@ import { CreditPacks } from "./billing/credit-packs";
  *
  * Two honest paths, subscription first (the better long-term value, made the
  * visual hero), a one-time top-up second. The closing line states the true
- * contrast — Founder gives 150 credits every month for what the Scale pack
+ * contrast — Founder gives 200 credits every month for what the Scale pack
  * costs once — nudging toward the subscription without a single dark pattern.
  */
 export function OutOfCredits({ showHeader = true }: { showHeader?: boolean }) {
@@ -22,7 +23,7 @@ export function OutOfCredits({ showHeader = true }: { showHeader?: boolean }) {
         <div className="text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gold-soft">Out of credits</p>
           <h3 className="mt-2 text-xl font-semibold tracking-tight text-ivory">Keep building — two ways forward</h3>
-          <p className="mt-1.5 text-sm text-mist">Each store costs 10 credits. Pick what fits.</p>
+          <p className="mt-1.5 text-sm text-mist">Each store costs {CREDIT_COSTS.storeGeneration} credits. Pick what fits.</p>
         </div>
       )}
 

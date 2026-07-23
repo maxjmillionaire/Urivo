@@ -18,7 +18,7 @@
 
 /** Mirror of lib/credits STORE_GENERATION_COST — kept here so this module stays
  *  isomorphic (client-importable) rather than pulling in server-only credit code. */
-const STORE_GENERATION_COST = 10;
+const STORE_GENERATION_COST = 20;
 
 export type CreditPackId = "boost" | "studio" | "scale";
 

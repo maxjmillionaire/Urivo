@@ -135,7 +135,7 @@ export function welcomeEmail(name?: string): RenderedEmail {
     heading: name ? `Welcome, ${name}.` : "Welcome to Urivo.",
     paragraphs: [
       "Your workspace is ready. Describe a business in one sentence and Urivo designs the brand, writes the catalog and builds a live storefront in under a minute.",
-      "You start with 15 free credits — enough for your first store.",
+      "You start with 20 free credits — enough for your first store.",
     ],
     cta: { label: "Build your first store", url: `${APP_URL()}/dashboard` },
   });

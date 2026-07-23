@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { getCreditBalance } from "@/lib/credits";
+import { getCreditBalance, STORE_GENERATION_COST } from "@/lib/credits";
 import { parseTheme } from "@/lib/storefront";
 import { planName, canPublish as planCanPublish } from "@/lib/plans";
 import { AppShell } from "./_shell/app-shell";
@@ -80,7 +80,7 @@ export default async function DashboardPage() {
         hasPlan={plan === "core" || plan === "pro"}
         liveStores={stores.filter((s) => s.is_active).length}
         productCount={productCount}
-        canGenerate={(balance ?? 0) >= 10}
+        canGenerate={(balance ?? 0) >= STORE_GENERATION_COST}
         canPublish={planCanPublish(plan)}
         stores={stores.map((s) => ({
           id: s.id,

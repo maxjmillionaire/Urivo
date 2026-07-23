@@ -88,7 +88,7 @@ export interface ActionProfile {
 
 export const ACTION_PROFILES: Record<AiFeature, ActionProfile> = {
   // System ~1900t + prompt ≤600 chars. Output cap 16000 (incl. thinking). 3–8 images.
-  storeGeneration: { credits: 10, inTypical: 2000, outTypical: 7000, inMax: 2100, outMax: 16000, imagesTypical: 5, imagesMax: 8 },
+  storeGeneration: { credits: 20, inTypical: 2000, outTypical: 7000, inMax: 2100, outMax: 16000, imagesTypical: 5, imagesMax: 8 },
   // System ~600t + context ~700t + history ≤12000 chars (~3000t). Output cap 700.
   askMessage: { credits: 1, inTypical: 1500, outTypical: 350, inMax: 4300, outMax: 700, imagesTypical: 0, imagesMax: 0 },
   // System ~1000t + context ~800t + history ≤14000 chars (~3500t). Output cap 2000.
@@ -96,9 +96,9 @@ export const ACTION_PROFILES: Record<AiFeature, ActionProfile> = {
   // System ~750t + prompt ≤600 chars. Output cap 4000.
   marketResearch: { credits: 3, inTypical: 900, outTypical: 2500, inMax: 900, outMax: 4000, imagesTypical: 0, imagesMax: 0 },
   // System ~750t + store context ~800t. Output cap 4000.
-  adStudio: { credits: 2, inTypical: 1550, outTypical: 2800, inMax: 1550, outMax: 4000, imagesTypical: 0, imagesMax: 0 },
+  adStudio: { credits: 3, inTypical: 1550, outTypical: 2800, inMax: 1550, outMax: 4000, imagesTypical: 0, imagesMax: 0 },
   // Pure image action (no LLM tokens).
-  productImage: { credits: 1, inTypical: 0, outTypical: 0, inMax: 0, outMax: 0, imagesTypical: 1, imagesMax: 1 },
+  productImage: { credits: 2, inTypical: 0, outTypical: 0, inMax: 0, outMax: 0, imagesTypical: 1, imagesMax: 1 },
 };
 
 // ── Cost functions ───────────────────────────────────────────────────────────
