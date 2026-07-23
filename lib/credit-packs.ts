@@ -9,7 +9,7 @@
  *    per-credit rate genuinely falls (Boost €0.95 → Studio €0.82 → Scale €0.66).
  *  - Honest anchoring: savings are computed against the Boost base rate, never invented.
  *  - Deliberate contrast that favours the subscription: Scale is 150 credits for
- *    €99 once, sitting next to Founder's 200 credits for €49 EVERY month — so the
+ *    €99 once, sitting next to Founder's 150 credits for €49 EVERY month — so the
  *    smart buyer is nudged toward subscribing, truthfully.
  *
  * Every pack's per-credit price stays ABOVE the subscription's, so packs can

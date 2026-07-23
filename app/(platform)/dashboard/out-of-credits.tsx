@@ -10,7 +10,7 @@ import { CreditPacks } from "./billing/credit-packs";
  *
  * Two honest paths, subscription first (the better long-term value, made the
  * visual hero), a one-time top-up second. The closing line states the true
- * contrast — Founder gives 200 credits every month for what the Scale pack
+ * contrast — Founder gives 150 credits every month for what the Scale pack
  * costs once — nudging toward the subscription without a single dark pattern.
  */
 export function OutOfCredits({ showHeader = true }: { showHeader?: boolean }) {
