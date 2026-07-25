@@ -1,13 +1,12 @@
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { getCreditBalance, STORE_GENERATION_COST } from "@/lib/credits";
 import { parseTheme } from "@/lib/storefront";
-import { planName, canPublish as planCanPublish } from "@/lib/plans";
 import { AppShell } from "./_shell/app-shell";
 import { DashboardHome } from "./_shell/dashboard-home";
 import type { RailStore } from "./_shell/app-rail";
 import { sendWelcomeIfFirstTime } from "@/lib/email/welcome";
 import { reconcilePendingReferral } from "@/lib/referral/service";
+import { buildDashboardOverview } from "@/lib/dashboard/overview";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +18,8 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, balance, { data: storeRows }] = await Promise.all([
-    supabase.from("profiles").select("email, full_name, plan").eq("id", user.id).single(),
-    getCreditBalance(user.id),
+  const [{ data: profile }, { data: storeRows }] = await Promise.all([
+    supabase.from("profiles").select("email, full_name").eq("id", user.id).single(),
     supabase
       .from("stores")
       .select("id, store_name, subdomain, is_active, theme_config, created_at")
@@ -30,18 +28,10 @@ export default async function DashboardPage() {
   ]);
 
   const stores = storeRows ?? [];
-  const storeIds = stores.map((s) => s.id);
 
-  let productCount = 0;
+  // Companion rail — the loud, living object (the top store) lives on the right.
   let rail: RailStore | null = null;
-
-  if (storeIds.length) {
-    const { count } = await supabase
-      .from("products")
-      .select("id", { count: "exact", head: true })
-      .in("store_id", storeIds);
-    productCount = count ?? 0;
-
+  if (stores.length) {
     const top = stores.find((s) => s.is_active) ?? stores[0];
     const theme = parseTheme(top.theme_config);
     const { data: topProducts } = await supabase
@@ -61,34 +51,18 @@ export default async function DashboardPage() {
     };
   }
 
-  // First dashboard visit → send the one-time welcome email (best-effort).
+  // The Executive Command Center — every number, briefing and recommendation
+  // from real tables (orders, storefront visits, catalogue, AI ledger, credits).
+  const overview = await buildDashboardOverview(user.id, profile?.full_name ?? null);
+
+  // First dashboard visit → one-time welcome email (best-effort).
   await sendWelcomeIfFirstTime(user.id, profile?.email ?? user.email ?? null, profile?.full_name ?? null);
-
-  // Attribute a creator code entered at signup (first-touch, validated, then
-  // cleared). Runs here so it survives email confirmation / OAuth. Best-effort.
+  // Attribute a creator code entered at signup (first-touch). Best-effort.
   await reconcilePendingReferral(user.id, user.user_metadata);
-
-  const plan = profile?.plan ?? "free";
-  const planLabel = planName(plan);
 
   return (
     <AppShell active="home" email={profile?.email ?? user.email ?? null} store={rail}>
-      <DashboardHome
-        fullName={profile?.full_name ?? null}
-        credits={balance}
-        planLabel={planLabel}
-        hasPlan={plan === "core" || plan === "pro"}
-        liveStores={stores.filter((s) => s.is_active).length}
-        productCount={productCount}
-        canGenerate={(balance ?? 0) >= STORE_GENERATION_COST}
-        canPublish={planCanPublish(plan)}
-        stores={stores.map((s) => ({
-          id: s.id,
-          name: s.store_name,
-          subdomain: s.subdomain,
-          isLive: s.is_active,
-        }))}
-      />
+      <DashboardHome overview={overview} />
     </AppShell>
   );
 }

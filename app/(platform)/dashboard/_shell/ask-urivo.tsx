@@ -171,6 +171,22 @@ export function AskUrivo({
     [messages, busy, storeId, editPropose, streamChat, creditsLeft],
   );
 
+  // The Home "Ask Urivo" command bar dispatches prompts here (via a window
+  // event) so the signature input and the companion rail are one assistant, not
+  // two. A ref keeps the listener bound to the latest `send` without rebinding.
+  const sendRef = useRef(send);
+  useEffect(() => {
+    sendRef.current = send;
+  }, [send]);
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const text = (e as CustomEvent<string>).detail;
+      if (typeof text === "string" && text.trim()) void sendRef.current(text);
+    };
+    window.addEventListener("urivo:ask", onAsk as EventListener);
+    return () => window.removeEventListener("urivo:ask", onAsk as EventListener);
+  }, []);
+
   const applyEdit = useCallback(
     async (msg: Msg) => {
       if (!storeId || !msg.edit || applyingId) return;

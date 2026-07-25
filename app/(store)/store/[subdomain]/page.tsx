@@ -6,6 +6,7 @@ import { parseTheme } from "@/lib/storefront";
 import { parseDesignSystem, themeToDesignSystem, parseLogo } from "@/lib/storefront/design-system";
 import { storeJsonLd, jsonLdScript } from "@/lib/seo";
 import { StorefrontRenderer } from "./storefront-renderer";
+import { VisitBeacon } from "./visit-beacon";
 
 export const dynamic = "force-dynamic";
 
@@ -144,6 +145,7 @@ export default async function StorefrontPage({ params }: Props) {
         </div>
       )}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }} />
+      {!isPreview && <VisitBeacon subdomain={subdomain} />}
       <StorefrontRenderer
         storeName={store.store_name}
         ds={ds}

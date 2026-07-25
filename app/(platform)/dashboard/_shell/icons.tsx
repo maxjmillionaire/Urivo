@@ -146,6 +146,77 @@ export function IconMenu(p: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+export function IconTrendUp(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M3 17 9 11l4 4 8-8" />
+      <path d="M15 4h6v6" />
+    </svg>
+  );
+}
+export function IconTrendDown(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M3 7 9 13l4-4 8 8" />
+      <path d="M15 20h6v-6" />
+    </svg>
+  );
+}
+export function IconBolt(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" />
+    </svg>
+  );
+}
+export function IconCheck(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+export function IconPulse(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M3 12h4l2-6 4 12 2-6h6" />
+    </svg>
+  );
+}
+export function IconBag(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M6 8h12l-1 12H7L6 8Z" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+    </svg>
+  );
+}
+export function IconEye(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+export function IconCoins(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <ellipse cx="9" cy="7" rx="6" ry="3" />
+      <path d="M3 7v5c0 1.7 2.7 3 6 3s6-1.3 6-3V7" />
+      <path d="M15 12.5c2.8-.2 6-1.4 6-3.5" />
+      <path d="M9 15v2c0 1.7 2.7 3 6 3s6-1.3 6-3v-5" />
+    </svg>
+  );
+}
+export function IconClock(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
 export function IconClose(p: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...p}>
