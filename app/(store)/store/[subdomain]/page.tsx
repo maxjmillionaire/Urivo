@@ -100,7 +100,7 @@ export default async function StorefrontPage({ params }: Props) {
   // legacy palette so nothing breaks while the generator is upgraded.
   const config = (store.theme_config ?? {}) as Record<string, unknown>;
   const ds = config.designSystem
-    ? parseDesignSystem(config.designSystem)
+    ? parseDesignSystem(config.designSystem, products.length)
     : themeToDesignSystem(parseTheme(store.theme_config));
   const logo = parseLogo(store.theme_config);
 

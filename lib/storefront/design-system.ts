@@ -67,12 +67,17 @@ export interface StoreBrief {
   conversionStrategy: string;
 }
 
+import { parseNarrative, type NarrativeBlock } from "./narrative";
+
 export interface StoreDesignSystem {
   personality: string;
   tagline?: string;
   brief?: StoreBrief;
   /** Customer-facing brand narrative for the story section (editorial, honest). */
   story?: string;
+  /** The authored emotional journey — the Creative Director's page composition.
+   *  When present, the renderer expresses this instead of a fixed section order. */
+  narrative?: NarrativeBlock[];
   palette: {
     background: string;
     surface: string;
@@ -265,7 +270,7 @@ function snapWeight(v: unknown): number {
  * Missing/invalid fields fall back so a partial or hostile payload still yields
  * a coherent, premium store. Derives secondary palette roles when absent.
  */
-export function parseDesignSystem(raw: unknown): StoreDesignSystem {
+export function parseDesignSystem(raw: unknown, productCount = 999): StoreDesignSystem {
   const r = (raw ?? {}) as Record<string, unknown>;
   const pRaw = (r.palette ?? {}) as Record<string, unknown>;
   const fRaw = (r.fonts ?? {}) as Record<string, unknown>;
@@ -305,6 +310,7 @@ export function parseDesignSystem(raw: unknown): StoreDesignSystem {
     tagline: typeof r.tagline === "string" && r.tagline.trim() ? r.tagline.trim().slice(0, 160) : undefined,
     brief: parseBrief(r.brief),
     story: typeof r.story === "string" && r.story.trim() ? r.story.trim().slice(0, 400) : undefined,
+    narrative: parseNarrative(r.narrative, productCount) ?? undefined,
     palette: { background, surface, ink, muted, line, accent, accentInk },
     fonts: {
       headingKey: fontKey(fRaw.headingKey, DEFAULT_HEADING),

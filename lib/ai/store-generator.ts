@@ -6,7 +6,6 @@ import {
   parseDesignSystem,
   FONT_KEYS,
   NAV_VARIANTS,
-  HERO_VARIANTS,
   CARD_VARIANTS,
   FOOTER_VARIANTS,
   BUTTON_SHAPES,
@@ -15,9 +14,9 @@ import {
   MOTION_LEVELS,
   DENSITIES,
   HEADING_CASES,
-  SECTION_KEYS,
   type StoreDesignSystem,
 } from "@/lib/storefront/design-system";
+import { BLOCK_KINDS } from "@/lib/storefront/narrative";
 import { AI_INPUT_BUDGET, clampText } from "./limits";
 import type { TokenUsage } from "@/lib/finance/cost-model";
 
@@ -53,6 +52,39 @@ const BriefSchema = z.object({
   conversionStrategy: z.string().min(3).max(300),
 });
 
+// One authored beat of the emotional journey. Fields are REQUIRED (the model
+// fills only the ones its `kind` needs and leaves the rest empty / -1) to keep
+// the structured-output schema under its union-parameter limit; parseNarrative
+// then validates strictly per kind and drops anything empty or malformed.
+// Length/shape constraints are intentionally omitted here: they bloat the
+// structured-output grammar. parseNarrative clamps every field and drops empty
+// or malformed beats, so validation lives there, not in the wire schema.
+const NarrativeItem = z.object({
+  title: z.string(),
+  detail: z.string(),
+  label: z.string(),
+  q: z.string(),
+  a: z.string(),
+});
+const NarrativeBlockSchema = z.object({
+  kind: e(BLOCK_KINDS),
+  intent: z.string(),
+  emphasis: z.enum(["calm", "bold"]),
+  eyebrow: z.string(),
+  headline: z.string(),
+  subhead: z.string(),
+  body: z.string(),
+  title: z.string(),
+  text: z.string(),
+  attribution: z.string(),
+  ctaLabel: z.string(),
+  heroProductIndex: z.number().int(), // -1 when idea-led
+  productIndex: z.number().int(), // -1 when unused
+  phrases: z.array(z.string()),
+  benefits: z.array(z.string()),
+  items: z.array(NarrativeItem),
+});
+
 const DesignSchema = z.object({
   // The creative brief comes FIRST — every design decision below emerges from it.
   brief: BriefSchema,
@@ -63,10 +95,10 @@ const DesignSchema = z.object({
     background: hex,
     ink: hex,
     accent: hex,
-    surface: hex.nullish(),
-    muted: hex.nullish(),
-    line: hex.nullish(),
-    accentInk: hex.nullish(),
+    surface: hex,
+    muted: hex,
+    line: hex,
+    accentInk: hex,
   }),
   fonts: z.object({ headingKey: e(FONT_KEYS), bodyKey: e(FONT_KEYS) }),
   typeStyle: z.object({
@@ -84,14 +116,18 @@ const DesignSchema = z.object({
   space: z.object({ density: e(DENSITIES), container: z.number().min(1040).max(1440) }),
   layout: z.object({
     nav: e(NAV_VARIANTS),
-    hero: e(HERO_VARIANTS),
     card: e(CARD_VARIANTS),
     footer: e(FOOTER_VARIANTS),
     imageTreatment: e(IMAGE_TREATMENTS),
     motion: e(MOTION_LEVELS),
-    announcement: z.string().max(120).nullable(),
-    sectionOrder: e(SECTION_KEYS).array().min(3).max(9),
+    announcement: z.string().max(120), // empty string = no announcement bar
   }),
+});
+
+// The authored emotional journey — a SECOND, dedicated call (below) so neither
+// strict grammar grows too large. It references products by index.
+const NarrativeSchema = z.object({
+  narrative: z.array(NarrativeBlockSchema).min(4).max(11),
 });
 
 const GenerationSchema = z.object({
@@ -143,13 +179,7 @@ STEP 2 — Let the brief dictate every choice below. Two different briefs must p
 - typeStyle: headingWeight (300–900), headingCase ("none" or "upper"), headingTracking (-0.04 tight to 0.3 wide, em), scale (1.12 restrained → 1.4 dramatic display). Luxury leans light weight, tight tracking, generous scale; fitness/streetwear leans heavy, upper, tight.
 - shape: radius (0 sharp → 32 very rounded), buttonShape ("sharp" | "soft" | "pill"), borderWidth (0–3), shadow ("none" | "soft" | "elevated"). Minimal luxury tends sharp + shadowless; friendly brands round + soft; streetwear sharp + hard.
 - space: density ("airy" | "balanced" | "tight"), container (1040 intimate → 1440 wide). Premium almost always means MORE whitespace — when unsure, go airier.
-- layout: nav (${NAV_VARIANTS.join(" | ")}), hero (${HERO_VARIANTS.join(" | ")}), card (${CARD_VARIANTS.join(" | ")}), footer (${FOOTER_VARIANTS.join(" | ")}), imageTreatment (${IMAGE_TREATMENTS.join(" | ")}), motion ("calm" | "lively"), announcement (a short top-bar line, or null), sectionOrder.
-
-Hero — this is where most AI stores fail. Never "headline + button + three products". Design a premium brand INTRODUCTION: editorial layout, cinematic imagery, luxurious whitespace, one emotional line of storytelling, premium type. It must immediately say "this is a real company." Prefer "editorial", "split" or "fullbleed" over a bare "statement" unless the brand is truly minimalist.
-
-Section composition — build a buying EXPERIENCE, not a page. sectionOrder is an ordered subset of: ${SECTION_KEYS.join(", ")} (always include "hero" and "collection"; add "announcement" first only if you set one). Sequence for trust and conversion: introduce the brand, present the product as the hero, layer honest trust (guarantees, materials, the founder's story), then invite the purchase. Use "story", "trust" and "highlights" — a premium store is never just a hero and a grid.
-
-Trust must be HONEST. This is a brand-new store with no customers yet, so NEVER invent reviews, star ratings or "10,000 happy customers". Build trust from what is real: guarantees, materials and craftsmanship, shipping, the founder's intent, and the quality of the work itself.
+- layout: nav (${NAV_VARIANTS.join(" | ")}), card (${CARD_VARIANTS.join(" | ")}), footer (${FOOTER_VARIANTS.join(" | ")}), imageTreatment (${IMAGE_TREATMENTS.join(" | ")}), motion ("calm" | "lively"), announcement (a short top-bar line, or an empty string for none).
 
 Copy standards:
 - Premium and specific — write as an experienced founder or luxury copywriter. Never generic filler.
@@ -161,7 +191,33 @@ Copy standards:
 
 Brand naming — think like a top branding agency. The name should feel like a company that could realistically become a global brand: memorable, premium, easy to pronounce, easy to spell, emotionally aligned with the brand, and usable internationally. Avoid generic words, awkward combinations, obvious AI-style names, unnecessary punctuation, numbers and random suffixes. If the founder supplied a name, use it as inspiration; if you can create a materially stronger one for this niche and positioning, do so confidently.
 
-FINAL QUALITY GATE — before you commit, ask yourself: would this look out of place beside the best ecommerce brands in the world? Would a customer trust it within five seconds? Would someone actually want to buy from this company? If any answer is no, raise the quality before returning. Never settle for "good enough".`;
+FINAL QUALITY GATE — the benchmark is not "a beautiful website". It is DESIRE. Would a customer believe — and want to buy from — this company within five seconds? Would this brand, palette, type and catalogue look at home beside the best DTC brands in the world? If not, raise the quality before returning. Never settle for "good enough".`;
+
+const NARRATIVE_SYSTEM = `You are the Creative Director for Urivo. You are given a finished premium brand — its name, positioning, story and product catalogue — and you now compose the storefront as a controlled EMOTIONAL JOURNEY.
+
+You are NOT choosing sections from a menu. A theme engine asks "which hero layout?". You ask "what story makes someone WANT this product — in what order, at what emotional intensity?". Return \`narrative\`: an ordered list of 5–9 "beats". Every beat exists for a psychological reason (state it in \`intent\`) and carries fully AUTHORED content specific to THIS brand and THESE products. Never boilerplate — nothing here may read like it could belong to another brand.
+
+Each beat is { kind, intent, emphasis ("calm" | "bold"), + the fields that kind uses; leave unused string fields as "" and unused index fields as -1 }. \`emphasis\` is the beat's emotional volume — reserve "bold" for the one or two true peaks; most beats are calm (restraint reads premium).
+
+Beat kinds and the fields each uses:
+- hero — THE HOOK. headline = an IDEA, a promise or a benefit, NEVER the brand name (the nav shows the name). Set heroProductIndex (0-based index into the product list) to lead with the hero product itself — the Apple/Seed move — or -1 for an idea-led hero. Uses: eyebrow, headline, subhead, ctaLabel, heroProductIndex.
+- spotlight — DESIRE. One product, large, benefit-led. Uses: productIndex, eyebrow, headline, benefits (2–5 concrete sensory outcomes the customer gets), ctaLabel.
+- pillars — WHY IT'S WORTH WANTING. Uses: title, items (2–4 of { title, detail }, each a real product-specific reason).
+- proof — CREDIBILITY / EDUCATION, the signature beat — ingredients, materials, how it works, provenance. Uses: title, items (3–6 of { label, detail }). Authored specificity here is what separates you from templates.
+- story — MEANING. Uses: eyebrow, headline, body (honest, why this brand exists).
+- quote — EMOTIONAL PEAK, one line, big type, air. Uses: text, attribution (only if honest — e.g. the founder; else ""). At most once.
+- trust — RISK REDUCTION. Uses: items (3–4 of { title, detail }) of HONEST guarantees (returns, secure checkout, shipping, quality) in THIS brand's voice, never generic.
+- faq — OBJECTION HANDLING. Uses: items (2–6 of { q, a }) — the real questions THIS product raises.
+- collection — THE SHOP (include exactly once). Uses: title (optional).
+- cta — THE CLOSE. Uses: headline, subhead, ctaLabel.
+- newsletter — RETENTION. Uses: headline, subhead.
+- marquee — RHYTHM. Uses: phrases (2–6 short authored proof phrases, not one word repeated).
+
+Composition principles: earn attention and create desire first; introduce the product early and make IT the hero (not the layout); layer meaning and credibility; reduce risk near the decision; close with a clear invitation. Not every brand needs every beat — choose the sequence and intensity that maximise desire and trust for THIS brand. Pace with whitespace and emphasis; premium is calm and deliberate, never a wall of sections.
+
+HONESTY is absolute: this store has no customers yet, so NEVER invent reviews, ratings, testimonials, star counts or "10,000 happy customers". Build desire and trust only from what is real — the product's concrete qualities and materials, honest guarantees, shipping, and the founder's intent.
+
+FINAL GATE: when someone lands here, their first feeling must be "I want this product" — not merely "this looks nice". If a beat doesn't earn that, cut or rewrite it.`;
 
 export interface StoreGenerationInput {
   prompt: string;
@@ -195,29 +251,80 @@ export async function generateStore(input: StoreGenerationInput): Promise<Genera
   });
 
   if (response.stop_reason === "refusal") throw new Error("AI_REFUSED");
-
   const parsed = response.parsed_output;
   if (!parsed) throw new Error("AI_INVALID_OUTPUT");
-
   const result = GenerationSchema.safeParse(parsed);
   if (!result.success) throw new Error("AI_INVALID_OUTPUT");
+  const { brand, design, products } = result.data;
 
-  // Second gate: clamp/normalise the design system defensively (spec 6.5).
-  // The brand story rides in the design system so the renderer can show real
-  // editorial narrative without threading extra props.
-  const designSystem = parseDesignSystem({
-    ...result.data.design,
-    tagline: result.data.brand.tagline,
-    story: result.data.brand.story,
-  });
+  // ── Call 2: the Creative Director composes the emotional journey ──────────
+  // A dedicated call keeps each strict grammar small, and lets the narrative be
+  // authored with full knowledge of the finished brand + real product list.
+  const rawNarrative = await composeNarrative(client, brand, design, products);
+
+  // Second gate: clamp/normalise defensively (spec 6.5). The story + narrative
+  // ride inside the design system so the renderer needs no extra props.
+  const designSystem = parseDesignSystem(
+    {
+      ...design,
+      tagline: brand.tagline,
+      story: brand.story,
+      narrative: rawNarrative,
+    },
+    products.length,
+  );
 
   return {
-    brand: result.data.brand,
+    brand,
     designSystem,
-    products: result.data.products,
+    products,
     usage: {
       inputTokens: response.usage?.input_tokens ?? 0,
       outputTokens: response.usage?.output_tokens ?? 0,
     },
   };
+}
+
+type Brand = z.infer<typeof GenerationSchema>["brand"];
+type Design = z.infer<typeof GenerationSchema>["design"];
+type Products = z.infer<typeof GenerationSchema>["products"];
+
+/** Author the storefront's emotional journey for a finished brand. Best-effort:
+ *  on any failure the store still renders (legacy fixed-section fallback). */
+async function composeNarrative(
+  client: Anthropic,
+  brand: Brand,
+  design: Design,
+  products: Products,
+): Promise<unknown> {
+  const list = products
+    .map((p, i) => `${i}. ${p.title} — €${p.priceEUR} — ${clampText(p.description, 160)}`)
+    .join("\n");
+  const context = `Brand: ${brand.name} — "${brand.tagline}"
+Personality: ${design.personality}
+Positioning: ${design.brief.positioning}
+Audience: ${design.brief.audience}
+Conversion strategy: ${design.brief.conversionStrategy}
+Story: ${brand.story}
+
+Products (index. title — price — description):
+${clampText(list, AI_INPUT_BUDGET.editorHistoryChars)}
+
+Compose the emotional journey (narrative) that makes this specific customer want these products.`;
+
+  try {
+    const res = await client.messages.parse({
+      model: STORE_GENERATOR_MODEL,
+      max_tokens: 8000,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "high", format: zodOutputFormat(NarrativeSchema) },
+      system: [{ type: "text", text: NARRATIVE_SYSTEM, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: context }],
+    });
+    if (res.stop_reason === "refusal") return null;
+    const p = NarrativeSchema.safeParse(res.parsed_output);
+    return p.success ? p.data.narrative : null;
+  } catch {
+    return null; // the store renders via the legacy path
+  }
 }

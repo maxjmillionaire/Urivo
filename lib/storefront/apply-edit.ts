@@ -53,6 +53,11 @@ export function applyDesignPatch(current: StoreDesignSystem, patch: DesignPatch)
   const raw: Record<string, unknown> = {
     personality: patch.personality ?? current.personality,
     tagline: patch.tagline ?? current.tagline,
+    // Carry through the authored intelligence a palette/type tweak must not wipe:
+    // the emotional journey, the creative brief and the brand story.
+    brief: current.brief,
+    story: current.story,
+    narrative: current.narrative,
     palette: { ...current.palette },
     fonts: { ...current.fonts },
     typeStyle: { ...current.typeStyle },

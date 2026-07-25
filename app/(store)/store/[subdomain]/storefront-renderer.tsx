@@ -10,6 +10,21 @@ import {
   type StoreLogo,
   type LogoPosition,
 } from "@/lib/storefront/design-system";
+import type {
+  NarrativeBlock,
+  HeroBlock,
+  MarqueeBlock,
+  SpotlightBlock,
+  PillarsBlock,
+  ProofBlock,
+  StoryBlock,
+  QuoteBlock,
+  TrustBlock,
+  FaqBlock,
+  CtaBlock,
+  NewsletterBlock,
+  Emphasis,
+} from "@/lib/storefront/narrative";
 import { toCents } from "@/lib/commerce/types";
 import { StoreCartProvider, AddToCart, CartButton } from "./cart/store-cart";
 
@@ -473,7 +488,7 @@ function ProductCard({ ds, product, index, logo, href }: { ds: StoreDesignSystem
   );
 }
 
-function Collection({ ds, catalog, logo, storeBase }: { ds: StoreDesignSystem; catalog: RenderProduct[]; logo?: StoreLogo | null; storeBase: string }) {
+function Collection({ ds, catalog, logo, storeBase, title }: { ds: StoreDesignSystem; catalog: RenderProduct[]; logo?: StoreLogo | null; storeBase: string; title?: string }) {
   if (catalog.length === 0) {
     return (
       <section className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
@@ -486,7 +501,7 @@ function Collection({ ds, catalog, logo, storeBase }: { ds: StoreDesignSystem; c
   return (
     <section id="uv-shop" className="uv-wrap" style={{ paddingTop: "calc(var(--pad-y) * .5)", paddingBottom: "var(--pad-y)", scrollMarginTop: "5rem" }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "2.4rem" }}>
-        <h2 className="uv-h" style={{ fontSize: "var(--h2)" }}>The collection</h2>
+        <h2 className="uv-h" style={{ fontSize: "var(--h2)" }}>{title ?? "The collection"}</h2>
         <span className="uv-eyebrow">{catalog.length} pieces</span>
       </div>
       <div
@@ -674,6 +689,243 @@ function Footer({ ds, storeName }: { ds: StoreDesignSystem; storeName: string })
   );
 }
 
+/* ============================ AUTHORED NARRATIVE ==========================
+ * The renderer as a faithful typesetting surface: it renders the Creative
+ * Director's authored beats, never boilerplate. Every string here comes from
+ * the model's narrative content; the design system supplies only the form.
+ * ========================================================================= */
+
+interface NarrativeCtx {
+  ds: StoreDesignSystem;
+  storeName: string;
+  catalog: RenderProduct[];
+  storeBase: string;
+  logo?: StoreLogo | null;
+  heroImage: string | null;
+}
+
+const npad = (e: Emphasis): string => (e === "bold" ? "var(--pad-y)" : "calc(var(--pad-y) * .62)");
+const pdpHref = (ctx: NarrativeCtx, p: RenderProduct) => `${ctx.storeBase}/product/${p.id}`;
+
+function NHero({ block, ctx }: { block: HeroBlock; ctx: NarrativeCtx }) {
+  const { ds, catalog, logo, heroImage } = ctx;
+  const prod = block.heroProductIndex != null ? catalog[block.heroProductIndex] : null;
+  const img = prod?.image_url ?? heroImage;
+  const cta = prod ? pdpHref(ctx, prod) : "#uv-shop";
+  const padTop = block.emphasis === "bold" ? "clamp(3.5rem,7vw,7rem)" : "clamp(2.5rem,5vw,4.5rem)";
+
+  if (img) {
+    return (
+      <section className="uv-wrap" style={{ paddingTop: padTop, paddingBottom: "var(--pad-y)" }}>
+        <div className="uv-hero-split" style={{ display: "grid", gap: "clamp(2rem,4vw,3.5rem)", gridTemplateColumns: "1.05fr 1fr", alignItems: "center" }}>
+          <div className="uv-rise">
+            {block.eyebrow && <p className="uv-eyebrow">{block.eyebrow}</p>}
+            <h1 style={{ fontSize: "var(--h1)", marginTop: block.eyebrow ? "1.2rem" : 0, maxWidth: "18ch" }}>{block.headline}</h1>
+            {block.subhead && <p style={{ marginTop: "1.4rem", maxWidth: "40ch", color: "var(--muted)", fontSize: "1.08rem", lineHeight: 1.65 }}>{block.subhead}</p>}
+            <div style={{ marginTop: "2.2rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+              <a href={cta} className="uv-btn">{block.ctaLabel}</a>
+              <a href="#uv-shop" className="uv-btn-ghost">Explore the collection</a>
+            </div>
+          </div>
+          <div className="uv-card" style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: "var(--radius)", overflow: "hidden" }}>
+            <Plane ds={ds} index={0} src={img} logo={logo} />
+          </div>
+        </div>
+      </section>
+    );
+  }
+  return (
+    <section className="uv-wrap uv-rise" style={{ paddingTop: padTop, paddingBottom: "var(--pad-y)" }}>
+      {block.eyebrow && <p className="uv-eyebrow">{block.eyebrow}</p>}
+      <h1 style={{ fontSize: "var(--h1)", marginTop: block.eyebrow ? "1.3rem" : 0, maxWidth: "20ch" }}>{block.headline}</h1>
+      {block.subhead && <p style={{ marginTop: "1.5rem", maxWidth: "46ch", color: "var(--muted)", fontSize: "1.12rem", lineHeight: 1.6 }}>{block.subhead}</p>}
+      <a href={cta} className="uv-btn" style={{ marginTop: "2.2rem", display: "inline-block" }}>{block.ctaLabel}</a>
+    </section>
+  );
+}
+
+function NMarquee({ block, ds }: { block: MarqueeBlock; ds: StoreDesignSystem }) {
+  const run = [...block.phrases, ...block.phrases].map((phrase, i) => (
+    <span key={i} className="uv-h" style={{ fontSize: "clamp(1.2rem,2.6vw,2rem)", padding: "0 1.4rem", opacity: 0.92, whiteSpace: "nowrap" }}>
+      {phrase} <span style={{ color: "var(--accent)" }}>✦</span>
+    </span>
+  ));
+  return (
+    <section style={{ borderTop: `var(--border-w) solid ${ds.palette.line}`, borderBottom: `var(--border-w) solid ${ds.palette.line}`, padding: "1.2rem 0", overflow: "hidden" }}>
+      <div className="uv-marquee-track">{run}</div>
+    </section>
+  );
+}
+
+function NSpotlight({ block, ctx }: { block: SpotlightBlock; ctx: NarrativeCtx }) {
+  const { ds, catalog, logo } = ctx;
+  const prod = catalog[block.productIndex];
+  if (!prod) return null;
+  return (
+    <section className="uv-wrap" style={{ paddingTop: npad(block.emphasis), paddingBottom: npad(block.emphasis) }}>
+      <div className="uv-hero-split" style={{ display: "grid", gap: "clamp(2rem,4vw,3.5rem)", gridTemplateColumns: "1fr 1fr", alignItems: "center" }}>
+        <div className="uv-card" style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: "var(--radius)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
+          <Plane ds={ds} index={block.productIndex} src={prod.image_url} alt={prod.title} logo={logo} />
+        </div>
+        <div>
+          {block.eyebrow && <p className="uv-eyebrow">{block.eyebrow}</p>}
+          <h2 className="uv-h" style={{ fontSize: "var(--h2)", marginTop: block.eyebrow ? "1rem" : 0 }}>{block.headline}</h2>
+          {block.benefits.length > 0 && (
+            <ul style={{ listStyle: "none", padding: 0, margin: "1.6rem 0 0", display: "grid", gap: ".85rem" }}>
+              {block.benefits.map((b) => (
+                <li key={b} style={{ display: "flex", gap: ".7rem", alignItems: "flex-start", fontSize: "1rem", lineHeight: 1.5 }}>
+                  <span style={{ color: "var(--accent)", marginTop: ".1rem", flexShrink: 0 }}>✓</span>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div style={{ marginTop: "2rem", display: "flex", alignItems: "center", gap: "1.2rem", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "1.35rem", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{price(prod.price_eur)}</span>
+            <AddToCart product={cartProduct(prod)} label={block.ctaLabel} className="uv-btn" />
+            <a href={pdpHref(ctx, prod)} className="uv-link">View details</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function NPillars({ block }: { block: PillarsBlock }) {
+  return (
+    <section className="uv-wrap" style={{ paddingTop: npad(block.emphasis), paddingBottom: npad(block.emphasis) }}>
+      {block.title && <h2 className="uv-h" style={{ fontSize: "var(--h2)", marginBottom: "2rem", maxWidth: "22ch" }}>{block.title}</h2>}
+      <div style={{ display: "grid", gap: "clamp(1.6rem,3vw,3rem)", gridTemplateColumns: `repeat(auto-fit, minmax(${block.items.length >= 3 ? 220 : 280}px, 1fr))` }}>
+        {block.items.map((it, i) => (
+          <div key={it.title}>
+            <span className="uv-h" style={{ color: "var(--accent)", fontSize: "1.1rem", fontVariantNumeric: "tabular-nums" }}>{String(i + 1).padStart(2, "0")}</span>
+            <p className="uv-h" style={{ fontSize: "1.2rem", marginTop: ".9rem" }}>{it.title}</p>
+            <p style={{ marginTop: ".6rem", color: "var(--muted)", fontSize: ".96rem", lineHeight: 1.6 }}>{it.detail}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function NProof({ block, ds }: { block: ProofBlock; ds: StoreDesignSystem }) {
+  return (
+    <section style={{ background: "var(--surface)", borderTop: `var(--border-w) solid ${ds.palette.line}`, borderBottom: `var(--border-w) solid ${ds.palette.line}` }}>
+      <div className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)" }}>
+        <h2 className="uv-h" style={{ fontSize: "var(--h2)", maxWidth: "24ch", marginBottom: "2.4rem" }}>{block.title}</h2>
+        <div style={{ display: "grid", gap: "0" }}>
+          {block.items.map((it, i) => (
+            <div key={it.label} style={{ display: "grid", gridTemplateColumns: "minmax(140px, 22%) 1fr", gap: "1.5rem", padding: "1.4rem 0", borderTop: i === 0 ? "none" : `var(--border-w) solid ${ds.palette.line}` }}>
+              <p className="uv-h" style={{ fontSize: "1.02rem" }}>{it.label}</p>
+              <p style={{ color: "var(--muted)", fontSize: ".98rem", lineHeight: 1.65 }}>{it.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function NStory({ block }: { block: StoryBlock }) {
+  return (
+    <section className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)" }}>
+      <div style={{ maxWidth: "64ch" }}>
+        {block.eyebrow && <p className="uv-eyebrow">{block.eyebrow}</p>}
+        <h2 className="uv-h" style={{ fontSize: "var(--h2)", marginTop: block.eyebrow ? "1.2rem" : 0, maxWidth: "26ch" }}>{block.headline}</h2>
+        <p style={{ marginTop: "1.4rem", color: "var(--muted)", fontSize: "1.08rem", lineHeight: 1.75 }}>{block.body}</p>
+      </div>
+    </section>
+  );
+}
+
+function NQuote({ block }: { block: QuoteBlock }) {
+  return (
+    <section className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
+      <blockquote className="uv-h" style={{ fontSize: "clamp(1.6rem,3.6vw,2.6rem)", lineHeight: 1.3, maxWidth: "24ch", margin: "0 auto", letterSpacing: "-0.01em" }}>
+        {block.text}
+      </blockquote>
+      {block.attribution && <p style={{ marginTop: "1.6rem", color: "var(--muted)", fontSize: ".9rem", letterSpacing: ".08em", textTransform: "uppercase" }}>{block.attribution}</p>}
+    </section>
+  );
+}
+
+function NTrust({ block, ds }: { block: TrustBlock; ds: StoreDesignSystem }) {
+  return (
+    <section className="uv-wrap" style={{ paddingTop: npad(block.emphasis), paddingBottom: npad(block.emphasis) }}>
+      <div style={{ display: "grid", gap: "1.5rem", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", borderTop: `var(--border-w) solid ${ds.palette.line}`, paddingTop: "2.2rem" }}>
+        {block.items.map((it) => (
+          <div key={it.title}>
+            <p className="uv-h" style={{ fontSize: ".98rem" }}>{it.title}</p>
+            <p style={{ marginTop: ".4rem", fontSize: ".86rem", color: "var(--muted)", lineHeight: 1.55 }}>{it.detail}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function NFaq({ block, ds }: { block: FaqBlock; ds: StoreDesignSystem }) {
+  return (
+    <section className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)" }}>
+      <div style={{ maxWidth: "72ch" }}>
+        <h2 className="uv-h" style={{ fontSize: "var(--h2)", marginBottom: "1.8rem" }}>Questions</h2>
+        {block.items.map((it, i) => (
+          <details key={it.q} style={{ borderTop: i === 0 ? `var(--border-w) solid ${ds.palette.line}` : "none", borderBottom: `var(--border-w) solid ${ds.palette.line}`, padding: "1.15rem 0" }}>
+            <summary className="uv-h" style={{ fontSize: "1.05rem", cursor: "pointer", listStyle: "none", display: "flex", justifyContent: "space-between", gap: "1rem" }}>
+              {it.q}<span style={{ color: "var(--accent)" }}>+</span>
+            </summary>
+            <p style={{ marginTop: ".9rem", color: "var(--muted)", fontSize: ".98rem", lineHeight: 1.7, maxWidth: "60ch" }}>{it.a}</p>
+          </details>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function NCta({ block }: { block: CtaBlock }) {
+  return (
+    <section className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
+      <h2 className="uv-h" style={{ fontSize: "var(--h2)", maxWidth: "22ch", margin: "0 auto" }}>{block.headline}</h2>
+      {block.subhead && <p style={{ marginTop: "1.1rem", color: "var(--muted)", fontSize: "1.05rem", maxWidth: "44ch", marginInline: "auto" }}>{block.subhead}</p>}
+      <a href="#uv-shop" className="uv-btn" style={{ marginTop: "2rem", display: "inline-block" }}>{block.ctaLabel}</a>
+    </section>
+  );
+}
+
+function NNewsletter({ block, ds }: { block: NewsletterBlock; ds: StoreDesignSystem }) {
+  return (
+    <section style={{ background: "var(--surface)", borderTop: `var(--border-w) solid ${ds.palette.line}` }}>
+      <div className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
+        <h2 className="uv-h" style={{ fontSize: "var(--h2)", maxWidth: "22ch", margin: "0 auto" }}>{block.headline}</h2>
+        <p style={{ marginTop: "1rem", color: "var(--muted)" }}>{block.subhead}</p>
+        <div style={{ marginTop: "1.8rem", display: "flex", gap: ".6rem", justifyContent: "center", flexWrap: "wrap" }}>
+          <input placeholder="you@email.com" style={{ padding: ".9rem 1.1rem", minWidth: "260px", borderRadius: "var(--btn-radius)", border: `var(--border-w) solid ${ds.palette.line}`, background: "var(--bg)", color: "var(--ink)", fontFamily: "var(--font-b)" }} />
+          <button className="uv-btn">Subscribe</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function renderBlock(block: NarrativeBlock, i: number, ctx: NarrativeCtx): React.ReactNode {
+  const key = `${block.kind}-${i}`;
+  switch (block.kind) {
+    case "hero": return <NHero key={key} block={block} ctx={ctx} />;
+    case "marquee": return <NMarquee key={key} block={block} ds={ctx.ds} />;
+    case "spotlight": return <NSpotlight key={key} block={block} ctx={ctx} />;
+    case "pillars": return <NPillars key={key} block={block} />;
+    case "proof": return <NProof key={key} block={block} ds={ctx.ds} />;
+    case "story": return <NStory key={key} block={block} />;
+    case "quote": return <NQuote key={key} block={block} />;
+    case "trust": return <NTrust key={key} block={block} ds={ctx.ds} />;
+    case "faq": return <NFaq key={key} block={block} ds={ctx.ds} />;
+    case "collection": return <Collection key={key} ds={ctx.ds} catalog={ctx.catalog} logo={ctx.logo} storeBase={ctx.storeBase} title={block.title ?? undefined} />;
+    case "cta": return <NCta key={key} block={block} />;
+    case "newsletter": return <NNewsletter key={key} block={block} ds={ctx.ds} />;
+    default: return null;
+  }
+}
+
 /* -------------------------------- assembly --------------------------------- */
 
 export function StorefrontRenderer({
@@ -714,10 +966,24 @@ export function StorefrontRenderer({
     }
   };
 
-  // Announcement always sits above the nav; everything else follows order.
-  const order = ds.layout.sectionOrder;
-  const hasAnnouncement = order.includes("announcement");
-  const body = order.filter((k) => k !== "announcement");
+  // New engine: the AI-authored emotional journey. Legacy stores (no narrative)
+  // still render through the original fixed-section order.
+  const narrative = ds.narrative;
+  let content: React.ReactNode;
+  if (narrative && narrative.length) {
+    const ctx: NarrativeCtx = { ds, storeName, catalog, storeBase, logo, heroImage };
+    // The narrative never includes the footer — it's the fixed shell close.
+    content = (
+      <>
+        {narrative.map((block, i) => renderBlock(block, i, ctx))}
+        <Footer ds={ds} storeName={storeName} />
+      </>
+    );
+  } else {
+    // Legacy: the fixed section order already carries its own footer.
+    const order = ds.layout.sectionOrder;
+    content = order.filter((k) => k !== "announcement").map(render);
+  }
 
   return (
     <>
@@ -725,9 +991,9 @@ export function StorefrontRenderer({
       <style dangerouslySetInnerHTML={{ __html: scopedCss(ds) }} />
       <div id="uv-store" style={buildVars(ds)}>
         <StoreCartProvider subdomain={subdomain} currency={currency}>
-          {hasAnnouncement && <Announcement ds={ds} />}
+          {ds.layout.announcement && <Announcement ds={ds} />}
           <Nav storeName={storeName} ds={ds} />
-          {body.map(render)}
+          {content}
         </StoreCartProvider>
       </div>
     </>
