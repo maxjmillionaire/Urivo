@@ -51,9 +51,28 @@ export type Density = (typeof DENSITIES)[number];
 export type HeadingCase = (typeof HEADING_CASES)[number];
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
+/**
+ * The creative brief — the strategy the AI commits to BEFORE it designs
+ * anything. Every visual decision emerges from these, and the imagery pipeline
+ * reads the photography direction so a store's photos share one art direction.
+ * Persisted with the store so edits and future generations stay coherent.
+ */
+export interface StoreBrief {
+  audience: string;
+  pricePoint: string;
+  positioning: string;
+  designPhilosophy: string;
+  typographyDirection: string;
+  photographyDirection: string;
+  conversionStrategy: string;
+}
+
 export interface StoreDesignSystem {
   personality: string;
   tagline?: string;
+  brief?: StoreBrief;
+  /** Customer-facing brand narrative for the story section (editorial, honest). */
+  story?: string;
   palette: {
     background: string;
     surface: string;
@@ -216,6 +235,25 @@ function clampNum(v: unknown, min: number, max: number, fallback: number): numbe
 function fontKey(v: unknown, fallback: string): string {
   return typeof v === "string" && FONT_LIBRARY[v] ? v : fallback;
 }
+function str(v: unknown, max: number): string {
+  return typeof v === "string" ? v.trim().slice(0, max) : "";
+}
+/** Validate the optional creative brief; returns undefined unless it's usably
+ *  complete (the fields that actually feed downstream — positioning + imagery). */
+function parseBrief(raw: unknown): StoreBrief | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const b = raw as Record<string, unknown>;
+  const brief: StoreBrief = {
+    audience: str(b.audience, 240),
+    pricePoint: str(b.pricePoint, 80),
+    positioning: str(b.positioning, 240),
+    designPhilosophy: str(b.designPhilosophy, 300),
+    typographyDirection: str(b.typographyDirection, 200),
+    photographyDirection: str(b.photographyDirection, 400),
+    conversionStrategy: str(b.conversionStrategy, 300),
+  };
+  return brief.positioning || brief.photographyDirection ? brief : undefined;
+}
 function snapWeight(v: unknown): number {
   const n = clampNum(v, 300, 900, 600);
   const steps = [300, 400, 500, 600, 700, 800, 900];
@@ -265,6 +303,8 @@ export function parseDesignSystem(raw: unknown): StoreDesignSystem {
     personality:
       typeof r.personality === "string" ? r.personality.trim().slice(0, 80) : "Considered, premium",
     tagline: typeof r.tagline === "string" && r.tagline.trim() ? r.tagline.trim().slice(0, 160) : undefined,
+    brief: parseBrief(r.brief),
+    story: typeof r.story === "string" && r.story.trim() ? r.story.trim().slice(0, 400) : undefined,
     palette: { background, surface, ink, muted, line, accent, accentInk },
     fonts: {
       headingKey: fontKey(fRaw.headingKey, DEFAULT_HEADING),

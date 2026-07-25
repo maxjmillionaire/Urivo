@@ -554,20 +554,23 @@ function Trust({ ds }: { ds: StoreDesignSystem }) {
 }
 
 function Story({ ds, storeName }: { ds: StoreDesignSystem; storeName: string }) {
+  // The real, on-brand narrative the Creative Director wrote (Design Engine 2.0).
+  // Fall back to a considered, honest line only for legacy stores without one.
+  const narrative =
+    ds.story?.trim() ||
+    "Made in small runs with materials chosen to age well. Nothing rushed, nothing disposable — only work we would be proud to keep for years.";
+  const positioning = ds.brief?.positioning?.trim();
   return (
     <section className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)" }}>
-      <div style={{ display: "grid", gap: "2.5rem", gridTemplateColumns: "1fr", maxWidth: "62ch" }}>
+      <div style={{ display: "grid", gap: "2.5rem", gridTemplateColumns: "1fr", maxWidth: "64ch" }}>
         <div>
-          <p className="uv-eyebrow">Our philosophy</p>
+          <p className="uv-eyebrow">The story</p>
           <h2 className="uv-h" style={{ fontSize: "var(--h2)", marginTop: "1.2rem" }}>
-            {storeName} exists for people who notice the details.
+            {positioning || `Why ${storeName} exists.`}
           </h2>
           <p style={{ marginTop: "1.4rem", color: "var(--muted)", fontSize: "1.05rem", lineHeight: 1.7 }}>
-            Every piece is made in small runs with materials chosen to age well. Nothing is rushed, nothing is disposable — only work we would be proud to keep for years.
+            {narrative}
           </p>
-          <div style={{ marginTop: "1.8rem" }}>
-            <button className="uv-link" style={{ background: "none", cursor: "pointer" }}>Read the full story</button>
-          </div>
         </div>
       </div>
     </section>

@@ -153,14 +153,20 @@ export function imageProvider(): ImageProvider | null {
 
 function artDirection(ds: StoreDesignSystem): string {
   // Translate the brand's design system into a consistent photographic brief so
-  // every product in a store shares one art direction.
+  // every product in a store shares one art direction. When the Creative Director
+  // committed to an explicit photography direction (Design Engine 2.0), that
+  // leads — it's the brief every shot must follow — grounded by the palette.
   const dark = ds.palette.background.toLowerCase() < "#888888";
   const surface = dark
     ? "a deep, moody seamless background"
     : "a soft, bright seamless background";
   const mood =
     ds.layout.motion === "lively" ? "energetic, editorial, contemporary" : "calm, refined, timeless";
-  return `Style: ${ds.personality}. ${mood} commercial product photography. ${surface} in tones near ${ds.palette.background}, with a subtle ${ds.palette.accent} accent in the lighting. Studio softbox lighting, shallow depth of field, high detail, photorealistic, centered single subject, generous negative space. No text, no logos, no watermark, no people.`;
+  const brief = ds.brief?.photographyDirection?.trim();
+  const direction = brief
+    ? `${brief} Grounded in tones near ${ds.palette.background} with a subtle ${ds.palette.accent} accent in the lighting.`
+    : `Style: ${ds.personality}. ${mood} commercial product photography. ${surface} in tones near ${ds.palette.background}, with a subtle ${ds.palette.accent} accent in the lighting.`;
+  return `${direction} Studio-grade lighting, shallow depth of field, high detail, photorealistic, centered single subject, generous negative space. No text, no logos, no watermark, no people.`;
 }
 
 function productPrompt(ds: StoreDesignSystem, title: string, description: string | null): string {
