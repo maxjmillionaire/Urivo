@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LOGO_POSITIONS, type StoreLogo, type LogoPosition } from "@/lib/storefront/design-system";
+import { BrandNameStudio } from "./brand-name-studio";
 
 /*
  * Merchant store management (screens-v1 §6): product CRUD table with an
@@ -246,6 +247,9 @@ export function StoreManager({
           Edit design
         </button>
       </section>
+
+      {/* Brand name + real domain availability */}
+      <BrandNameStudio storeId={storeId} currentName={theme.storeName} context={theme.tagline} />
 
       {/* Brand logo */}
       <section className="u-float mt-5 rounded-2xl border border-hair bg-panel/70 p-5">

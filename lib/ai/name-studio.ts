@@ -12,8 +12,19 @@ import * as z from "zod/v4";
  * This is the only place name-ideation touches the AI SDK (spec 6.9).
  */
 
+import { NAME_STYLES, type NameStyle } from "@/lib/naming/styles";
+
 export const NAME_MODEL = "claude-opus-4-8";
-export const NAME_PROMPT_VERSION = "v1";
+export const NAME_PROMPT_VERSION = "v2-styles";
+
+export { NAME_STYLES, type NameStyle };
+
+const STYLE_DIRECTION: Record<NameStyle, string> = {
+  premium: "Style: premium and timeless — confident, ownable, could become a global brand. A balanced mix of coined words, evocative roots and clean compounds.",
+  luxury: "Style: quiet luxury — refined, elegant, understated. Lean on soft classical roots (Latin, French, Italian), graceful phonetics and a couture feel. Never loud or literal.",
+  minimal: "Style: minimal — short, clean, often a single word of 4–7 letters. Calm, modern, lowercase-friendly. Nothing ornate; every letter earns its place.",
+  modern: "Style: modern and technical — sleek, forward, slightly futuristic. Crisp consonants, contemporary coinages, a Nothing/Arc/Linear sensibility. Never retro.",
+};
 
 const NamesSchema = z.object({
   names: z
@@ -42,12 +53,19 @@ For each name give a 6–14 word rationale — the feeling or idea it carries. R
 
 export interface NameInput {
   prompt: string;
+  style?: NameStyle;
+  /** Names already seen — so "regenerate" returns genuinely fresh options. */
+  avoid?: string[];
 }
 
 /** Produce a validated shortlist of brandable store-name ideas. */
 export async function suggestStoreNames(input: NameInput): Promise<NameIdeas> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("AI_NOT_CONFIGURED");
+
+  const styleLine = input.style ? `\n\n${STYLE_DIRECTION[input.style]}` : "";
+  const avoid = (input.avoid ?? []).filter(Boolean).slice(0, 24);
+  const avoidLine = avoid.length ? `\n\nDo NOT repeat or lightly vary any of these already-seen names: ${avoid.join(", ")}. Return a completely fresh set.` : "";
 
   const client = new Anthropic({ apiKey });
   const response = await client.messages.parse({
@@ -58,7 +76,7 @@ export async function suggestStoreNames(input: NameInput): Promise<NameIdeas> {
     messages: [
       {
         role: "user",
-        content: `Invent brandable store names for this idea:\n\n${input.prompt.trim()}`,
+        content: `Invent brandable store names for this idea:\n\n${input.prompt.trim()}${styleLine}${avoidLine}`,
       },
     ],
   });
