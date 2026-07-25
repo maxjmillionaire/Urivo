@@ -52,6 +52,26 @@ export interface SupplierSignals {
   categoryTrend?: "declining" | "steady" | "rising" | "hot" | null;
 }
 
+/*
+ * Learned signals — Merchant Intelligence. Unlike SupplierSignals (public vendor
+ * metrics), these come from anonymised, platform-wide OUTCOMES aggregated across
+ * every merchant who sold the same product. They cannot be replicated by a
+ * competitor because they require Urivo's install base. As sampleSize grows,
+ * these progressively dominate the Urivo Score — it evolves from "estimated from
+ * public metrics" to "measured from real results".
+ *
+ * Indices are relative to the platform average (1.0 = average, 1.4 = 40% better).
+ */
+export interface LearnedSignals {
+  sampleSize: number; // orders/merchants backing these numbers (drives confidence)
+  conversionIndex?: number | null; // sessions → orders, vs platform average
+  refundRatePct?: number | null; // measured (overrides the public estimate)
+  removalRatePct?: number | null; // % of merchants who imported then REMOVED it (strong negative)
+  repeatPurchaseRatePct?: number | null; // customers who bought again
+  aovIndex?: number | null; // contribution to average order value, vs average
+  nicheFitScore?: number | null; // 0–1: performance within THIS niche specifically
+}
+
 /** A product as Urivo understands it, regardless of source vendor. */
 export interface SupplierProduct {
   provider: SupplierProviderId;

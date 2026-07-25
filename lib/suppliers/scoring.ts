@@ -13,7 +13,7 @@
  * Pure + isomorphic — the UI renders the score directly; no server needed.
  */
 
-import type { SupplierProduct, SupplierSignals, Money } from "./types";
+import type { SupplierProduct, SupplierSignals, LearnedSignals, Money } from "./types";
 
 export interface ScoreSignalBreakdown {
   key: "margin" | "shipping" | "trust" | "refunds" | "trend";
@@ -60,6 +60,7 @@ export function marginPct(cost: Money | null | undefined, retail: Money | null |
 export function scoreSupplierProduct(
   product: SupplierProduct,
   targetRetail?: Money | null,
+  learned?: LearnedSignals | null,
 ): UrivoScore {
   const s: SupplierSignals = product.signals ?? {};
   const retail = targetRetail ?? product.suggestedRetail ?? null;
@@ -116,14 +117,19 @@ export function scoreSupplierProduct(
     });
   }
 
-  // ── Refunds (lower is better) ───────────────────────────────────────────
+  // ── Refunds (lower is better) — measured platform data overrides the estimate ─
   {
-    const present = s.refundRatePct != null;
+    const measured = learned?.refundRatePct;
+    const rate = measured ?? s.refundRatePct;
+    const present = rate != null;
     // 0% → 1, ≥10% → 0.
-    const value = present ? clamp01((10 - s.refundRatePct!) / 10) : 0;
+    const value = present ? clamp01((10 - rate!) / 10) : 0;
     parts.push({
       key: "refunds", label: "Refund rate", weight: WEIGHTS.refunds, present, value,
-      reason: present && value >= 0.7 ? `Low refund rate (${s.refundRatePct!.toFixed(1)}%)` : undefined,
+      reason:
+        present && value >= 0.7
+          ? `Low refund rate (${rate!.toFixed(1)}%${measured != null ? " · measured" : ""})`
+          : undefined,
     });
   }
 
@@ -149,16 +155,60 @@ export function scoreSupplierProduct(
   const weighted = parts.reduce((a, p) => a + (p.present ? p.value : NEUTRAL) * p.weight, 0);
   const score100 = Math.round(weighted * 100);
 
-  const confidence = Number(
+  let confidence = Number(
     parts.filter((p) => p.present).reduce((a, p) => a + p.weight, 0).toFixed(2),
   ); // present weight = coverage
-  const stars = Math.max(1, Math.min(5, Math.round(score100 / 20)));
   const reasons = parts
     .filter((p) => p.reason)
     .sort((a, b) => b.value * b.weight - a.value * a.weight)
     .map((p) => p.reason!) as string[];
 
-  return { score: score100, stars, confidence, reasons, breakdown: parts };
+  // ── Merchant Intelligence blend ──────────────────────────────────────────
+  // With real platform outcomes, a MEASURED-performance score progressively
+  // takes over from the public estimate. learnedWeight grows with sample size
+  // (0 → up to 0.6). This is how the Urivo Score evolves from "estimated" to
+  // "proven" as the install base grows — the part competitors can't copy.
+  let finalScore = score100;
+  if (learned && learned.sampleSize > 0) {
+    const perf = learnedPerformance(learned);
+    const learnedWeight = clamp01(learned.sampleSize / 200) * 0.6;
+    finalScore = Math.round(score100 * (1 - learnedWeight) + perf.value * 100 * learnedWeight);
+    reasons.unshift(...perf.reasons); // proven results lead
+    confidence = Number(Math.min(1, confidence + learnedWeight).toFixed(2));
+  }
+
+  const stars = Math.max(1, Math.min(5, Math.round(finalScore / 20)));
+  return { score: finalScore, stars, confidence, reasons, breakdown: parts };
+}
+
+/** Measured platform performance → 0–1 value + human reasons. Missing sub-signals
+ *  are neutral (0.5), same discipline as the public score. */
+function learnedPerformance(l: LearnedSignals): { value: number; reasons: string[] } {
+  const W = { conversion: 0.3, repeat: 0.2, aov: 0.15, removal: 0.2, niche: 0.15 };
+  const reasons: string[] = [];
+
+  const convPresent = l.conversionIndex != null;
+  const conv = convPresent ? clamp01(l.conversionIndex! / 2) : 0.5;
+  if (convPresent && l.conversionIndex! >= 1.2) reasons.push(`Converts ${l.conversionIndex!.toFixed(1)}× the platform average`);
+
+  const repeatPresent = l.repeatPurchaseRatePct != null;
+  const repeat = repeatPresent ? clamp01(l.repeatPurchaseRatePct! / 40) : 0.5;
+  if (repeatPresent && l.repeatPurchaseRatePct! >= 25) reasons.push(`High repeat purchase (${Math.round(l.repeatPurchaseRatePct!)}%)`);
+
+  const aovPresent = l.aovIndex != null;
+  const aov = aovPresent ? clamp01(l.aovIndex! / 2) : 0.5;
+  if (aovPresent && l.aovIndex! >= 1.2) reasons.push("Lifts average order value");
+
+  const remPresent = l.removalRatePct != null;
+  const removal = remPresent ? clamp01((30 - l.removalRatePct!) / 30) : 0.5;
+  if (remPresent && l.removalRatePct! <= 5) reasons.push(`Kept by ${Math.round(100 - l.removalRatePct!)}% of merchants`);
+
+  const nichePresent = l.nicheFitScore != null;
+  const niche = nichePresent ? clamp01(l.nicheFitScore!) : 0.5;
+
+  const value =
+    conv * W.conversion + repeat * W.repeat + aov * W.aov + removal * W.removal + niche * W.niche;
+  return { value, reasons };
 }
 
 /** Score + rank a batch, best opportunity first. */
