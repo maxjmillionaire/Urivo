@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { GenerateStorePanel } from "../generate-store-panel";
 import { AnimatedNumber } from "./animated-number";
+import { Reveal } from "../../_motion/reveal";
 import type {
   DashboardOverview,
   Kpi,
@@ -95,22 +96,32 @@ export function DashboardHome({ overview }: { overview: DashboardOverview }) {
       {/* ── Executive KPIs ─────────────────────────────────────────────── */}
       <section aria-label="Business metrics">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-          {kpis.map((k) => (
-            <KpiCard key={k.key} kpi={k} />
+          {kpis.map((k, i) => (
+            <Reveal key={k.key} delay={i * 0.05} y={12}>
+              <KpiCard kpi={k} />
+            </Reveal>
           ))}
         </div>
       </section>
 
       {/* ── Health + AI activity ───────────────────────────────────────── */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <HealthCard score={health.score} band={health.band} signals={health.signals} />
-        <AiStatusCard items={aiStatus} />
+        <Reveal>
+          <HealthCard score={health.score} band={health.band} signals={health.signals} />
+        </Reveal>
+        <Reveal delay={0.08}>
+          <AiStatusCard items={aiStatus} />
+        </Reveal>
       </div>
 
       {/* ── Opportunities + Timeline ───────────────────────────────────── */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-        <OpportunitiesCard opportunities={opportunities} canGenerate={canGenerate} />
-        <TimelineCard events={timeline} />
+        <Reveal>
+          <OpportunitiesCard opportunities={opportunities} canGenerate={canGenerate} />
+        </Reveal>
+        <Reveal delay={0.08}>
+          <TimelineCard events={timeline} />
+        </Reveal>
       </div>
 
       {/* ── Stores ─────────────────────────────────────────────────────── */}
@@ -217,7 +228,7 @@ function AskBar({ hasStore }: { hasStore: boolean }) {
 function KpiCard({ kpi }: { kpi: Kpi }) {
   const Icon = KPI_ICON[kpi.key] ?? IconTrendUp;
   return (
-    <div className="u-float u-lift rounded-2xl border border-hair bg-panel/70 p-4 transition-colors hover:border-hair-strong">
+    <div className="u-float u-hover-card rounded-2xl border border-hair bg-panel/70 p-4 hover:border-hair-strong">
       <div className="flex items-center justify-between">
         <p className="text-[10.5px] font-medium uppercase tracking-[0.12em] text-mist">{kpi.label}</p>
         <Icon width={14} height={14} className={kpi.gold ? "text-gold" : "text-mist-dim"} />
@@ -327,11 +338,40 @@ function bandColor(band: string): string {
 function HealthRing({ score }: { score: number }) {
   const r = 30;
   const c = 2 * Math.PI * r;
-  const dash = (Math.max(0, Math.min(100, score)) / 100) * c;
+  const target = (Math.max(0, Math.min(100, score)) / 100) * c;
+
+  // The arc sweeps from empty to its score the first time it's on screen —
+  // "charts animate once", nothing dramatic. CSS transition does the tween;
+  // we only flip the target from 0 → score. Reduced-motion snaps straight there.
+  const ref = useRef<SVGCircleElement>(null);
+  const [dash, setDash] = useState(0);
+
+  useEffect(() => {
+    const el = ref.current;
+    const reduce =
+      typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!el || reduce || typeof IntersectionObserver === "undefined") {
+      setDash(target);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          requestAnimationFrame(() => setDash(target));
+          io.disconnect();
+        }
+      },
+      { threshold: 0.5 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [target]);
+
   return (
     <svg width="76" height="76" viewBox="0 0 76 76" className="shrink-0" aria-hidden>
       <circle cx="38" cy="38" r={r} fill="none" stroke="var(--color-hair)" strokeWidth="6" />
       <circle
+        ref={ref}
         cx="38"
         cy="38"
         r={r}
@@ -341,7 +381,7 @@ function HealthRing({ score }: { score: number }) {
         strokeLinecap="round"
         strokeDasharray={`${dash} ${c}`}
         transform="rotate(-90 38 38)"
-        style={{ transition: "stroke-dasharray 900ms var(--ease-urivo)" }}
+        style={{ transition: "stroke-dasharray 1100ms var(--ease-urivo)" }}
       />
       <defs>
         <linearGradient id="healthGrad" x1="0" y1="0" x2="1" y2="1">
@@ -525,8 +565,10 @@ function StoresSection({
         <EmptyStores canGenerate={canGenerate} />
       ) : (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {stores.map((s) => (
-            <StoreMiniCard key={s.id} store={s} canPublish={canPublish} />
+          {stores.map((s, i) => (
+            <Reveal key={s.id} delay={i * 0.06} y={16}>
+              <StoreMiniCard store={s} canPublish={canPublish} />
+            </Reveal>
           ))}
         </div>
       )}
@@ -539,7 +581,7 @@ function StoreMiniCard({ store, canPublish }: { store: StoreCard; canPublish: bo
   return (
     <Link
       href={`/dashboard/stores/${store.id}`}
-      className="u-float u-lift group block rounded-2xl border border-hair bg-panel/70 p-4 transition-colors hover:border-hair-strong"
+      className="u-float u-hover-card group block rounded-2xl border border-hair bg-panel/70 p-4 hover:border-hair-strong"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">

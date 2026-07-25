@@ -450,6 +450,29 @@
   transform: scale(0.96);
 }
 
+/*
+ * Premium card hover — a whisper of elevation, a 1.2% scale and a warm gold
+ * halo. Compositor-only (transform + shadow), 280ms on the signature curve.
+ * Used on KPI + store cards so they feel alive without ever distracting.
+ */
+.u-hover-card {
+  transition: transform 280ms var(--ease-urivo), box-shadow 280ms var(--ease-urivo),
+    border-color 280ms var(--ease-urivo), background-color 200ms var(--ease-urivo);
+}
+@media (hover: hover) and (pointer: fine) {
+  .u-hover-card:hover {
+    transform: translateY(-3px) scale(1.012);
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.35),
+      0 24px 60px -28px rgba(0, 0, 0, 0.75),
+      0 0 0 1px rgba(224, 192, 105, 0.12),
+      0 18px 48px -22px rgba(224, 192, 105, 0.2);
+  }
+}
+.u-hover-card:active {
+  transform: translateY(0) scale(0.995);
+}
+
 /* Ask Urivo: message bubbles + proposed-change card rise in, never pop. */
 @keyframes urivo-msg-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -503,4 +526,5 @@
     animation: none !important;
   }
   .u-lift:hover { transform: none; }
+  .u-hover-card:hover { transform: none; }
 }

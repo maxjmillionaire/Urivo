@@ -31,10 +31,16 @@ export function AnimatedNumber({
   className?: string;
   durationMs?: number;
 }) {
+  // Start at the final value on the server / before hydration so there's no
+  // flash; the count-up only replaces it once the number scrolls into view.
   const [shown, setShown] = useState(value);
   const raf = useRef<number | null>(null);
+  const host = useRef<HTMLSpanElement>(null);
+  const played = useRef(false);
 
   useEffect(() => {
+    const el = host.current;
+    if (!el) return;
     const reduce =
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -42,23 +48,49 @@ export function AnimatedNumber({
       setShown(value);
       return;
     }
-    const start = performance.now();
-    const from = 0;
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - start) / durationMs);
-      // easeOutExpo — fast then settling, matches the product's motion curve.
-      const eased = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
-      setShown(from + (value - from) * eased);
-      if (p < 1) raf.current = requestAnimationFrame(tick);
+
+    const run = () => {
+      if (played.current) return;
+      played.current = true;
+      const start = performance.now();
+      const tick = (t: number) => {
+        const p = Math.min(1, (t - start) / durationMs);
+        // easeOutExpo — fast then settling, matches the product's motion curve.
+        const eased = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
+        setShown(value * eased);
+        if (p < 1) raf.current = requestAnimationFrame(tick);
+      };
+      setShown(0);
+      raf.current = requestAnimationFrame(tick);
     };
-    raf.current = requestAnimationFrame(tick);
+
+    // Count up the first time the figure is visible (spec: "statistics count up
+    // once visible"). IntersectionObserver is cheap and self-disconnecting.
+    if (typeof IntersectionObserver === "undefined") {
+      run();
+    } else {
+      const io = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) {
+            run();
+            io.disconnect();
+          }
+        },
+        { threshold: 0.4 },
+      );
+      io.observe(el);
+      return () => {
+        io.disconnect();
+        if (raf.current) cancelAnimationFrame(raf.current);
+      };
+    }
     return () => {
       if (raf.current) cancelAnimationFrame(raf.current);
     };
   }, [value, durationMs]);
 
   return (
-    <span className={className} style={{ fontVariantNumeric: "tabular-nums" }}>
+    <span ref={host} className={className} style={{ fontVariantNumeric: "tabular-nums" }}>
       {format(shown, display)}
     </span>
   );

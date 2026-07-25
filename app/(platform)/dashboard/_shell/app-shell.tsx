@@ -72,7 +72,7 @@ export async function AppShell({
       />
       <AppSidebar active={active} account={account} />
       <div className="relative lg:pl-[240px] lg:pr-[340px]">
-        <main id="main" className="u-enter mx-auto max-w-4xl px-5 pb-12 pt-20 sm:px-8 lg:pt-9">
+        <main id="main" className="mx-auto max-w-4xl px-5 pb-12 pt-20 sm:px-8 lg:pt-9">
           {children}
         </main>
       </div>
