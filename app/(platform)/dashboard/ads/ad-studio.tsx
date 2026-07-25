@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
+import { RevealStagger } from "../../_motion/reveal-stagger";
 
 /*
  * Ad Studio client. Generates a channel strategy + platform-ready creative for
@@ -105,7 +106,7 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
       )}
 
       {plan && (
-        <div className="u-enter mt-6">
+        <RevealStagger className="mt-6">
           {/* Strategy */}
           <div className="u-float rounded-2xl border border-hair bg-panel/70 p-6">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">Lead with this</p>
@@ -178,7 +179,7 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
               paste results back here when the connection lands.
             </p>
           </div>
-        </div>
+        </RevealStagger>
       )}
     </div>
   );

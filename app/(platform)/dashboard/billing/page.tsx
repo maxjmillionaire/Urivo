@@ -7,6 +7,7 @@ import { UpgradeButton, ManageSubscriptionButton } from "./upgrade-buttons";
 import { CreditPacks } from "./credit-packs";
 import { PLANS, planName, formatPrice, isLaunchWindow } from "@/lib/plans";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
+import { RevealStagger } from "../../_motion/reveal-stagger";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export default async function BillingPage() {
 
   return (
     <AppShell active="billing" email={profile?.email ?? user.email ?? null} store={rail}>
+      <RevealStagger>
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">Billing</p>
         <h1 className="mt-2 text-[28px] font-semibold tracking-tight text-ivory">Plan &amp; credits</h1>
@@ -172,6 +174,7 @@ export default async function BillingPage() {
           </div>
         )}
       </section>
+      </RevealStagger>
     </AppShell>
   );
 }

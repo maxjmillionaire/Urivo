@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
+import { RevealStagger } from "../../_motion/reveal-stagger";
 
 /*
  * Market Research lab. A founder describes a niche; Urivo returns a market read,
@@ -159,7 +160,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 function ReportView({ report, onGenerate }: { report: Report; onGenerate: (idea: string) => void }) {
   const brandIdea = `${report.brand.name} — ${report.brand.vibe}. ${report.summary}`;
   return (
-    <div className="u-enter mt-6">
+    <RevealStagger className="mt-6">
       {/* Overview */}
       <div className="u-float rounded-2xl border border-hair bg-panel/70 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -264,6 +265,6 @@ function ReportView({ report, onGenerate }: { report: Report; onGenerate: (idea:
           </button>
         </div>
       </Section>
-    </div>
+    </RevealStagger>
   );
 }

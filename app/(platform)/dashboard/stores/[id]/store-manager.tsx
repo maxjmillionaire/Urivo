@@ -395,8 +395,13 @@ export function StoreManager({
                             </div>
                           )}
                           {busy && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-night/70">
-                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-hair-strong border-t-gold" />
+                            <div className="absolute inset-0 flex items-center justify-center bg-night/60">
+                              <span className="u-skel absolute inset-0" aria-hidden />
+                              <span
+                                className="relative h-2.5 w-2.5 rounded-full bg-gold"
+                                style={{ animation: "urivo-live 1.4s ease-in-out infinite" }}
+                                aria-label="Generating"
+                              />
                             </div>
                           )}
                         </div>
