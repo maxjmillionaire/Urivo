@@ -8,6 +8,8 @@ import { getConnection, toEur } from "./import";
 import { getSupplierProvider } from "./registry";
 import { scoreSupplierProduct, type UrivoScore } from "./scoring";
 import { learnedSignalsForMany, recordProductOutcome } from "./intelligence";
+import { selectRun, recordRun, type RunArms } from "@/lib/intelligence/decisions";
+import type { CopyStyle } from "@/lib/ai/product-optimizer";
 import { SupplierError, type SupplierProviderId, type SupplierProduct, type Money } from "./types";
 
 /*
@@ -57,6 +59,8 @@ export interface AutopilotResult {
   skippedLowScore: number;
   collections: string[];
   published: boolean;
+  /** The strategy (bandit arms) this run used — every one is a logged experiment. */
+  strategy?: RunArms;
 }
 
 function charm(n: number): number {
@@ -64,15 +68,49 @@ function charm(n: number): number {
   return r >= 2 ? r - 0.01 : Math.max(0.99, Math.round(n * 100) / 100);
 }
 
-/** Respect the brand's intended price when it clears the minimum margin; else
- *  price up from cost to the target margin. Always charm-rounded. */
-function smartPrice(costEur: number, intentPriceEur: number | null, opts: typeof DEFAULTS): number {
-  if (intentPriceEur && costEur > 0 && (intentPriceEur - costEur) / intentPriceEur >= opts.minMarginPct) {
-    return charm(intentPriceEur);
+/** Pricing strategy per bandit arm — each is a real, measurable experiment. */
+function priceByArm(arm: string, costEur: number, intentPriceEur: number | null, opts: typeof DEFAULTS): number {
+  switch (arm) {
+    case "margin_60":
+      return charm(Math.max(costEur / 0.4, costEur * 1.8, 0.99));
+    case "margin_68":
+      return charm(Math.max(costEur / 0.32, costEur * 1.8, 0.99));
+    case "premium":
+      return charm(Math.max(costEur * 2.2, (intentPriceEur ?? 0) * 1.15, costEur / 0.28, 0.99));
+    case "anchor_intent":
+    default:
+      // Respect the brand's intended price when it clears min margin; else 65%.
+      if (intentPriceEur && costEur > 0 && (intentPriceEur - costEur) / intentPriceEur >= opts.minMarginPct) {
+        return charm(intentPriceEur);
+      }
+      return charm(Math.max(costEur / (1 - opts.targetMarginPct), costEur * 1.8, 0.99));
   }
-  const raw = costEur / (1 - opts.targetMarginPct);
-  return charm(Math.max(raw, costEur * 1.8, 0.99));
 }
+
+interface Prepared {
+  cand: Candidate;
+  variantId: string | null;
+  inventory: number | null;
+  cost: Money;
+  costEur: number;
+  priceEur: number;
+  marginPct: number;
+  category: string;
+  images: string[];
+  rawTitle: string;
+  rawDescription: string | null;
+}
+
+/** Hero-selection strategy per bandit arm → index of the hero in the list. */
+function heroIndex(arm: string, prepared: Prepared[]): number {
+  if (prepared.length === 0) return 0;
+  if (arm === "first_intent") return 0; // keep the brand's generated order
+  if (arm === "top_margin")
+    return prepared.reduce((bi, p, i, a) => (p.marginPct > a[bi].marginPct ? i : bi), 0);
+  return prepared.reduce((bi, p, i, a) => (p.cand.score.score > a[bi].cand.score.score ? i : bi), 0);
+}
+
+const SELECTION_MIN: Record<string, number> = { min50: 50, min60: 60, min68: 68 };
 
 interface Candidate {
   product: SupplierProduct;
@@ -124,6 +162,11 @@ export async function autoSourceStore(
   const intents = (intentRows ?? []).slice(0, opts.targetCount);
   if (intents.length === 0) return empty("insufficient_matches");
 
+  // Decision Intelligence: pick the strategy (bandit arms) for this niche.
+  const niche = ds.personality;
+  const arms = await selectRun(niche);
+  const minScore = SELECTION_MIN[arms.selection] ?? opts.minScore;
+
   // ── Search + score each intent, pick the best real match ─────────────────
   const chosen: Candidate[] = [];
   const takenIds = new Set<string>();
@@ -152,7 +195,7 @@ export async function autoSourceStore(
 
     const best = ranked[0];
     if (!best) continue;
-    if (best.score.score < opts.minScore) {
+    if (best.score.score < minScore) {
       skippedLowScore++;
       continue;
     }
@@ -170,7 +213,27 @@ export async function autoSourceStore(
     return { ...empty("insufficient_matches"), skippedLowScore };
   }
 
-  // ── On-brand copy (best-effort) ──────────────────────────────────────────
+  // ── Pre-compute cost + price (pricing experiment) ────────────────────────
+  const prepared: Prepared[] = chosen.map((cand) => {
+    const variant = cand.product.variants.find((v) => v.externalVariantId === cand.variantId) ?? cand.product.variants[0];
+    const cost = variant?.cost ?? cand.product.fromCost;
+    const costEur = Math.round(toEur(cost) * 100) / 100;
+    const priceEur = priceByArm(arms.pricing, costEur, cand.intentPriceEur, opts);
+    const marginPct = priceEur > 0 ? Math.round(((priceEur - costEur) / priceEur) * 100) : 0;
+    return {
+      cand, variantId: variant?.externalVariantId ?? null, inventory: variant?.inventory ?? null,
+      cost, costEur, priceEur, marginPct,
+      category: cand.product.category ?? "Featured",
+      images: cand.product.images.length ? cand.product.images : variant?.imageUrl ? [variant.imageUrl] : [],
+      rawTitle: cand.product.title, rawDescription: cand.product.description,
+    };
+  });
+
+  // ── Hero experiment: move the chosen hero to position 0 ──────────────────
+  const hi = heroIndex(arms.hero, prepared);
+  if (hi > 0) prepared.unshift(prepared.splice(hi, 1)[0]);
+
+  // ── On-brand copy in the chosen voice (copy_style experiment) ────────────
   const apiKey = process.env.ANTHROPIC_API_KEY;
   let optimized: { title: string; description: string }[] | null = null;
   if ((options.optimizeCopy ?? true) && apiKey) {
@@ -178,7 +241,8 @@ export async function autoSourceStore(
       const res = await optimizeProductCopy(
         apiKey,
         { name: store.store_name, tagline: ds.tagline ?? "", personality: ds.personality },
-        chosen.map((c) => ({ title: c.product.title, description: c.product.description })),
+        prepared.map((p) => ({ title: p.rawTitle, description: p.rawDescription })),
+        arms.copy_style as CopyStyle,
       );
       optimized = res.products;
     } catch {
@@ -191,21 +255,13 @@ export async function autoSourceStore(
 
   const result: ChosenProduct[] = [];
   const collectionsSet = new Set<string>();
-  let position = 0;
 
-  for (let i = 0; i < chosen.length; i++) {
-    const c = chosen[i];
-    const variant = c.product.variants.find((v) => v.externalVariantId === c.variantId) ?? c.product.variants[0];
-    const cost = variant?.cost ?? c.product.fromCost;
-    const costEur = Math.round(toEur(cost) * 100) / 100;
-    const priceEur = smartPrice(costEur, c.intentPriceEur, opts);
-    const marginPct = priceEur > 0 ? Math.round(((priceEur - costEur) / priceEur) * 100) : 0;
-    const title = optimized?.[i]?.title ?? c.product.title;
-    const description = optimized?.[i]?.description ?? c.product.description ?? "";
-    const category = c.product.category ?? "Featured";
-    const collection = category;
+  for (let i = 0; i < prepared.length; i++) {
+    const p = prepared[i];
+    const title = optimized?.[i]?.title ?? p.rawTitle;
+    const description = optimized?.[i]?.description ?? p.rawDescription ?? "";
+    const collection = p.category;
     collectionsSet.add(collection);
-    const imageUrl = c.product.images[0] ?? variant?.imageUrl ?? null;
 
     const { data: created } = await admin
       .from("products")
@@ -213,10 +269,10 @@ export async function autoSourceStore(
         store_id: storeId,
         title,
         description,
-        price_eur: priceEur,
-        image_url: imageUrl,
-        inventory_count: Math.max(0, variant?.inventory ?? 100),
-        position: position++,
+        price_eur: p.priceEur,
+        image_url: p.images[0] ?? null,
+        inventory_count: Math.max(0, p.inventory ?? 100),
+        position: i,
       })
       .select("id")
       .single();
@@ -227,29 +283,31 @@ export async function autoSourceStore(
       store_id: storeId,
       user_id: userId,
       provider,
-      external_product_id: c.product.externalProductId,
-      external_variant_id: variant?.externalVariantId ?? null,
-      supplier_cost_eur: costEur,
-      supplier_currency: cost.currency,
-      supplier_cost_original: Math.round(cost.amount * 100) / 100,
-      sync_status: variant?.inStock === false ? "out_of_stock" : "synced",
+      external_product_id: p.cand.product.externalProductId,
+      external_variant_id: p.variantId,
+      supplier_cost_eur: p.costEur,
+      supplier_currency: p.cost.currency,
+      supplier_cost_original: Math.round(p.cost.amount * 100) / 100,
+      sync_status: "synced",
       last_synced_at: new Date().toISOString(),
-      raw: (c.product.raw ?? null) as object | null,
+      raw: (p.cand.product.raw ?? null) as object | null,
     });
 
-    // Merchant Intelligence: a real merchant just imported this product.
     await recordProductOutcome({
-      provider, externalProductId: c.product.externalProductId, event: "import",
-      category, niche: ds.personality, storeId,
+      provider, externalProductId: p.cand.product.externalProductId, event: "import",
+      category: collection, niche: ds.personality, storeId,
     });
 
     result.push({
-      externalProductId: c.product.externalProductId,
-      externalVariantId: variant?.externalVariantId ?? null,
-      title, category, collection, costEur, priceEur, marginPct,
-      score: c.score.score, stars: c.score.stars, reasons: c.score.reasons,
+      externalProductId: p.cand.product.externalProductId,
+      externalVariantId: p.variantId,
+      title, category: p.category, collection, costEur: p.costEur, priceEur: p.priceEur, marginPct: p.marginPct,
+      score: p.cand.score.score, stars: p.cand.score.stars, reasons: p.cand.score.reasons,
     });
   }
+
+  // ── Log every decision as an experiment for this store ───────────────────
+  await recordRun(storeId, userId, niche, arms, { chosen: result.length });
 
   // ── Publish (if the plan allows) ─────────────────────────────────────────
   let published = false;

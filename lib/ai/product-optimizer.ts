@@ -41,6 +41,14 @@ export interface RawListing {
   description: string | null;
 }
 
+export type CopyStyle = "editorial" | "benefit" | "sensory";
+
+const STYLE_DIRECTION: Record<CopyStyle, string> = {
+  editorial: "Voice: minimal and editorial — understated, confident, magazine-like. Short, precise lines.",
+  benefit: "Voice: benefit-led — lead with what the product does for the customer, concrete and persuasive without hype.",
+  sensory: "Voice: warm and sensory — evoke material, texture and feeling; tactile and inviting.",
+};
+
 const SYSTEM_PROMPT = `You are Urivo's merchandiser. You rewrite raw supplier product listings into premium, on-brand copy for a specific store. You receive the brand and a numbered list of products; return the SAME number of products, in the SAME order.
 
 For each product:
@@ -58,8 +66,10 @@ export async function optimizeProductCopy(
   apiKey: string,
   brand: OptimizerBrand,
   listings: RawListing[],
+  style?: CopyStyle,
 ): Promise<{ products: OptimizedCopy; usage: TokenUsage }> {
   const client = new Anthropic({ apiKey });
+  const styleLine = style ? `\n${STYLE_DIRECTION[style]}` : "";
 
   const list = listings
     .slice(0, 24)
@@ -80,7 +90,10 @@ ${clampText(list, AI_INPUT_BUDGET.editorHistoryChars)}`;
     max_tokens: 4000,
     thinking: { type: "adaptive" },
     output_config: { effort: "medium", format: zodOutputFormat(OptimizedSchema) },
-    system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+    system: [
+      { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+      ...(styleLine ? [{ type: "text" as const, text: styleLine }] : []),
+    ],
     messages: [{ role: "user", content: context }],
   });
 
