@@ -1,18 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { runEvolution, GEN_SIZES, type EvolutionRun, type Scores } from "@/lib/evolution/engine";
-
-/** Advanced-tier readout: the winning storefront's seven fitness signals. */
-const DIMENSIONS: [keyof Scores, string][] = [
-  ["conversion", "Conversion"],
-  ["trust", "Trust"],
-  ["premium", "Premium feel"],
-  ["brand", "Brand fit"],
-  ["readability", "Readability"],
-  ["balance", "Visual balance"],
-  ["purchase", "Purchase clarity"],
-];
+import { runEvolution, GEN_SIZES, type EvolutionRun } from "@/lib/evolution/engine";
+import { ChampionReveal } from "./champion-reveal";
 
 /*
  * The Evolution Laboratory (spec 6.6). Watch ~100 storefront variants compete,
@@ -199,57 +189,18 @@ export function EvolutionLab({ tier = "standard" }: { tier?: "standard" | "advan
           </svg>
         )}
 
-        {/* Winner reveal — a dark glass card spotlit on the stage */}
+        {/* The tree quietly settles; the verdict is presented below, deliberately. */}
         {phase === "done" && run && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-6">
-            <div className="u-glass u-float pointer-events-auto rounded-2xl border border-gold/25 px-8 py-5 text-center">
-              <div className="flex items-center justify-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-gold" />
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-soft">
-                  Winner · fitness {run.winner.overall.toFixed(1)}
-                </p>
-              </div>
-              <p className="mt-2 text-2xl font-semibold tracking-tight text-ivory">
-                This becomes your Store v1.0
-              </p>
-            </div>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gold-soft">
+              Convergence complete
+            </p>
           </div>
         )}
       </div>
 
-      {/* Advanced (Pro) — the winning storefront's full fitness breakdown */}
-      {tier === "advanced" && phase === "done" && run && (
-        <div className="u-float mt-6 rounded-2xl border border-hair bg-panel/70 p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-gold" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mist">
-                Advanced Evolution · winner breakdown
-              </p>
-            </div>
-            <p className="text-xs text-mist">7 fitness signals</p>
-          </div>
-          <div className="mt-5 grid gap-x-8 gap-y-4 sm:grid-cols-2">
-            {DIMENSIONS.map(([key, label]) => {
-              const v = run.winner.scores[key];
-              return (
-                <div key={key}>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-[13px] text-ivory">{label}</span>
-                    <span className="text-[13px] font-semibold tabular-nums u-gold-text">{v.toFixed(1)}</span>
-                  </div>
-                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${Math.max(0, Math.min(100, v))}%`, backgroundImage: "var(--grad-gold)" }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* The Winning Store Reveal — analysis, elimination, then the crowned store */}
+      {phase === "done" && run && <ChampionReveal key={run.seed} run={run} tier={tier} />}
 
       <p className="mt-4 text-center text-xs text-mist">
         Continuous optimization never stops — Urivo keeps running experiments
