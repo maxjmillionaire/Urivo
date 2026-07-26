@@ -142,7 +142,7 @@ export function welcomeEmail(name?: string): RenderedEmail {
 }
 
 export function subscriptionConfirmedEmail(
-  plan: "Core" | "Pro",
+  plan: string,
   priceLine: string,
 ): RenderedEmail {
   return build(`Your Urivo ${plan} subscription is active`, {
