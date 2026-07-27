@@ -62,7 +62,7 @@
   --color-ivory: #f4f1e8;        /* primary text (warm ivory) */
   --color-cloud: #e7ecf3;        /* clean near-white text */
   --color-mist: #93a3bc;         /* secondary text */
-  --color-mist-dim: #5f6f89;     /* tertiary / captions */
+  --color-mist-dim: #7c8ca6;     /* tertiary / captions — AA (≥4.5:1 on cards) */
   --color-navymark: #24324c;     /* logo-tile navy for chips */
   --color-live: #34d399;         /* LIVE / success on dark */
   --color-alert: #f87171;        /* error on dark */

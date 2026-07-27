@@ -137,6 +137,23 @@ function euros(cents: number): string {
   return v % 1 === 0 ? `€${v.toLocaleString("en-US")}` : `€${v.toFixed(2)}`;
 }
 
+/** Live-stores subline that names the remainder instead of a bare total. */
+function storesSub(live: number, total: number, canPublish: boolean): string {
+  if (total === 0) return "none yet";
+  const rest = total - live;
+  if (rest <= 0) return live === 1 ? "1 store, live" : "all live";
+  // "paused" is an adjective (2 paused); "draft" is a noun (2 drafts).
+  return canPublish ? `${rest} paused` : `${rest} draft${rest === 1 ? "" : "s"}`;
+}
+
+/** Credits subline in OUTCOMES, not units — what the balance actually buys. */
+function creditsSub(credits: number): string {
+  const stores = Math.floor(credits / STORE_GENERATION_COST);
+  if (stores >= 1) return `≈ ${stores} more store${stores === 1 ? "" : "s"}`;
+  if (credits > 0) return "≈ a round of edits";
+  return "topped up on renewal";
+}
+
 const FEATURE_LABEL: Record<string, string> = {
   store_generation: "Generated a store",
   store_edit: "Applied a store edit",
@@ -313,7 +330,9 @@ export async function buildDashboardOverview(
       display: "number",
       deltaPct: null,
       isNew: false,
-      sub: stores.length ? `of ${stores.length} total` : "none yet",
+      // Unambiguous: name what the rest are, not just a total (a total next to a
+      // plan card reads like a quota). "1 paused" / "2 drafts" says it plainly.
+      sub: storesSub(liveStores, stores.length, canPublish),
       awaiting: false,
     },
     {
@@ -323,7 +342,9 @@ export async function buildDashboardOverview(
       display: "number",
       deltaPct: null,
       isNew: false,
-      sub: "this cycle",
+      // Legible in outcomes, not units: what this balance actually buys. The
+      // full per-action breakdown is one tap away in the card's popover.
+      sub: creditsSub(credits),
       awaiting: false,
       gold: true,
     },

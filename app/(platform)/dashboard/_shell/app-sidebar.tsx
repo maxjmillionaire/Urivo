@@ -25,12 +25,12 @@ import { AccountMenu, type Account } from "./account-menu";
 
 export type NavKey = "home" | "research" | "stores" | "ads" | "evolution" | "billing" | "settings";
 
-const NAV: { key: NavKey; label: string; href: string; Icon: typeof IconHome }[] = [
+const NAV: { key: NavKey; label: string; href: string; Icon: typeof IconHome; hint?: string }[] = [
   { key: "home", label: "Home", href: "/dashboard", Icon: IconHome },
-  { key: "research", label: "Research", href: "/dashboard/research", Icon: IconResearch },
+  { key: "research", label: "Research", href: "/dashboard/research", Icon: IconResearch, hint: "Find winning products and read the market" },
   { key: "stores", label: "Stores", href: "/dashboard#stores", Icon: IconStore },
-  { key: "ads", label: "Ad Studio", href: "/dashboard/ads", Icon: IconMegaphone },
-  { key: "evolution", label: "Evolution Lab", href: "/dashboard/evolution", Icon: IconEvolution },
+  { key: "ads", label: "Ad Studio", href: "/dashboard/ads", Icon: IconMegaphone, hint: "Generate ad strategy and creative" },
+  { key: "evolution", label: "Evolution Lab", href: "/dashboard/evolution", Icon: IconEvolution, hint: "Urivo generates a hundred storefronts and evolves the best one" },
   { key: "billing", label: "Billing", href: "/dashboard/billing", Icon: IconCard },
 ];
 
@@ -44,13 +44,14 @@ export function AppSidebar({
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
-  const row = (key: NavKey | "support", label: string, href: string, Icon: typeof IconHome) => {
+  const row = (key: NavKey | "support", label: string, href: string, Icon: typeof IconHome, hint?: string) => {
     const on = key === active;
     return (
       <Link
         key={key}
         href={href}
         onClick={close}
+        title={hint}
         aria-current={on ? "page" : undefined}
         className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] transition-colors duration-200 ${
           on ? "bg-white/[0.05] font-medium text-ivory u-float" : "text-mist hover:bg-white/[0.035] hover:text-ivory"
@@ -117,7 +118,7 @@ export function AppSidebar({
         </div>
 
         <nav className="mt-1 flex-1 space-y-1 px-3">
-          {NAV.map(({ key, label, href, Icon }) => row(key, label, href, Icon))}
+          {NAV.map(({ key, label, href, Icon, hint }) => row(key, label, href, Icon, hint))}
         </nav>
 
         <div className="space-y-0.5 px-3 pb-3">

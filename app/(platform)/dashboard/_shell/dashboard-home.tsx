@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { GenerateStorePanel } from "../generate-store-panel";
 import { AnimatedNumber } from "./animated-number";
 import { Reveal } from "../../_motion/reveal";
+import { CREDIT_COSTS } from "@/lib/credit-costs";
 import type {
   DashboardOverview,
   Kpi,
@@ -231,7 +233,11 @@ function KpiCard({ kpi }: { kpi: Kpi }) {
     <div className="u-float u-hover-card rounded-2xl border border-hair bg-panel/70 p-4 hover:border-hair-strong">
       <div className="flex items-center justify-between">
         <p className="text-[10.5px] font-medium uppercase tracking-[0.12em] text-mist">{kpi.label}</p>
-        <Icon width={14} height={14} className={kpi.gold ? "text-gold" : "text-mist-dim"} />
+        {kpi.key === "credits" ? (
+          <CreditsInfo />
+        ) : (
+          <Icon width={14} height={14} className={kpi.gold ? "text-gold" : "text-mist-dim"} />
+        )}
       </div>
       <div className="mt-2.5 flex items-end justify-between gap-2">
         {kpi.awaiting ? (
@@ -281,6 +287,108 @@ function TrendChip({ deltaPct, isNew }: { deltaPct: number | null; isNew: boolea
       <Icon width={11} height={11} />
       {Math.abs(Math.round(deltaPct))}%
     </span>
+  );
+}
+
+/* ── Credit cost breakdown (radical clarity, no gamification) ─────────────
+ * Opaque metering is the category's known sore point. A tap on the credits
+ * card shows exactly what every action costs, in plain language — rendered
+ * through a portal so it escapes the KPI grid's transformed stacking contexts.
+ */
+const CREDIT_LINES: { label: string; cost: number }[] = [
+  { label: "Generate a store", cost: CREDIT_COSTS.storeGeneration },
+  { label: "AI edit or question", cost: CREDIT_COSTS.askMessage },
+  { label: "Market research", cost: CREDIT_COSTS.marketResearch },
+  { label: "Ad creative", cost: CREDIT_COSTS.adStudio },
+  { label: "Product image", cost: CREDIT_COSTS.productImage },
+];
+
+function CreditsInfo() {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+
+  const place = () => {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos({ top: r.bottom + 8, right: Math.max(12, window.innerWidth - r.right) });
+  };
+
+  const toggle = () => {
+    if (!open) place();
+    setOpen((v) => !v);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (popRef.current?.contains(t) || btnRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    // Any scroll/resize would drift the anchored position — dismiss instead.
+    const onMove = () => setOpen(false);
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onEsc);
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onEsc);
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={toggle}
+        aria-label="What credits cost"
+        aria-expanded={open}
+        className="u-press flex h-5 w-5 items-center justify-center rounded-full text-mist-dim transition-colors hover:text-mist"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 11.5v4.5" strokeLinecap="round" />
+          <path d="M12 7.75h.01" strokeLinecap="round" />
+        </svg>
+      </button>
+      {open &&
+        pos &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={popRef}
+            role="dialog"
+            aria-label="Credit costs"
+            className="fixed z-50 w-64 rounded-xl border border-hair-strong bg-panel-2 p-3.5 text-left shadow-2xl"
+            style={{ top: pos.top, right: pos.right, animation: "urivo-fade-up 150ms var(--ease-urivo) both" }}
+          >
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-mist">What credits buy</p>
+            <ul className="mt-2.5 space-y-1.5">
+              {CREDIT_LINES.map((l) => (
+                <li key={l.label} className="flex items-center justify-between gap-4 text-[12px]">
+                  <span className="text-cloud">{l.label}</span>
+                  <span className="shrink-0 font-semibold tabular-nums text-ivory">
+                    {l.cost} {l.cost === 1 ? "credit" : "credits"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 border-t border-hair pt-2.5 text-[11px] leading-relaxed text-mist">
+              You&apos;re only charged when an action finishes — a generation never half-completes. Top up
+              anytime from Billing.
+            </p>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 

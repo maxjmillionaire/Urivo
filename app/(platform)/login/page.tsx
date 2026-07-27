@@ -177,21 +177,16 @@ function LoginForm() {
       <div className="relative w-full max-w-[400px]">
         {/* Brand */}
         <div className="flex flex-col items-center text-center">
-          <div className="relative">
-            <span
-              aria-hidden
-              className="absolute -inset-4 rounded-[28px]"
-              style={{ background: "radial-gradient(circle, rgba(232,205,128,0.22), rgba(232,205,128,0) 70%)" }}
-            />
-            <Image
-              src={logo}
-              alt="Urivo"
-              width={72}
-              height={72}
-              priority
-              className="relative rounded-[20px] u-float"
-            />
-          </div>
+          {/* One glow per screen — the primary action (Sign in) carries it, not
+              the logo. A quiet mark reads as more confident than a lit one. */}
+          <Image
+            src={logo}
+            alt="Urivo"
+            width={72}
+            height={72}
+            priority
+            className="rounded-[20px] u-float"
+          />
           <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.4em] text-mist" style={{ paddingLeft: "0.4em" }}>
             Urivo
           </p>
