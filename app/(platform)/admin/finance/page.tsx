@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
-import { getFinanceSnapshot, modeledTiers } from "@/lib/finance/reporting";
+import { getFinanceSnapshot, modeledTiers, costPerActionReport } from "@/lib/finance/reporting";
 import { EUR_PER_USD, USD_PER_EUR } from "@/lib/finance/cost-model";
 import { getPlatformSettings } from "@/lib/platform/settings";
 import { FreeGenerationsSwitch } from "./kill-switch";
@@ -13,6 +13,13 @@ export const metadata = { title: "Finance · Urivo (internal)", robots: { index:
 
 const eur = (n: number) =>
   new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(n || 0);
+const eur4 = (n: number) =>
+  new Intl.NumberFormat("de-DE", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  }).format(n || 0);
 const pct = (n: number) => `${(n || 0).toFixed(1)}%`;
 const int = (n: number) => new Intl.NumberFormat("de-DE").format(Math.round(n || 0));
 const FEATURE_LABEL: Record<string, string> = {
@@ -36,6 +43,13 @@ export default async function FinanceDashboardPage() {
   const snap = await getFinanceSnapshot();
   const tiers = modeledTiers();
   const settings = await getPlatformSettings();
+  const actionCosts = await costPerActionReport();
+  // The mispricing signal: if credit pricing matched cost, €/credit would be
+  // flat across every action. Name the spread so the gap is legible.
+  const priced = actionCosts.filter((r) => r.costPerCreditEur > 0);
+  const cpcMin = priced.length ? Math.min(...priced.map((r) => r.costPerCreditEur)) : 0;
+  const cpcMax = priced.length ? Math.max(...priced.map((r) => r.costPerCreditEur)) : 0;
+  const cpcSpread = cpcMin > 0 ? cpcMax / cpcMin : 0;
   const periodLabel = new Date(snap.periodStart).toLocaleDateString("de-DE", {
     month: "long",
     year: "numeric",
@@ -124,6 +138,47 @@ export default async function FinanceDashboardPage() {
               Tokens {int(snap.inputTokens)} in / {int(snap.outputTokens)} out
             </span>
           </div>
+        </Section>
+
+        {/* Cost per action (measured) — the basis for repricing, not a repricing */}
+        <Section
+          title="Cost per action (measured, by model)"
+          subtitle="Real unit cost from the ledger vs the credits charged — the basis for a pricing decision, not a pricing change"
+        >
+          {actionCosts.length === 0 ? (
+            <Empty>No AI actions recorded yet — this populates as real usage arrives.</Empty>
+          ) : (
+            <>
+              <Table
+                head={["Feature", "Model", "Actions", "Avg in tok", "Avg out tok", "Avg cost", "Credits", "€ / credit"]}
+                rows={actionCosts.map((r) => [
+                  FEATURE_LABEL[r.feature] ?? r.feature,
+                  r.model,
+                  int(r.actions),
+                  int(r.avgInputTokens),
+                  int(r.avgOutputTokens),
+                  eur4(r.avgCostEur),
+                  r.creditsPerAction.toFixed(r.creditsPerAction < 10 ? 1 : 0),
+                  r.costPerCreditEur > 0 ? eur4(r.costPerCreditEur) : "—",
+                ])}
+              />
+              <p className="mt-2 text-xs text-white/50">
+                {priced.length >= 2 && cpcSpread >= 1.5 ? (
+                  <>
+                    If credit pricing matched cost, “€ / credit” would be roughly flat. It ranges{" "}
+                    {eur4(cpcMin)}–{eur4(cpcMax)} — a <strong>{cpcSpread.toFixed(1)}× spread</strong>, so some
+                    actions are underpriced relative to others. Reprice on this once there are a few hundred real
+                    generations. The credit table is deliberately unchanged.
+                  </>
+                ) : (
+                  <>
+                    The “€ / credit” column exposes any mispricing once there is enough volume. The credit table is
+                    deliberately unchanged.
+                  </>
+                )}
+              </p>
+            </>
+          )}
         </Section>
 
         {/* Top users by cost */}

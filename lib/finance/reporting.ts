@@ -200,6 +200,58 @@ export async function getFinanceSnapshot(since: Date = monthStart()): Promise<Fi
   };
 }
 
+export interface ActionCostRow {
+  feature: string;
+  model: string;
+  actions: number;
+  avgInputTokens: number;
+  avgOutputTokens: number;
+  avgImages: number;
+  avgCostEur: number;
+  creditsPerAction: number;
+  /** avgCostEur / creditsPerAction — the mispricing signal. If pricing matched
+   *  cost this would be roughly constant across every action type. */
+  costPerCreditEur: number;
+}
+
+/*
+ * Measured cost per action type, by model (part 5.2). Reporting only — this
+ * derives the true unit cost from the usage ledger so the founder can compare it
+ * to the credit table and reprice on data, after real volume. It changes no
+ * pricing.
+ */
+export async function costPerActionReport(since: Date = monthStart()): Promise<ActionCostRow[]> {
+  const admin = supabaseAdmin();
+  const { data } = await admin.rpc("finance_cost_per_action", { p_since: since.toISOString() });
+  const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0));
+  const rows = (data ?? []) as {
+    feature: string;
+    model: string;
+    actions: number;
+    credits: number;
+    input_tokens: number;
+    output_tokens: number;
+    images: number;
+    total_cost_usd: number;
+  }[];
+  return rows.map((r) => {
+    const actions = num(r.actions) || 1;
+    const avgCostEur = usdToEur(num(r.total_cost_usd)) / actions;
+    const creditsPerAction = num(r.credits) / actions;
+    return {
+      feature: r.feature,
+      model: r.model,
+      actions: num(r.actions),
+      avgInputTokens: Math.round(num(r.input_tokens) / actions),
+      avgOutputTokens: Math.round(num(r.output_tokens) / actions),
+      avgImages: num(r.images) / actions,
+      avgCostEur,
+      creditsPerAction,
+      costPerCreditEur: creditsPerAction > 0 ? avgCostEur / creditsPerAction : 0,
+    };
+  });
+}
+
 /** The modeled current-tier economics (for the simulator panel — no live data needed). */
 export function modeledTiers() {
   return (["free", "core", "pro"] as PlanKey[]).map((key) => {
