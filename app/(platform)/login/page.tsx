@@ -109,6 +109,20 @@ function LoginForm() {
           setBanner({ kind: "error", text: "Your password does not meet the requirements yet." });
           return;
         }
+        // Signup guardrails: per-IP throttle + disposable-domain block (2.2).
+        const guard = await fetch("/api/auth/signup-guard", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.toLowerCase().trim() }),
+        });
+        if (!guard.ok) {
+          const g = (await guard.json().catch(() => ({}))) as { message?: string };
+          setBanner({
+            kind: "error",
+            text: g.message || "We couldn't process that signup right now. Please try again.",
+          });
+          return;
+        }
         const { data, error } = await supabase.auth.signUp({
           email: email.toLowerCase().trim(),
           password,
@@ -129,7 +143,10 @@ function LoginForm() {
           router.refresh();
           return;
         }
-        setBanner({ kind: "success", text: "Account created. Please confirm your email to continue." });
+        setBanner({
+          kind: "success",
+          text: "Account created. Confirm your email to activate your account and unlock your welcome credits.",
+        });
         return;
       }
       const { error } = await supabase.auth.signInWithPassword({

@@ -4,6 +4,8 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
 import { getFinanceSnapshot, modeledTiers } from "@/lib/finance/reporting";
 import { EUR_PER_USD, USD_PER_EUR } from "@/lib/finance/cost-model";
+import { getPlatformSettings } from "@/lib/platform/settings";
+import { FreeGenerationsSwitch } from "./kill-switch";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +35,7 @@ export default async function FinanceDashboardPage() {
 
   const snap = await getFinanceSnapshot();
   const tiers = modeledTiers();
+  const settings = await getPlatformSettings();
   const periodLabel = new Date(snap.periodStart).toLocaleDateString("de-DE", {
     month: "long",
     year: "numeric",
@@ -60,6 +63,18 @@ export default async function FinanceDashboardPage() {
             </p>
           </div>
         </header>
+
+        {/* Cost controls */}
+        <Section title="Cost controls" subtitle="The levers for runaway free-tier spend — changeable without a deploy">
+          <FreeGenerationsSwitch initial={settings.freeGenerationsEnabled} />
+          <p className="text-xs text-white/40">
+            Spend alert fires once/day when free-account AI cost crosses ${settings.dailyFreeSpendAlertUsd.toFixed(2)}
+            {settings.freeDailyGenerationCap > 0
+              ? ` · daily free-generation cap: ${settings.freeDailyGenerationCap}`
+              : " · no daily generation cap set"}
+            .
+          </p>
+        </Section>
 
         {/* Headline KPIs */}
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">

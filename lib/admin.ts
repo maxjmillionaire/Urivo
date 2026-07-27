@@ -9,13 +9,17 @@ import "server-only";
  * no hardcoded fallback address — access is configured per deployment, never
  * baked into the repo.
  */
+export function adminEmails(): string[] {
+  const raw = process.env.ADMIN_EMAILS;
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+}
+
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
-  const raw = process.env.ADMIN_EMAILS;
-  if (!raw) return false;
-  const allow = raw
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
+  const allow = adminEmails().map((e) => e.toLowerCase());
   return allow.includes(email.toLowerCase());
 }

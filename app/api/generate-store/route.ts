@@ -14,6 +14,8 @@ import {
 } from "@/lib/ai/store-generator";
 import { generateStoreImagery } from "@/lib/ai/image-generator";
 import { recordAiUsage } from "@/lib/finance/ledger";
+import { getPlatformSettings } from "@/lib/platform/settings";
+import { maybeAlertSpend } from "@/lib/platform/spend-alert";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,6 +68,19 @@ export async function POST(request: NextRequest) {
       },
       { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
     );
+  }
+
+  // 1b. Free-tier kill switch (cost control). When free generations are paused,
+  // free accounts see an honest capacity state; paying accounts are unaffected.
+  if (plan.key === "free") {
+    const settings = await getPlatformSettings();
+    if (!settings.freeGenerationsEnabled) {
+      return fail(
+        503,
+        "FREE_GENERATIONS_PAUSED",
+        "Free store generation is paused while we scale up capacity. Upgrade to generate now, or check back shortly.",
+      );
+    }
   }
 
   // 2. Validate request
@@ -207,6 +222,10 @@ export async function POST(request: NextRequest) {
     model: STORE_GENERATOR_MODEL,
     requestId,
   });
+
+  // Spend guardrail (2.5): check the day's free-tier inference spend and alert
+  // admins if it has crossed the threshold. Best-effort; never blocks.
+  await maybeAlertSpend();
 
   // Publishing (going live) is a paid capability. Stores are created live by
   // default, so on a plan that can't publish we start the new store as a draft —

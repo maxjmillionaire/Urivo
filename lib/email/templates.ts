@@ -178,6 +178,20 @@ export function paymentFailedEmail(): RenderedEmail {
   });
 }
 
+export function spendAlertEmail(freeUsd: string, paidUsd: string, thresholdUsd: string): RenderedEmail {
+  return build("Urivo alert: free-tier AI spend over threshold", {
+    preheader: `Free-account AI spend has crossed ${thresholdUsd} today.`,
+    heading: "Free-tier spend is over the daily threshold.",
+    paragraphs: [
+      `Today's AI inference spend from FREE accounts is ${freeUsd}, which has crossed your ${thresholdUsd} alert threshold.`,
+      `Paid-account spend today is ${paidUsd} — expected cost of goods, shown for contrast; only the free number is a concern.`,
+      "If this is unexpected, you can suspend free generations instantly from Admin → Finance.",
+    ],
+    cta: { label: "Open admin", url: `${APP_URL()}/admin/finance` },
+    footnote: "At most one of these is sent per day.",
+  });
+}
+
 export function subscriptionCancelledEmail(): RenderedEmail {
   return build("Your Urivo subscription was cancelled", {
     preheader: "Your plan has been cancelled.",
