@@ -380,6 +380,9 @@ export function AskUrivo({
             </button>
           </div>
         </div>
+        <p className="mt-2 text-center text-[10px] leading-tight text-mist-dim">
+          Urivo is an AI and can make mistakes. Check important information.
+        </p>
       </div>
     </div>
   );
