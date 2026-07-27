@@ -253,15 +253,40 @@ function Plane({
       </>
     );
   }
+  // Intentional branded placeholder (never an empty plane or broken-image icon).
+  // Derived entirely from the merchant's own design system — palette field, a
+  // soft accent light, and the product's monogram set in the brand's heading
+  // face — so a store with images pending still looks deliberate, not broken.
+  const monogram = monogramOf(alt);
   return (
     <div className="uv-plane" style={{ position: "absolute", inset: 0, ...planeStyle(ds) }}>
       <div
         style={{
           position: "absolute",
           inset: 0,
-          background: `radial-gradient(120% 90% at 30% 18%, ${rgba(p.accent, 0.14)}, transparent 60%)`,
+          background: `radial-gradient(120% 90% at 30% 18%, ${rgba(p.accent, 0.16)}, transparent 60%)`,
         }}
       />
+      {monogram && (
+        <span
+          className="uv-h"
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "clamp(1.5rem, 6vw, 3.75rem)",
+            fontWeight: Math.max(ds.typeStyle.headingWeight, 600),
+            letterSpacing: "0.04em",
+            color: rgba(p.ink, 0.16),
+            userSelect: "none",
+          }}
+        >
+          {monogram}
+        </span>
+      )}
       <span
         className="uv-h"
         style={{ position: "absolute", left: "1rem", top: "0.85rem", fontSize: ".7rem", letterSpacing: ".2em", opacity: 0.4 }}
@@ -270,6 +295,18 @@ function Plane({
       </span>
     </div>
   );
+}
+
+/** Up to two initials from a product title, for the branded image placeholder. */
+function monogramOf(alt?: string): string {
+  if (!alt) return "";
+  const words = alt.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  const initials = words
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+  return initials || (alt[0]?.toUpperCase() ?? "");
 }
 
 /* --------------------------------- NAV ------------------------------------- */

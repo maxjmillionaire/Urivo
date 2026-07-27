@@ -96,7 +96,13 @@ export function ProductView({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={product.image_url} alt={product.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : (
-                  <div style={{ position: "absolute", inset: 0, background: `radial-gradient(120% 90% at 30% 20%, ${p.accent}22, transparent 60%), linear-gradient(160deg, ${p.surface}, ${p.background})` }} />
+                  // Intentional branded placeholder — palette field + the
+                  // product's monogram in the brand's heading face.
+                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: `radial-gradient(120% 90% at 30% 20%, ${p.accent}22, transparent 60%), linear-gradient(160deg, ${p.surface}, ${p.background})` }}>
+                    <span className="uv-h" aria-hidden style={{ fontSize: "clamp(2.5rem, 12vw, 6rem)", fontWeight: Math.max(ds.typeStyle.headingWeight, 600), letterSpacing: "0.04em", color: `${p.ink}1f`, userSelect: "none" }}>
+                      {product.title.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || product.title.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
                 )}
               </div>
               {product.image_url && (
