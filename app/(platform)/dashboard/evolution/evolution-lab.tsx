@@ -82,6 +82,15 @@ export function EvolutionLab({ tier = "standard" }: { tier?: "standard" | "advan
 
   return (
     <div className="mt-8">
+      {/* Honesty: this is a deterministic simulation, not a live test on real
+          traffic. Label it plainly so no one reads the scores as measured. */}
+      <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-hair bg-panel/60 px-3 py-1">
+        <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-mist">
+          Simulation preview
+        </span>
+      </div>
+
       {/* Controls */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <input
@@ -203,8 +212,9 @@ export function EvolutionLab({ tier = "standard" }: { tier?: "standard" | "advan
       {phase === "done" && run && <ChampionReveal key={run.seed} run={run} tier={tier} />}
 
       <p className="mt-4 text-center text-xs text-mist">
-        Continuous optimization never stops — Urivo keeps running experiments
-        after launch to find better conversions.
+        A fast simulation of how Urivo&apos;s optimization engine evolves a storefront — it runs
+        instantly and uses no live traffic or credits. Scores are a fitness model, not measured
+        conversion.
       </p>
     </div>
   );
