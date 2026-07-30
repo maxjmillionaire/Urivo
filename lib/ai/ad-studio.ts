@@ -1,4 +1,5 @@
 import "server-only";
+import { modelFor } from "./models";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
@@ -13,7 +14,7 @@ import type { TokenUsage } from "@/lib/finance/cost-model";
  * (spec 6.9).
  */
 
-export const AD_MODEL = "claude-opus-4-8";
+export const AD_MODEL = modelFor("adStudio");
 
 const PLATFORMS = ["Meta", "Google", "TikTok", "Pinterest"] as const;
 const FIT = ["high", "medium", "low"] as const;

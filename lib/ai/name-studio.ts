@@ -1,4 +1,5 @@
 import "server-only";
+import { modelFor } from "./models";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
@@ -14,7 +15,7 @@ import * as z from "zod/v4";
 
 import { NAME_STYLES, type NameStyle } from "@/lib/naming/styles";
 
-export const NAME_MODEL = "claude-opus-4-8";
+export const NAME_MODEL = modelFor("naming");
 export const NAME_PROMPT_VERSION = "v2-styles";
 
 export { NAME_STYLES, type NameStyle };

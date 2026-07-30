@@ -1,4 +1,5 @@
 import "server-only";
+import { modelFor } from "./models";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
@@ -27,7 +28,7 @@ import type { TokenUsage } from "@/lib/finance/cost-model";
  * editing conversation touches the AI SDK (spec 6.9).
  */
 
-export const EDITOR_MODEL = "claude-opus-4-8";
+export const EDITOR_MODEL = modelFor("storeEdit");
 
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const en = <T extends readonly string[]>(v: T) => z.enum(v as unknown as [string, ...string[]]);

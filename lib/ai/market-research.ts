@@ -1,4 +1,5 @@
 import "server-only";
+import { modelFor } from "./models";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
@@ -18,7 +19,7 @@ import type { TokenUsage } from "@/lib/finance/cost-model";
  * never generic filler.
  */
 
-export const RESEARCH_MODEL = "claude-opus-4-8";
+export const RESEARCH_MODEL = modelFor("marketResearch");
 export const RESEARCH_PROMPT_VERSION = "v1";
 
 const DEMAND_LEVELS = ["emerging", "growing", "established", "saturated"] as const;

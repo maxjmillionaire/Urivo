@@ -1,4 +1,5 @@
 import "server-only";
+import { modelFor } from "./models";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
@@ -34,7 +35,7 @@ import type { TokenUsage } from "@/lib/finance/cost-model";
  * the schema constrains it, and parseDesignSystem() clamps it again.
  */
 
-export const STORE_GENERATOR_MODEL = "claude-opus-4-8";
+export const STORE_GENERATOR_MODEL = modelFor("storeGeneration");
 export const STORE_GENERATOR_PROMPT_VERSION = "v3-design-engine";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;

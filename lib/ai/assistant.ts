@@ -1,4 +1,5 @@
 import "server-only";
+import { modelFor } from "./models";
 import Anthropic from "@anthropic-ai/sdk";
 import { AI_INPUT_BUDGET, boundHistory, clampText } from "./limits";
 import type { TokenUsage } from "@/lib/finance/cost-model";
@@ -13,7 +14,7 @@ import type { TokenUsage } from "@/lib/finance/cost-model";
  * than claiming to have mutated a store it cannot yet write to.
  */
 
-export const ASSISTANT_MODEL = "claude-opus-4-8";
+export const ASSISTANT_MODEL = modelFor("assistant");
 export const ASSISTANT_PROMPT_VERSION = "v1";
 
 const MAX_TOKENS = 700;

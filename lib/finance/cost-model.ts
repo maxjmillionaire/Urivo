@@ -103,9 +103,11 @@ export const ACTION_PROFILES: Record<AiFeature, ActionProfile> = {
 
 // ── Cost functions ───────────────────────────────────────────────────────────
 
-/** USD cost of a given token count on a given model. */
-export function anthropicCostUsd(usage: TokenUsage, model: ModelId = ACTIVE_MODEL): number {
-  const m = MODELS[model];
+/** USD cost of a given token count on a given model. Accepts any model string
+ *  (models can be routed via env); an unpriced model falls back to the default's
+ *  pricing so cost estimation degrades gracefully rather than throwing. */
+export function anthropicCostUsd(usage: TokenUsage, model: string = ACTIVE_MODEL): number {
+  const m = MODELS[model as ModelId] ?? MODELS[ACTIVE_MODEL];
   return usage.inputTokens * m.inputPerToken + usage.outputTokens * m.outputPerToken;
 }
 
@@ -123,7 +125,7 @@ export interface ActionCost {
 export function costOfActionExact(
   usage: TokenUsage,
   images: number,
-  model: ModelId = ACTIVE_MODEL,
+  model: string = ACTIVE_MODEL,
 ): ActionCost {
   const anthropicUsd = anthropicCostUsd(usage, model);
   const imageUsd = images * IMAGE_COST_USD;

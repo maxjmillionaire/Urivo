@@ -1,4 +1,5 @@
 import "server-only";
+import { modelFor } from "./models";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
@@ -15,7 +16,7 @@ import type { TokenUsage } from "@/lib/finance/cost-model";
  * re-validated and clamped; on any failure the caller keeps the raw copy.
  */
 
-export const OPTIMIZER_MODEL = "claude-opus-4-8";
+export const OPTIMIZER_MODEL = modelFor("productOptimizer");
 
 const OptimizedSchema = z.object({
   products: z
