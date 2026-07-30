@@ -40,6 +40,7 @@ export async function grantMonthlyCredits(
   userId: string,
   planKey: PlanKey,
   periodKey: string,
+  expiresAt: Date | null = null,
 ): Promise<{ granted: boolean; amount: number }> {
   const plan = getPlan(planKey);
   if (plan.monthlyCredits <= 0) return { granted: false, amount: 0 };
@@ -61,6 +62,9 @@ export async function grantMonthlyCredits(
     delta: plan.monthlyCredits,
     reason,
     source: "subscription",
+    // Plan credits are use-it-or-lose-it: they lapse at the end of the period
+    // they were granted for. Purchased packs (grantCreditPack) never expire.
+    expires_at: expiresAt ? expiresAt.toISOString() : null,
   });
   if (error) throw new Error(`Failed to grant monthly credits: ${error.message}`);
 

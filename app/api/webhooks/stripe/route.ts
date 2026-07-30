@@ -12,6 +12,7 @@ import {
   planFromSubscription,
   resolveUserForSubscription,
   sendRenewalReceipt,
+  subscriptionPeriodEnd,
 } from "@/lib/billing/subscription";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId, logger } from "@/lib/logger";
@@ -202,8 +203,14 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
   // Keep profile state fresh (plan/status/period), then grant the period's
   // credits keyed by the invoice id — first month and every renewal, once each.
+  // Plan credits expire at the end of this billing period (use-it-or-lose-it).
   await syncSubscription(sub);
-  await grantMonthlyCredits(userId, planFromSubscription(sub), invoice.id ?? subId);
+  await grantMonthlyCredits(
+    userId,
+    planFromSubscription(sub),
+    invoice.id ?? subId,
+    subscriptionPeriodEnd(sub),
+  );
 
   // A light receipt for genuine renewals only (the welcome covers the first).
   if (invoice.billing_reason === "subscription_cycle") {

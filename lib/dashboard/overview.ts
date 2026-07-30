@@ -1,6 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getCreditBalance, STORE_GENERATION_COST } from "@/lib/credits";
+import { getCreditBalance, getCreditExpiry, STORE_GENERATION_COST, type CreditExpiry } from "@/lib/credits";
 import { planName, canPublish as planCanPublish } from "@/lib/plans";
 import { storeStatsFor, sumStats, type StoreStats } from "@/lib/analytics/visits";
 
@@ -112,6 +112,7 @@ export interface DashboardOverview {
   canGenerate: boolean;
   canPublish: boolean;
   credits: number;
+  creditsExpiry: CreditExpiry | null;
   storeCount: number;
 }
 
@@ -173,9 +174,10 @@ export async function buildDashboardOverview(
   const admin = supabaseAdmin();
   const now = new Date();
 
-  const [{ data: profile }, credits, { data: storeRows }] = await Promise.all([
+  const [{ data: profile }, credits, creditsExpiry, { data: storeRows }] = await Promise.all([
     admin.from("profiles").select("plan").eq("id", userId).single(),
     getCreditBalance(userId).catch(() => 0),
+    getCreditExpiry(userId).catch(() => null),
     admin
       .from("stores")
       .select("id, store_name, subdomain, is_active, stripe_charges_enabled, created_at")
@@ -442,6 +444,7 @@ export async function buildDashboardOverview(
     canGenerate: credits >= STORE_GENERATION_COST,
     canPublish,
     credits,
+    creditsExpiry,
     storeCount: stores.length,
   };
 }

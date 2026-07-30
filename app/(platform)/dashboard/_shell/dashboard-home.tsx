@@ -64,6 +64,7 @@ export function DashboardHome({ overview }: { overview: DashboardOverview }) {
     hasPlan,
     canGenerate,
     canPublish,
+    creditsExpiry,
     storeCount,
   } = overview;
 
@@ -100,7 +101,7 @@ export function DashboardHome({ overview }: { overview: DashboardOverview }) {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
           {kpis.map((k, i) => (
             <Reveal key={k.key} delay={i * 0.05} y={12}>
-              <KpiCard kpi={k} />
+              <KpiCard kpi={k} creditsExpiry={creditsExpiry} />
             </Reveal>
           ))}
         </div>
@@ -227,14 +228,14 @@ function AskBar({ hasStore }: { hasStore: boolean }) {
 }
 
 /* ── KPI card ─────────────────────────────────────────────────────────── */
-function KpiCard({ kpi }: { kpi: Kpi }) {
+function KpiCard({ kpi, creditsExpiry }: { kpi: Kpi; creditsExpiry?: DashboardOverview["creditsExpiry"] }) {
   const Icon = KPI_ICON[kpi.key] ?? IconTrendUp;
   return (
     <div className="u-float u-hover-card rounded-2xl border border-hair bg-panel/70 p-4 hover:border-hair-strong">
       <div className="flex items-center justify-between">
         <p className="text-[10.5px] font-medium uppercase tracking-[0.12em] text-mist">{kpi.label}</p>
         {kpi.key === "credits" ? (
-          <CreditsInfo />
+          <CreditsInfo expiry={creditsExpiry ?? null} />
         ) : (
           <Icon width={14} height={14} className={kpi.gold ? "text-gold" : "text-mist-dim"} />
         )}
@@ -303,7 +304,7 @@ const CREDIT_LINES: { label: string; cost: number }[] = [
   { label: "Product image", cost: CREDIT_COSTS.productImage },
 ];
 
-function CreditsInfo() {
+function CreditsInfo({ expiry }: { expiry: DashboardOverview["creditsExpiry"] }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -381,9 +382,15 @@ function CreditsInfo() {
                 </li>
               ))}
             </ul>
+            {expiry && (
+              <p className="mt-3 rounded-lg border border-gold/20 bg-gold/[0.05] px-2.5 py-2 text-[11px] leading-relaxed text-cloud">
+                {expiry.amount} plan credit{expiry.amount === 1 ? "" : "s"} expire on{" "}
+                {new Date(expiry.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}.
+              </p>
+            )}
             <p className="mt-3 border-t border-hair pt-2.5 text-[11px] leading-relaxed text-mist">
-              You&apos;re only charged when an action finishes — a generation never half-completes. Top up
-              anytime from Billing.
+              Monthly plan credits are use-it-or-lose-it — they expire at the end of each billing period.
+              Purchased packs never expire. You&apos;re only charged when an action finishes.
             </p>
           </div>,
           document.body,

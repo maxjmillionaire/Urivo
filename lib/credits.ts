@@ -44,6 +44,23 @@ export async function spendCredits(
   return typeof data === "number" ? data : 0;
 }
 
+export interface CreditExpiry {
+  amount: number;
+  expiresAt: string;
+}
+
+/**
+ * The soonest upcoming credit expiry (plan credits are use-it-or-lose-it), or
+ * null when nothing is scheduled to expire. For honest UI surfacing.
+ */
+export async function getCreditExpiry(userId: string): Promise<CreditExpiry | null> {
+  const { data, error } = await supabaseAdmin().rpc("credit_expiry_summary", { p_user_id: userId });
+  if (error || !data) return null;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || !row.expires_at || !row.amount) return null;
+  return { amount: Number(row.amount), expiresAt: row.expires_at as string };
+}
+
 export async function getCreditBalance(userId: string): Promise<number> {
   const { data, error } = await supabaseAdmin().rpc("credit_balance", {
     p_user_id: userId,
