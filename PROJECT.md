@@ -97,13 +97,13 @@ Launch Offer
 
 From launch until the end of the launch campaign:
 
-Core
+Core (shown to customers as "Founder")
 
-€49/month (Lifetime Launch Price)
+€39/month (Lifetime Launch Price)
 
 Pro
 
-€199/month (Lifetime Launch Price)
+€149/month (Lifetime Launch Price)
 
 ---
 
@@ -111,13 +111,17 @@ Standard Pricing
 
 After the launch campaign:
 
-Core
+Core (Founder)
 
-€79/month
+€49/month
 
 Pro
 
-€299/month
+€199/month
+
+<!-- Pricing source of truth: lib/plans.ts. Keep these figures in sync with it. -->
+
+
 
 ---
 

@@ -39,12 +39,12 @@ Run through them on the deployed staging URL and confirm each:
 - [ ] **Sign up** with email + name → land on dashboard, greeting shows your name.
 - [ ] **Google sign-in** → works, name/avatar populate.
 - [ ] **Generate a store** → real brand + products + **photos** appear; credits
-      drop by 10; on a free account the store is a **draft**.
+      drop by 20; on a free account the store is a **draft**.
 - [ ] **Preview the draft** (View/Preview) → you see it with the "Preview" banner;
       an incognito visitor gets 404 (not public).
 - [ ] **Ask Urivo** (needs a paid plan) → streams a reply; footer shows
       `1 credit · N left`; balance drops; at 0 the upgrade/top-up pop-up appears.
-- [ ] **Market research / Ad Studio** → produce output; credits drop (3 / 2).
+- [ ] **Market research / Ad Studio** → produce output; credits drop (3 / 3).
 - [ ] **Out of credits** → generate modal shows the two-path moment.
 - [ ] **Settings** → change name / password; **Sign out** from the account menu.
 - [ ] **Legal** pages (Impressum / Datenschutz / AGB) load.
