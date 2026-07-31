@@ -33,7 +33,7 @@ describe("credit packs — pricing invariants (revenue-critical)", () => {
   });
 
   it("every pack's per-credit price stays ABOVE the Founder subscription rate (packs never cannibalise plans)", () => {
-    const founderPerCredit = 39 / 150; // €39 launch / 150 monthly credits
+    const founderPerCredit = 49 / 150; // €49 / 150 monthly credits
     for (const id of CREDIT_PACK_ORDER) {
       expect(perCredit(CREDIT_PACKS[id])).toBeGreaterThan(founderPerCredit);
     }

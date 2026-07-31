@@ -20,14 +20,14 @@ describe("plans — tier + price logic (money-critical)", () => {
     expect(getPlan("garbage").key).toBe("free");
   });
 
-  it("prices follow the launch window", () => {
+  it("prices are €49 / €199, flat across the launch window (no price drop)", () => {
     const during = new Date("2026-07-25T00:00:00Z");
     const after = new Date("2026-09-01T00:00:00Z");
     expect(isLaunchWindow(during)).toBe(true);
     expect(isLaunchWindow(after)).toBe(false);
-    expect(monthlyPrice("core", during)).toBe(39);
+    expect(monthlyPrice("core", during)).toBe(49);
     expect(monthlyPrice("core", after)).toBe(49);
-    expect(monthlyPrice("pro", during)).toBe(149);
+    expect(monthlyPrice("pro", during)).toBe(199);
     expect(monthlyPrice("pro", after)).toBe(199);
   });
 

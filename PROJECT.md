@@ -93,31 +93,19 @@ Users who value speed, quality and premium software.
 
 # Pricing Strategy
 
-Launch Offer
-
-From launch until the end of the launch campaign:
+Pricing (flat — no launch price drop)
 
 Core (shown to customers as "Founder")
-
-€39/month (Lifetime Launch Price)
-
-Pro
-
-€149/month (Lifetime Launch Price)
-
----
-
-Standard Pricing
-
-After the launch campaign:
-
-Core (Founder)
 
 €49/month
 
 Pro
 
 €199/month
+
+Creator referrals give the referred subscriber 20% off their FIRST month only;
+from month two they pay full price. The referring creator earns 25% of that
+first month's (discounted) revenue.
 
 <!-- Pricing source of truth: lib/plans.ts. Keep these figures in sync with it. -->
 

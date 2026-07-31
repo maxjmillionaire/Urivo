@@ -85,7 +85,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
       premiumSupport: false,
       earlyAccess: false,
     },
-    price: { currency: "EUR", launch: 39, regular: 49 },
+    price: { currency: "EUR", launch: 49, regular: 49 },
     highlights: [
       "150 AI credits every month",
       "AI Store Assistant",
@@ -110,7 +110,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
       premiumSupport: true,
       earlyAccess: true,
     },
-    price: { currency: "EUR", launch: 149, regular: 199 },
+    price: { currency: "EUR", launch: 199, regular: 199 },
     highlights: [
       "500 AI credits every month",
       "Advanced Evolution Lab",
