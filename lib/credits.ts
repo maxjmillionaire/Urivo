@@ -1,5 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { notifyLowCredits } from "@/lib/notifications/events";
 
 /*
  * Credit business logic — one place, server-authoritative (spec 6.2 §14).
@@ -41,7 +42,10 @@ export async function spendCredits(
     if ((error.message || "").includes("INSUFFICIENT_CREDITS")) throw new InsufficientCreditsError();
     throw new Error(`Failed to spend credits: ${error.message}`);
   }
-  return typeof data === "number" ? data : 0;
+  const newBalance = typeof data === "number" ? data : 0;
+  // Notify once when the balance crosses below "can't generate another store".
+  void notifyLowCredits(userId, newBalance + amount, newBalance);
+  return newBalance;
 }
 
 export interface CreditExpiry {

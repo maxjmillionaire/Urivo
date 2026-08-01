@@ -48,6 +48,34 @@ export async function notify(userId: string, input: NotifyInput): Promise<void> 
   }
 }
 
+/**
+ * Raise a notification at most once per (kind, key) within a window — for
+ * repeatable triggers (a store re-published, credits expiring) that must not
+ * spam the feed. The dedupe key is stored in metadata.key.
+ */
+export async function notifyOnce(
+  userId: string,
+  key: string,
+  input: NotifyInput,
+  windowDays = 7,
+): Promise<void> {
+  try {
+    const since = new Date(Date.now() - windowDays * 86_400_000).toISOString();
+    const { data } = await supabaseAdmin()
+      .from("notifications")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("kind", input.kind)
+      .contains("metadata", { key })
+      .gte("created_at", since)
+      .limit(1);
+    if (data && data.length > 0) return;
+    await notify(userId, { ...input, metadata: { ...(input.metadata ?? {}), key } });
+  } catch (err) {
+    logger.warn("notifyOnce threw", { userId, err: err instanceof Error ? err.message : String(err) });
+  }
+}
+
 export async function getNotifications(userId: string, limit = 12): Promise<Notification[]> {
   const { data } = await supabaseAdmin()
     .from("notifications")

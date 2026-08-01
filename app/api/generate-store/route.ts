@@ -16,6 +16,7 @@ import { generateStoreImagery } from "@/lib/ai/image-generator";
 import { recordAiUsage } from "@/lib/finance/ledger";
 import { getPlatformSettings } from "@/lib/platform/settings";
 import { maybeAlertSpend } from "@/lib/platform/spend-alert";
+import { notifyLowCredits, notifyFirstStore } from "@/lib/notifications/events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -226,6 +227,20 @@ export async function POST(request: NextRequest) {
   // Spend guardrail (2.5): check the day's free-tier inference spend and alert
   // admins if it has crossed the threshold. Best-effort; never blocks.
   await maybeAlertSpend();
+
+  // Operating-loop notifications (best-effort — never block the response).
+  try {
+    await notifyLowCredits(user.id, balance, result.credits_remaining);
+    const { count: storeCount } = await admin
+      .from("stores")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+    if ((storeCount ?? 0) <= 1) {
+      await notifyFirstStore(user.id, result.store_id, generated.brand.name);
+    }
+  } catch (err) {
+    captureException(err, { requestId, userId: user.id, route: "generate-store:notify" });
+  }
 
   // Publishing (going live) is a paid capability. Stores are created live by
   // default, so on a plan that can't publish we start the new store as a draft —

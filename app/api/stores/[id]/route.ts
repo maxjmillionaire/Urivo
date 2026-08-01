@@ -4,6 +4,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { requireStoreOwner } from "@/lib/tenant";
 import { getPlanForUser } from "@/lib/plan-access";
 import { StoreUpdateSchema } from "@/lib/validation";
+import { notifyStorePublished } from "@/lib/notifications/events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,9 +41,10 @@ export async function PATCH(
   // Merge palette/tagline into the existing theme_config JSON.
   const { data: current } = await supabase
     .from("stores")
-    .select("theme_config")
+    .select("theme_config, is_active")
     .eq("id", id)
     .single();
+  const wasLive = current?.is_active === true;
 
   const theme = (current?.theme_config ?? {}) as Record<string, unknown>;
   const palette = (theme.palette ?? {}) as Record<string, unknown>;
@@ -86,6 +88,12 @@ export async function PATCH(
   if (error) {
     return fail(500, "INTERNAL", "Could not save your changes. Please try again.");
   }
+
+  // A store going live (draft → published) is a moment worth marking.
+  if (body.isActive === true && !wasLive && data) {
+    await notifyStorePublished(owner.userId, data.id, data.store_name);
+  }
+
   return NextResponse.json({ success: true, store: data });
 }
 
