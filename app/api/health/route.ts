@@ -25,6 +25,7 @@ export async function GET() {
     rateLimiter: has(process.env.UPSTASH_REDIS_REST_URL) ? "upstash" : "in-memory (per-instance)",
     email: has(process.env.RESEND_API_KEY),
     errorMonitoring: has(process.env.SENTRY_DSN),
+    weeklyDigest: has(process.env.CRON_SECRET),
   };
 
   // Phase 2 — billing / commerce.

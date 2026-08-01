@@ -34,13 +34,31 @@ interface Block {
   paragraphs: string[];
   cta?: { label: string; url: string };
   footnote?: string;
+  /** Optional stat grid (weekly digest) rendered between the lead and body copy. */
+  stats?: { label: string; value: string }[];
 }
 
-function layout({ preheader, heading, paragraphs, cta, footnote }: Block): string {
+/** Bulletproof stat grid: one label/value row per stat, hairline-separated. */
+function statsBlock(stats: { label: string; value: string }[]): string {
+  if (stats.length === 0) return "";
+  const rows = stats
+    .map(
+      (s, i) =>
+        `<tr>
+           <td style="padding:13px 18px;font-family:${FONT};font-size:13px;color:${MUTED};${i > 0 ? `border-top:1px solid ${LINE};` : ""}">${s.label}</td>
+           <td align="right" style="padding:13px 18px;font-family:${FONT};font-size:15px;font-weight:600;color:${INK};${i > 0 ? `border-top:1px solid ${LINE};` : ""}">${s.value}</td>
+         </tr>`,
+    )
+    .join("");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 24px;border:1px solid ${LINE};border-radius:14px;overflow:hidden;background:${SURFACE_MUTED};">${rows}</table>`;
+}
+
+function layout({ preheader, heading, paragraphs, cta, footnote, stats }: Block): string {
   const [lead, ...rest] = paragraphs;
   const leadHtml = lead
     ? `<p style="margin:0 0 20px;font-family:${FONT};font-size:16px;line-height:1.7;color:${INK};font-weight:500;">${lead}</p>`
     : "";
+  const statsHtml = stats ? statsBlock(stats) : "";
   const restHtml = rest
     .map(
       (p) =>
@@ -98,6 +116,7 @@ function layout({ preheader, heading, paragraphs, cta, footnote }: Block): strin
           <p style="margin:0 0 14px;font-family:${FONT};font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:${MUTED};">Urivo</p>
           <h1 class="u-h1" style="margin:0 0 22px;font-family:${FONT};font-weight:600;font-size:28px;line-height:1.25;color:${INK};letter-spacing:-0.4px;">${heading}</h1>
           ${leadHtml}
+          ${statsHtml}
           ${restHtml}
           ${button}
           ${foot}
@@ -210,6 +229,32 @@ export function spendAlertEmail(freeUsd: string, paidUsd: string, thresholdUsd: 
     ],
     cta: { label: "Open admin", url: `${APP_URL()}/admin/finance` },
     footnote: "At most one of these is sent per day.",
+  });
+}
+
+export interface WeeklyDigestContent {
+  name?: string;
+  /** The lead line — a contextual read of the week (celebratory or steadying). */
+  headline: string;
+  /** The next-best-action paragraph. */
+  nudge: string;
+  stats: { label: string; value: string }[];
+  ctaLabel: string;
+  /** Path appended to APP_URL for the primary button. */
+  ctaPath: string;
+  /** Optional footnote (e.g. an expiring-credits reminder). */
+  footnote?: string;
+}
+
+export function weeklyDigestEmail(d: WeeklyDigestContent): RenderedEmail {
+  const hi = d.name ? `Here's your week, ${d.name}.` : "Here's your week.";
+  return build("Your week on Urivo", {
+    preheader: d.headline,
+    heading: hi,
+    paragraphs: [d.headline, d.nudge],
+    stats: d.stats,
+    cta: { label: d.ctaLabel, url: `${APP_URL()}${d.ctaPath}` },
+    footnote: d.footnote,
   });
 }
 
