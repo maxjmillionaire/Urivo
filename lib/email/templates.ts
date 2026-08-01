@@ -178,6 +178,27 @@ export function paymentFailedEmail(): RenderedEmail {
   });
 }
 
+export function newOrderEmail(storeName: string, amount: string, isFirst: boolean): RenderedEmail {
+  if (isFirst) {
+    return build(`Your first sale on ${storeName}`, {
+      preheader: `${storeName} just made its first sale — ${amount}.`,
+      heading: "Your first sale.",
+      paragraphs: [
+        `${storeName} just received its very first order — ${amount}. This is the one every founder remembers.`,
+        "Open your dashboard to see the order and get it on its way.",
+      ],
+      cta: { label: "View the order", url: `${APP_URL()}/dashboard` },
+      footnote: "Congratulations — the first of many.",
+    });
+  }
+  return build(`New order — ${amount}`, {
+    preheader: `${storeName} received a new order.`,
+    heading: `New order — ${amount}`,
+    paragraphs: [`${storeName} just received a new order for ${amount}. It's ready to fulfil in your dashboard.`],
+    cta: { label: "View the order", url: `${APP_URL()}/dashboard` },
+  });
+}
+
 export function spendAlertEmail(freeUsd: string, paidUsd: string, thresholdUsd: string): RenderedEmail {
   return build("Urivo alert: free-tier AI spend over threshold", {
     preheader: `Free-account AI spend has crossed ${thresholdUsd} today.`,

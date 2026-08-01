@@ -4,6 +4,8 @@ import { getCreditBalance } from "@/lib/credits";
 import { AppSidebar, type NavKey } from "./app-sidebar";
 import { AppRail, type RailStore } from "./app-rail";
 import { MobileRail } from "./mobile-rail";
+import { NotificationBell } from "./notification-bell";
+import { getNotifications, unreadCount } from "@/lib/notifications/service";
 import type { Account } from "./account-menu";
 
 /*
@@ -44,11 +46,15 @@ export async function AppShell({
   };
 
   let credits = 0;
+  let notifs: Awaited<ReturnType<typeof getNotifications>> = [];
+  let unread = 0;
 
   if (user) {
-    const [{ data: profile }, balance] = await Promise.all([
+    const [{ data: profile }, balance, notifList, unreadN] = await Promise.all([
       supabase.from("profiles").select("full_name, email, plan").eq("id", user.id).single(),
       getCreditBalance(user.id).catch(() => 0),
+      getNotifications(user.id).catch(() => []),
+      unreadCount(user.id).catch(() => 0),
     ]);
     account = {
       name: profile?.full_name ?? metaName ?? null,
@@ -57,6 +63,8 @@ export async function AppShell({
       avatarUrl: avatarUrl ?? metaAvatar ?? null,
     };
     credits = balance;
+    notifs = notifList;
+    unread = unreadN;
   }
 
   return (
@@ -72,6 +80,11 @@ export async function AppShell({
       />
       <AppSidebar active={active} account={account} />
       <div className="relative lg:pl-[240px] lg:pr-[340px]">
+        <div className="pointer-events-none absolute right-5 top-4 z-30 sm:right-8 lg:top-3">
+          <div className="pointer-events-auto">
+            <NotificationBell items={notifs} unread={unread} />
+          </div>
+        </div>
         <main id="main" className="mx-auto max-w-4xl px-5 pb-12 pt-20 sm:px-8 lg:pt-9">
           {children}
         </main>

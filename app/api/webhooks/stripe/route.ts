@@ -3,6 +3,9 @@ import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { stripe, isStripeConfigured } from "@/lib/commerce/stripe";
 import { recordPaidOrder, type OrderLineInput } from "@/lib/commerce/orders";
+import { notify } from "@/lib/notifications/service";
+import { sendEmail } from "@/lib/email/service";
+import { newOrderEmail } from "@/lib/email/templates";
 import {
   linkSubscription,
   syncSubscription,
@@ -118,13 +121,61 @@ async function fulfilOrder(event: Stripe.Event, session: Stripe.Checkout.Session
     lines = [];
   }
 
-  await recordPaidOrder(supabaseAdmin(), {
+  const orderId = await recordPaidOrder(supabaseAdmin(), {
     eventId: event.id,
     eventType: event.type,
     storeId,
     session,
     lines,
   });
+
+  // A genuinely new order (not a replayed webhook) → tell the merchant.
+  if (orderId) await notifyMerchantOfOrder(storeId, session);
+}
+
+/**
+ * The "cha-ching": notify the store owner of a new sale — in-app and by email —
+ * and celebrate the very first one. Best-effort; never affects order recording.
+ */
+async function notifyMerchantOfOrder(storeId: string, session: Stripe.Checkout.Session) {
+  try {
+    const admin = supabaseAdmin();
+    const { data: store } = await admin
+      .from("stores")
+      .select("user_id, store_name")
+      .eq("id", storeId)
+      .maybeSingle();
+    if (!store?.user_id) return;
+
+    const { count } = await admin
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("store_id", storeId);
+    const isFirst = (count ?? 0) <= 1;
+
+    const cents = session.amount_total ?? 0;
+    const currency = (session.currency ?? "eur").toUpperCase();
+    const symbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : `${currency} `;
+    const amount = `${symbol}${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
+
+    await notify(store.user_id, {
+      kind: isFirst ? "first_sale" : "order",
+      title: isFirst ? `Your first sale on ${store.store_name}` : `New order — ${amount}`,
+      body: isFirst
+        ? `${store.store_name} just made its first sale (${amount}).`
+        : `${store.store_name} received an order for ${amount}.`,
+      href: `/dashboard/stores/${storeId}/orders`,
+      severity: "success",
+      metadata: { storeId, amountCents: cents },
+    });
+
+    const { data: owner } = await admin.from("profiles").select("email").eq("id", store.user_id).maybeSingle();
+    if (owner?.email) {
+      await sendEmail({ to: owner.email, email: newOrderEmail(store.store_name, amount, isFirst) });
+    }
+  } catch (err) {
+    logger.warn("notifyMerchantOfOrder failed", { storeId, err: err instanceof Error ? err.message : String(err) });
+  }
 }
 
 // ------------------------------------------------------------------
