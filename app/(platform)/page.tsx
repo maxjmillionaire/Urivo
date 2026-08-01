@@ -148,6 +148,7 @@ export default function Home() {
             </span>
           )}
           <h2 className="text-4xl font-semibold tracking-tight text-ivory">Simple, premium pricing</h2>
+          <p className="mt-3 text-mist">From your idea to a live store in minutes.</p>
         </div>
 
         <div className="mt-14 grid gap-6 md:grid-cols-3">

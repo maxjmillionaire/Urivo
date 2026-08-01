@@ -167,7 +167,7 @@ interface SubStateInput {
   subscriptionId: string | null;
   customerId: string | null;
   currentPeriodEnd: Date | null;
-  priceType: "standard" | "launch" | "creator";
+  priceType: "standard" | "launch" | "creator" | "founding";
 }
 
 /** Persist the resolved subscription state onto the profile. */
@@ -186,9 +186,9 @@ async function applySubscriptionState(input: SubStateInput): Promise<void> {
   if (error) throw new Error(`Failed to sync subscription state: ${error.message}`);
 }
 
-function priceTypeOf(sub: Stripe.Subscription): "standard" | "launch" | "creator" {
+function priceTypeOf(sub: Stripe.Subscription): "standard" | "launch" | "creator" | "founding" {
   const t = sub.metadata?.price_type;
-  return t === "launch" || t === "creator" ? t : "standard";
+  return t === "launch" || t === "creator" || t === "founding" ? t : "standard";
 }
 
 async function profileEmail(userId: string): Promise<string | null> {

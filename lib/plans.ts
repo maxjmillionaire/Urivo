@@ -44,6 +44,8 @@ export interface PlanConfig {
     launch: number;
     /** Monthly price after the launch window. */
     regular: number;
+    /** Lifetime price for founding members (first 50). Undefined = no discount. */
+    founding?: number;
   };
   /** Marketing bullets — kept here so the pricing deck and product never drift. */
   highlights: string[];
@@ -85,7 +87,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
       premiumSupport: false,
       earlyAccess: false,
     },
-    price: { currency: "EUR", launch: 49, regular: 49 },
+    price: { currency: "EUR", launch: 49, regular: 49, founding: 29 },
     highlights: [
       "150 AI credits every month",
       "AI Store Assistant",
@@ -110,7 +112,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
       premiumSupport: true,
       earlyAccess: true,
     },
-    price: { currency: "EUR", launch: 199, regular: 199 },
+    price: { currency: "EUR", launch: 199, regular: 199, founding: 149 },
     highlights: [
       "500 AI credits every month",
       "Advanced Evolution Lab",
@@ -139,6 +141,27 @@ export function isLaunchWindow(now: Date = new Date()): boolean {
 export function monthlyPrice(key: string | null | undefined, now: Date = new Date()): number {
   const p = getPlan(key);
   return isLaunchWindow(now) ? p.price.launch : p.price.regular;
+}
+
+/**
+ * The price a specific user pays for a plan. Founding members (first 50) keep a
+ * lifetime discounted price; everyone else pays the standard monthly price.
+ */
+export function priceForUser(
+  key: string | null | undefined,
+  priceType: string | null | undefined,
+  now: Date = new Date(),
+): number {
+  const p = getPlan(key);
+  if (priceType === "founding" && typeof p.price.founding === "number") {
+    return p.price.founding;
+  }
+  return monthlyPrice(key, now);
+}
+
+/** True if this price tag is a real, honour-forever founding member. */
+export function isFounding(priceType: string | null | undefined): boolean {
+  return priceType === "founding";
 }
 
 export function planName(key: string | null | undefined): string {

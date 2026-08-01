@@ -54,6 +54,47 @@ export async function setFreeGenerationsEnabled(enabled: boolean): Promise<void>
   if (error) throw new Error(`Failed to update platform settings: ${error.message}`);
 }
 
+// ------------------------------------------------------------------
+// Founding members (first 50) — private tracking for the founder.
+// ------------------------------------------------------------------
+
+export interface FoundingMember {
+  email: string;
+  createdAt: string;
+  plan: string;
+  status: string;
+}
+
+export interface FoundingStatus {
+  cap: number;
+  claimed: number;
+  remaining: number;
+  subscribed: number;
+  members: FoundingMember[];
+}
+
+export async function getFoundingStatus(): Promise<FoundingStatus> {
+  const admin = supabaseAdmin();
+  const [settingsRes, rowsRes] = await Promise.all([
+    admin.from("platform_settings").select("founding_cap, founding_claimed").eq("id", true).maybeSingle(),
+    admin
+      .from("profiles")
+      .select("email, created_at, plan, subscription_status")
+      .eq("price_type", "founding")
+      .order("created_at", { ascending: true }),
+  ]);
+  const cap = settingsRes.data?.founding_cap ?? 50;
+  const claimed = settingsRes.data?.founding_claimed ?? 0;
+  const members: FoundingMember[] = (rowsRes.data ?? []).map((r) => ({
+    email: r.email,
+    createdAt: r.created_at,
+    plan: r.plan,
+    status: r.subscription_status,
+  }));
+  const subscribed = members.filter((m) => m.status === "active").length;
+  return { cap, claimed, remaining: Math.max(0, cap - claimed), subscribed, members };
+}
+
 /** Record that today's spend alert has been sent (idempotency for the alert). */
 export async function markSpendAlertSent(day: string): Promise<void> {
   await supabaseAdmin()

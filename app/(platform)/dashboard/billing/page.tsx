@@ -5,7 +5,7 @@ import { AppShell } from "../_shell/app-shell";
 import { loadRailStore } from "../_shell/rail-data";
 import { UpgradeButton, ManageSubscriptionButton } from "./upgrade-buttons";
 import { CreditPacks } from "./credit-packs";
-import { PLANS, planName, formatPrice, isLaunchWindow } from "@/lib/plans";
+import { PLANS, planName, formatPrice, isLaunchWindow, priceForUser } from "@/lib/plans";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { RevealStagger } from "../../_motion/reveal-stagger";
 
@@ -26,14 +26,18 @@ export default async function BillingPage() {
   ]);
 
   const plan = profile?.plan ?? "free";
+  const priceType = profile?.price_type ?? "standard";
+  const isFoundingMember = priceType === "founding";
   const launch = isLaunchWindow();
   const planLabel = planName(plan);
   const priceOrigin =
-    profile?.price_type === "launch"
-      ? "Founder pricing — locked for the life of your subscription"
-      : profile?.price_type === "creator"
-        ? "Creator pricing for your first three months"
-        : "Standard pricing";
+    isFoundingMember
+      ? "Founding member — lifetime price, locked forever"
+      : profile?.price_type === "launch"
+        ? "Founder pricing — locked for the life of your subscription"
+        : profile?.price_type === "creator"
+          ? "Creator pricing for your first three months"
+          : "Standard pricing";
 
   return (
     <AppShell active="billing" email={profile?.email ?? user.email ?? null} store={rail}>
@@ -62,9 +66,15 @@ export default async function BillingPage() {
       {plan === "free" && (
         <section className="mt-8">
           <h2 className="text-lg font-semibold tracking-tight text-ivory">Upgrade</h2>
+          <p className="mt-1 text-sm text-mist">
+            From your idea to a live store in minutes.
+            {isFoundingMember && " You're a founding member — your price is locked for life."}
+          </p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             {([PLANS.core, PLANS.pro] as const).map((p) => {
               const popular = p.key === "core";
+              const price = priceForUser(p.key, priceType);
+              const struck = isFoundingMember ? p.price.regular : launch ? p.price.regular : null;
               return (
                 <div
                   key={p.key}
@@ -82,9 +92,11 @@ export default async function BillingPage() {
                   </div>
                   <div className="mt-4 flex items-baseline gap-2">
                     <span className="text-3xl font-semibold tracking-tight text-ivory">
-                      {formatPrice(launch ? p.price.launch : p.price.regular)}
+                      {formatPrice(price)}
                     </span>
-                    {launch && <span className="text-mist line-through">{formatPrice(p.price.regular)}</span>}
+                    {struck != null && struck !== price && (
+                      <span className="text-mist line-through">{formatPrice(struck)}</span>
+                    )}
                     <span className="text-sm text-mist">/ mo</span>
                   </div>
                   <ul className="mt-5 flex-1 space-y-2.5">

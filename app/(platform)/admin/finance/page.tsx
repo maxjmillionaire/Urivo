@@ -4,7 +4,8 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
 import { getFinanceSnapshot, modeledTiers, costPerActionReport } from "@/lib/finance/reporting";
 import { EUR_PER_USD, USD_PER_EUR } from "@/lib/finance/cost-model";
-import { getPlatformSettings } from "@/lib/platform/settings";
+import { getPlatformSettings, getFoundingStatus } from "@/lib/platform/settings";
+import { planName } from "@/lib/plans";
 import { FreeGenerationsSwitch } from "./kill-switch";
 
 export const runtime = "nodejs";
@@ -43,6 +44,7 @@ export default async function FinanceDashboardPage() {
   const snap = await getFinanceSnapshot();
   const tiers = modeledTiers();
   const settings = await getPlatformSettings();
+  const founding = await getFoundingStatus();
   const actionCosts = await costPerActionReport();
   // The mispricing signal: if credit pricing matched cost, €/credit would be
   // flat across every action. Name the spread so the gap is legible.
@@ -77,6 +79,32 @@ export default async function FinanceDashboardPage() {
             </p>
           </div>
         </header>
+
+        {/* Founding members — the first 50 (private tracker, no public counter) */}
+        <Section
+          title="Founding members"
+          subtitle="The first 50 signups lock a lifetime price (Founder €29 / Pro €149). Private — no public counter."
+        >
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Tile label="Claimed" value={`${founding.claimed} / ${founding.cap}`} accent />
+            <Tile label="Spots left" value={int(founding.remaining)} />
+            <Tile label="Subscribed" value={int(founding.subscribed)} sub="paying founders" />
+            <Tile label="Not yet paid" value={int(founding.claimed - founding.subscribed)} sub="signed up, no plan" />
+          </div>
+          {founding.members.length > 0 && (
+            <div className="mt-4">
+              <Table
+                head={["Member", "Signed up", "Plan", "Status"]}
+                rows={founding.members.map((m) => [
+                  m.email,
+                  new Date(m.createdAt).toLocaleDateString("de-DE", { day: "numeric", month: "short" }),
+                  m.status === "active" ? planName(m.plan) : "—",
+                  m.status,
+                ])}
+              />
+            </div>
+          )}
+        </Section>
 
         {/* Cost controls */}
         <Section title="Cost controls" subtitle="The levers for runaway free-tier spend — changeable without a deploy">

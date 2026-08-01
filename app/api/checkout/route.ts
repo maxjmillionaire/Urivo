@@ -4,7 +4,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isStripeConfigured, stripe } from "@/lib/commerce/stripe";
 import { resolveStripeCustomer } from "@/lib/billing/customer";
-import { getPlan, monthlyPrice, isLaunchWindow } from "@/lib/plans";
+import { getPlan, priceForUser, isLaunchWindow } from "@/lib/plans";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
 
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   // Existing subscribers change plans via the portal, not a fresh subscription.
   const { data: profile } = await supabaseAdmin()
     .from("profiles")
-    .select("subscription_status, stripe_subscription_id")
+    .select("subscription_status, stripe_subscription_id, price_type")
     .eq("id", user.id)
     .maybeSingle();
   if (profile?.stripe_subscription_id && profile.subscription_status === "active") {
@@ -67,8 +67,11 @@ export async function POST(request: NextRequest) {
   }
 
   const plan = getPlan(body.plan);
-  const priceEUR = monthlyPrice(body.plan);
-  const priceType = isLaunchWindow() ? "launch" : "standard";
+  // Founding members (first 50) keep their lifetime price; everyone else pays
+  // the standard price. The price tag is stamped at signup (migration 0023).
+  const priceType =
+    profile?.price_type === "founding" ? "founding" : isLaunchWindow() ? "launch" : "standard";
+  const priceEUR = priceForUser(body.plan, priceType);
   const meta = { kind: "subscription", user_id: user.id, plan: body.plan, price_type: priceType };
 
   const requestId = newRequestId();

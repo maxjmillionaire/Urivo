@@ -8,6 +8,8 @@ import {
   canPublish,
   planName,
   formatPrice,
+  priceForUser,
+  isFounding,
 } from "./plans";
 
 describe("plans — tier + price logic (money-critical)", () => {
@@ -43,6 +45,17 @@ describe("plans — tier + price logic (money-critical)", () => {
     expect(nextPlan("free")?.key).toBe("core");
     expect(nextPlan("core")?.key).toBe("pro");
     expect(nextPlan("pro")).toBeNull();
+  });
+
+  it("founding members get the lifetime price; everyone else pays standard", () => {
+    expect(isFounding("founding")).toBe(true);
+    expect(isFounding("standard")).toBe(false);
+    // Founding lifetime prices.
+    expect(priceForUser("core", "founding")).toBe(29);
+    expect(priceForUser("pro", "founding")).toBe(149);
+    // Non-founding pays the standard €49 / €199.
+    expect(priceForUser("core", "standard")).toBe(49);
+    expect(priceForUser("pro", null)).toBe(199);
   });
 
   it("customer-facing names + price formatting", () => {
