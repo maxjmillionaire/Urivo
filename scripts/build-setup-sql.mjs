@@ -12,15 +12,24 @@
  */
 
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dir = join(root, "supabase", "migrations");
-const out = join(root, "supabase", "setup_all.sql");
+
+/*
+ * `--from 0005` emits a catch-up file instead of the full setup — for a project
+ * that already has earlier migrations applied and would error on a bare
+ * `create table` if the whole chain were replayed.
+ */
+const fromArg = process.argv.indexOf("--from");
+const from = fromArg > -1 ? process.argv[fromArg + 1] : null;
+const out = join(root, "supabase", from ? `catch_up_from_${from}.sql` : "setup_all.sql");
 
 const files = readdirSync(dir)
   .filter((f) => f.endsWith(".sql"))
+  .filter((f) => (from ? f.slice(0, 4) >= from : true))
   .sort();
 
 if (files.length === 0) {
@@ -32,7 +41,19 @@ const first = files[0].slice(0, 4);
 const last = files[files.length - 1].slice(0, 4);
 const rule = "─".repeat(57);
 
-const header = `-- ============================================================
+const header = from
+  ? `-- ============================================================
+-- URIVO — Database catch-up (migrations ${first}–${last}).
+-- For a project that ALREADY has the earlier migrations applied.
+-- Paste this whole file into Supabase → SQL Editor → New query → Run.
+--
+-- Use setup_all.sql instead on a brand-new, empty project.
+--
+-- GENERATED FILE — do not edit by hand.
+-- Regenerate with: npm run db:build -- --from ${from}
+-- ============================================================
+`
+  : `-- ============================================================
 -- URIVO — Complete database setup (one-shot).
 -- Paste this whole file into Supabase → SQL Editor → New query → Run.
 -- It applies migrations ${first}–${last} in order. Safe to run once on a fresh project.
@@ -50,4 +71,4 @@ const body = files
   .join("");
 
 writeFileSync(out, header + body);
-console.log(`setup_all.sql rebuilt from ${files.length} migrations (${first} → ${last}).`);
+console.log(`${basename(out)} rebuilt from ${files.length} migrations (${first} → ${last}).`);

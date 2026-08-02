@@ -17,14 +17,25 @@ run-through — in that order.
 ## Block 1 — Infrastructure & secrets (needed for ANY launch)
 
 1. **Supabase project** — create one at supabase.com.
-   - SQL Editor → New query → paste **`supabase/setup_all.sql`** → Run. That
-     single file contains every migration (`0001` → `0025`) in order.
-     Alternatively run each file in `supabase/migrations/` in order — never a
-     subset, later ones depend on earlier ones.
+   - **On a brand-new, empty project:** SQL Editor → New query → paste
+     **`supabase/setup_all.sql`** → Run. That single file contains every
+     migration (`0001` → `0026`) in order.
+   - **On a project that already has some migrations applied:** do NOT replay
+     `setup_all.sql` — migration `0001` creates tables unconditionally and will
+     error on the first one that already exists. Instead check what is actually
+     there (below), then generate and run a catch-up:
+     `npm run db:build -- --from 00NN` → paste `supabase/catch_up_from_00NN.sql`.
+   - **To see how far a project has got**, open `<SUPABASE_URL>/rest/v1/` with
+     your service-role key as both `apikey` and `Authorization: Bearer`. The
+     response lists every table and RPC the project actually exposes. A project
+     missing `orders`, `notifications` or `platform_settings` is behind.
    - Project Settings → API → copy the URL, the `anon` key, and the
      `service_role` key.
    - *If you add a migration later,* regenerate the one-shot file with
      `npm run db:build` so it never drifts behind the folder.
+   - **Free-tier projects pause after ~7 days idle.** A paused project refuses
+     connections and looks exactly like a network fault. Check the dashboard
+     before debugging anything else.
 2. **Anthropic key** — platform.claude.com → API keys. Without this, no AI
    works at all (generation, Ask Urivo, research, ads).
 3. **Set env vars** (see `.env.example`) on **Railway** → your service →
