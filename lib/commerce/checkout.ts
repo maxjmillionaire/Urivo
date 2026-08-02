@@ -15,6 +15,7 @@ export interface StoreForCheckout {
   store_name: string;
   subdomain: string;
   currency: string;
+  /** The OWNER's connected account (migration 0026: payouts are per merchant). */
   stripe_account_id: string | null;
   stripe_charges_enabled: boolean;
 }
@@ -27,12 +28,28 @@ export async function loadStoreForCheckout(
 ): Promise<StoreForCheckout | null> {
   const { data } = await admin
     .from("stores")
-    .select("id, store_name, subdomain, currency, stripe_account_id, stripe_charges_enabled, is_active")
+    .select("id, store_name, subdomain, currency, is_active")
     .eq("subdomain", subdomain)
     .eq("is_active", true)
     .maybeSingle();
   if (!data) return null;
-  return data as StoreForCheckout;
+
+  // Payout accounts belong to the merchant, not the store, so the account this
+  // store sells through is resolved from its owner.
+  const { data: payout } = await admin.rpc("store_payout_account", { p_store_id: data.id });
+  const row = (Array.isArray(payout) ? payout[0] : payout) as
+    | { stripe_account_id: string | null; charges_enabled: boolean }
+    | null
+    | undefined;
+
+  return {
+    id: data.id,
+    store_name: data.store_name,
+    subdomain: data.subdomain,
+    currency: data.currency,
+    stripe_account_id: row?.stripe_account_id ?? null,
+    stripe_charges_enabled: row?.charges_enabled === true,
+  };
 }
 
 /**

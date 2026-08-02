@@ -90,27 +90,38 @@ next-best-action. The endpoint is built and secured; it needs a scheduler.
 Unset `CRON_SECRET` disables the endpoint (503) — it fails closed, so an
 unconfigured deployment can never fan out mail.
 
-## Block 4 — Stripe Connect merchant onboarding (NOT built — the one real gap)
+## Block 4 — Stripe Connect merchant onboarding (built — verify with live keys)
 
-Storefront checkout already refuses to charge unless the store has a connected
-account with charges enabled (`app/api/store/[subdomain]/checkout/route.ts`),
-and the `stores` table carries `stripe_account_id` / `stripe_charges_enabled`.
-**Nothing creates that account.** Until this ships, merchants cannot be paid.
+**Model: one connected account per merchant** (founder decision, migration
+0026). A merchant onboards once and every store they own sells through that
+account. The account lives on `profiles`; the per-store columns from 0005 are
+deprecated and no longer read.
 
-To build:
+Written and waiting on keys:
 
-- [ ] Decide the account model: one connected account **per user** (simplest,
-      recommended) vs **per store**. The schema currently hangs the account off
-      the store, so per-store works today and per-user means copying the id onto
-      each of the owner's stores.
-- [ ] `POST` route that calls `accounts.create` (Express) then
-      `accountLinks.create` and redirects the merchant to Stripe onboarding.
-- [ ] Return path that re-reads the account and persists `stripe_account_id`
-      plus `charges_enabled`.
-- [ ] Handle `account.updated` in the existing webhook to keep
-      `stripe_charges_enabled` current (a merchant can be de-authorised later).
-- [ ] Surface payout status in the dashboard: a store that cannot accept
-      payments must say so plainly rather than failing at checkout.
+- `POST /api/connect/onboard` — creates the Express account (idempotent) and
+  returns a fresh onboarding link. Once charges are enabled the same endpoint
+  returns an Express dashboard link instead, so the button keeps working.
+- `GET /api/connect/return` — Stripe's return leg. Re-reads the account rather
+  than assuming success, so the dashboard is accurate immediately.
+- `GET /api/connect/refresh` — re-mints an expired onboarding link.
+- `account.updated` in the webhook — keeps `charges_enabled` honest, and
+  notifies the merchant when payouts turn on or get restricted.
+- Billing page shows payout state in plain language for all five states.
+
+To verify:
+
+- [ ] Complete Stripe's Express onboarding end to end in test mode.
+- [ ] Confirm `profiles.stripe_account_id` / `stripe_charges_enabled` populate,
+      and the billing card moves to **Active**.
+- [ ] Confirm a second store owned by the same merchant sells through the same
+      account without re-onboarding.
+- [ ] Abandon onboarding half-way, return, and confirm you resume the same
+      account rather than creating a second one.
+- [ ] Let an onboarding link expire and confirm `/api/connect/refresh` puts you
+      back into the flow.
+- [ ] Trigger a restriction in test mode and confirm the store stops accepting
+      orders and the merchant is notified.
 
 ## Block 5 — Phase 2 (Stripe: billing + commerce) — verification, not construction
 

@@ -5,6 +5,8 @@ import { AppShell } from "../_shell/app-shell";
 import { loadRailStore } from "../_shell/rail-data";
 import { UpgradeButton, ManageSubscriptionButton } from "./upgrade-buttons";
 import { CreditPacks } from "./credit-packs";
+import { PayoutSetup } from "./payouts";
+import { getConnectStatus, connectState } from "@/lib/billing/connect";
 import { PLANS, planName, formatPrice, isLaunchWindow, priceForUser } from "@/lib/plans";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { RevealStagger } from "../../_motion/reveal-stagger";
@@ -18,11 +20,12 @@ export default async function BillingPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, balance, ledger, rail] = await Promise.all([
+  const [{ data: profile }, balance, ledger, rail, connect] = await Promise.all([
     supabase.from("profiles").select("plan, price_type, subscription_status, email").eq("id", user.id).single(),
     getCreditBalance(user.id),
     getCreditLedger(user.id),
     loadRailStore(user.id),
+    getConnectStatus(user.id),
   ]);
 
   const plan = profile?.plan ?? "free";
@@ -62,6 +65,13 @@ export default async function BillingPage() {
           <p className="mt-3 text-xs text-mist-dim">Each store costs {CREDIT_COSTS.storeGeneration} credits</p>
         </div>
       </section>
+
+      {/* Payouts matter once a merchant can publish and sell. */}
+      {plan !== "free" && (
+        <section className="mt-4">
+          <PayoutSetup state={connectState(connect)} />
+        </section>
+      )}
 
       {plan === "free" && (
         <section className="mt-8">

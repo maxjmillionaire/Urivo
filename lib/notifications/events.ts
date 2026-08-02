@@ -35,6 +35,46 @@ export async function notifyFirstStore(userId: string, storeId: string, storeNam
   });
 }
 
+/**
+ * Payouts are live — the merchant can now actually be paid. Deduped generously:
+ * Stripe can re-confirm an account repeatedly, and this should feel like a
+ * milestone, not a recurring notice.
+ */
+export async function notifyPayoutsReady(userId: string): Promise<void> {
+  await notifyOnce(
+    userId,
+    "payouts_ready",
+    {
+      kind: "payouts_ready",
+      title: "Your store can accept payments",
+      body: "Payout setup is complete. Orders from your storefronts now pay out to your bank account.",
+      href: "/dashboard/billing",
+      severity: "success",
+    },
+    30,
+  );
+}
+
+/**
+ * Stripe disabled charges on a live merchant (failed verification, new
+ * requirements). This is money stopping, so it is critical and re-raised weekly
+ * until resolved.
+ */
+export async function notifyPayoutsRestricted(userId: string): Promise<void> {
+  await notifyOnce(
+    userId,
+    "payouts_restricted",
+    {
+      kind: "payouts_restricted",
+      title: "Action needed: your store can't take payments",
+      body: "Stripe needs more information before your storefronts can accept orders again. It usually takes a few minutes to resolve.",
+      href: "/dashboard/billing",
+      severity: "critical",
+    },
+    7,
+  );
+}
+
 /** A store went live. Deduped per store per day so toggling doesn't spam. */
 export async function notifyStorePublished(userId: string, storeId: string, storeName: string): Promise<void> {
   await notifyOnce(

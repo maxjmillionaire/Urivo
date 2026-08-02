@@ -17,6 +17,8 @@ import {
   sendRenewalReceipt,
   subscriptionPeriodEnd,
 } from "@/lib/billing/subscription";
+import { applyAccountUpdate } from "@/lib/billing/connect";
+import { notifyPayoutsReady, notifyPayoutsRestricted } from "@/lib/notifications/events";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId, logger } from "@/lib/logger";
 
@@ -88,7 +90,46 @@ async function handleConnectEvent(event: Stripe.Event) {
     if (session.payment_status === "paid" || event.type === "checkout.session.async_payment_succeeded") {
       await fulfilOrder(event, session);
     }
+    return;
   }
+
+  // The merchant's payout account changed — Stripe can enable OR disable a
+  // merchant at any time, so this is what keeps a live store honest about
+  // whether it can still take money.
+  if (event.type === "account.updated") {
+    const account = event.data.object as Stripe.Account;
+    const before = await connectStatusForAccount(account.id);
+    await applyAccountUpdate(account);
+
+    const nowEnabled = account.charges_enabled === true;
+    if (before !== null && before !== nowEnabled) {
+      const userId = await userIdForAccount(account.id);
+      if (userId) {
+        await (nowEnabled ? notifyPayoutsReady(userId) : notifyPayoutsRestricted(userId));
+      }
+    }
+  }
+}
+
+/** The user behind a connected account, or null if we don't know it. */
+async function userIdForAccount(accountId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin()
+    .from("profiles")
+    .select("id")
+    .eq("stripe_account_id", accountId)
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
+/** Charges-enabled as we currently have it mirrored, or null if unknown. */
+async function connectStatusForAccount(accountId: string): Promise<boolean | null> {
+  const { data } = await supabaseAdmin()
+    .from("profiles")
+    .select("stripe_charges_enabled")
+    .eq("stripe_account_id", accountId)
+    .maybeSingle();
+  if (!data) return null;
+  return data.stripe_charges_enabled === true;
 }
 
 async function fulfilOrder(event: Stripe.Event, session: Stripe.Checkout.Session) {
