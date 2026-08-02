@@ -8,6 +8,24 @@ import { createServerClient } from "@supabase/ssr";
 
 const SUBDOMAIN_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,61})[a-z0-9]$/;
 
+/*
+ * Admin allow-list check. Mirrors lib/admin.ts, which is the canonical
+ * definition — it is restated here because middleware runs in the edge runtime
+ * and must not pull in `server-only` modules. Keep the two in step.
+ *
+ * Fail closed: unset ADMIN_EMAILS means nobody is an admin.
+ */
+function isAdminRequest(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const raw = process.env.ADMIN_EMAILS;
+  if (!raw) return false;
+  return raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(email.toLowerCase());
+}
+
 export async function middleware(request: NextRequest) {
   // --- Tenant subdomain rewrite -------------------------------------
   const rootDomain = (process.env.ROOT_DOMAIN ?? "localhost:3000")
@@ -42,12 +60,17 @@ export async function middleware(request: NextRequest) {
   // --- Auth session + protected routes ------------------------------
   const path = request.nextUrl.pathname;
   const needsAuthHandling =
-    path.startsWith("/dashboard") || path === "/login";
+    path.startsWith("/dashboard") || path.startsWith("/admin") || path === "/login";
   if (!needsAuthHandling) return NextResponse.next();
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseKey) return NextResponse.next();
+  if (!supabaseUrl || !supabaseKey) {
+    // Without auth configured we cannot establish who anyone is, so the admin
+    // area must stay shut rather than fall through to the page.
+    if (path.startsWith("/admin")) return new NextResponse(null, { status: 404 });
+    return NextResponse.next();
+  }
 
   let response = NextResponse.next({ request });
 
@@ -84,6 +107,19 @@ export async function middleware(request: NextRequest) {
     redirectUrl.pathname = "/dashboard";
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
+  }
+
+  /*
+   * The admin area must be INVISIBLE, not merely protected. The page itself
+   * calls notFound() as defence in depth, but by then the streamed shell has
+   * already flushed a 200 (the (platform) group has a loading.tsx), so the
+   * response looked like a real page to crawlers and uptime monitors. Deciding
+   * here — before any rendering — lets us answer with a true 404.
+   *
+   * Fail closed: with ADMIN_EMAILS unset, nobody is an admin.
+   */
+  if (path.startsWith("/admin") && !isAdminRequest(user?.email)) {
+    return new NextResponse(null, { status: 404 });
   }
 
   return response;
