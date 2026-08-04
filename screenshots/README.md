@@ -1,7 +1,10 @@
 # Urivo — product screenshots
 
-Captured from the running application against the live Supabase project,
-1512×950 at 2× (mobile 390×844 at 3×). Real data, real rendering — no mockups.
+Captured from the running application against the live Supabase project.
+Every screen in **two viewports only** — desktop 1512×950 and mobile 390×844,
+both at 2×. Real data, real rendering — no mockups.
+
+Files are prefixed `desktop-` and `mobile-`.
 
 | File | Screen |
 | --- | --- |

@@ -6,6 +6,8 @@ import { getReferralSnapshot } from "@/lib/referral/reporting";
 import { isLaunchWindow } from "@/lib/plans";
 import { CREATOR_COMMISSION_RATE, CREATOR_DISCOUNT_RATE } from "@/lib/referral/codes";
 import { CreateCreatorForm } from "./create-creator-form";
+import { PayoutButton } from "./payout-button";
+import { getPayoutSummary, getPayoutHistory } from "@/lib/referral/payouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +29,9 @@ export default async function ReferralsDashboardPage() {
   if (!user || !isAdminEmail(user.email)) notFound();
 
   const { overview, topCreators } = await getReferralSnapshot();
+  const payouts = await getPayoutSummary();
+  const payoutHistory = await getPayoutHistory(10);
+  const totalOwed = payouts.reduce((sum, p) => sum + p.owedEur, 0);
   const launch = isLaunchWindow();
 
   return (
@@ -83,6 +88,90 @@ export default async function ReferralsDashboardPage() {
         {/* Onboard a creator */}
         <Section title="Add a creator" subtitle="Issues a unique referral code, ready for checkout">
           <CreateCreatorForm />
+        </Section>
+
+
+        {/* Settle what the referral engine says you owe. */}
+        <Section
+          title="Payouts"
+          subtitle="Commissions earned and not yet transferred. Send the money, then record it here."
+        >
+          {payouts.filter((p) => p.owedCount > 0).length === 0 ? (
+            <Empty>Nothing owed right now.</Empty>
+          ) : (
+            <>
+              <p className="text-sm text-white/60">
+                Outstanding across all creators:{" "}
+                <span className="font-semibold text-amber-200">{eur(totalOwed)}</span>
+              </p>
+              <div className="space-y-3">
+                {payouts
+                  .filter((p) => p.owedCount > 0)
+                  .map((p) => (
+                    <div
+                      key={p.creatorId}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-white/90">
+                          {p.creatorName}{" "}
+                          <span className="font-mono text-xs uppercase tracking-wide text-amber-200/80">
+                            {p.creatorCode}
+                          </span>
+                        </p>
+                        <p className="mt-0.5 text-xs text-white/45">
+                          {eur(p.owedEur)} owed · {int(p.owedCount)} commission
+                          {p.owedCount === 1 ? "" : "s"} · {eur(p.paidEur)} paid to date
+                          {p.lastPaidAt
+                            ? ` · last ${new Date(p.lastPaidAt).toLocaleDateString("de-DE")}`
+                            : ""}
+                        </p>
+                      </div>
+                      <PayoutButton
+                        creatorId={p.creatorId}
+                        creatorName={p.creatorName}
+                        owedEur={p.owedEur}
+                        owedCount={p.owedCount}
+                      />
+                    </div>
+                  ))}
+              </div>
+            </>
+          )}
+
+          {payoutHistory.length > 0 && (
+            <div className="mt-2">
+              <p className="mb-2 text-xs text-white/40">Recent transfers</p>
+              <div className="overflow-x-auto rounded-xl border border-white/10">
+                <table className="w-full min-w-[560px] text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/[0.03] text-left text-xs uppercase tracking-wide text-white/45">
+                      <th className="px-4 py-2.5 font-medium">Date</th>
+                      <th className="px-4 py-2.5 font-medium">Creator</th>
+                      <th className="px-4 py-2.5 font-medium">Method</th>
+                      <th className="px-4 py-2.5 font-medium">Reference</th>
+                      <th className="px-4 py-2.5 text-right font-medium">Commissions</th>
+                      <th className="px-4 py-2.5 text-right font-medium">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payoutHistory.map((h) => (
+                      <tr key={h.id} className="border-b border-white/[0.06] last:border-0">
+                        <td className="px-4 py-2.5 text-white/70">
+                          {new Date(h.paidAt).toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" })}
+                        </td>
+                        <td className="px-4 py-2.5 text-white/90">{h.creatorName}</td>
+                        <td className="px-4 py-2.5 text-white/60">{h.method ?? "—"}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-white/50">{h.reference ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-white/70">{int(h.referralCount)}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-white/90">{eur(h.amountEur)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </Section>
 
         {/* Leaderboard */}

@@ -34,12 +34,25 @@ export function codeDiscountRate(now: Date = new Date()): number {
   return isLaunchWindow(now) ? 0 : CREATOR_DISCOUNT_RATE;
 }
 
-/** Commission (EUR) a creator earns on a given first-payment amount. */
+/**
+ * Commission (EUR) a creator earns on a given first-payment amount.
+ *
+ * Floored at zero: referrals.commission_amount_eur carries a `>= 0` check, so a
+ * negative amount arriving from a refund or an adjustment would raise a
+ * constraint violation and break the referral path rather than record nothing.
+ * A negative payment simply earns no commission.
+ */
 export function commissionFor(firstPaymentEur: number, rate = CREATOR_COMMISSION_RATE): number {
-  return Math.round(firstPaymentEur * rate * 100) / 100;
+  const gross = Math.max(0, firstPaymentEur) * Math.max(0, rate);
+  return Math.round(gross * 100) / 100;
 }
 
-/** Apply a discount rate to a gross price, returning the net the customer pays. */
+/**
+ * Apply a discount rate to a gross price, returning the net the customer pays.
+ * The rate is clamped to 0–1 so a bad rate can never invert the price and hand
+ * money back to the customer.
+ */
 export function applyDiscount(priceEur: number, discountRate: number): number {
-  return Math.round(priceEur * (1 - discountRate) * 100) / 100;
+  const rate = Math.min(1, Math.max(0, discountRate));
+  return Math.round(Math.max(0, priceEur) * (1 - rate) * 100) / 100;
 }

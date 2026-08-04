@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:build": "node scripts/build-setup-sql.mjs"
+    "db:build": "node scripts/build-setup-sql.mjs",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.0",
