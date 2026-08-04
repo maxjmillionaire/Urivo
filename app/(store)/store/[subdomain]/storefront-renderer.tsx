@@ -381,8 +381,18 @@ function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
 
 /* --------------------------------- HERO ------------------------------------ */
 
+/*
+ * Taglines are AI-written, so they arrive with or without a full stop. Append
+ * one only when it is missing — hardcoding "{tagline}." rendered a doubled
+ * mark on every storefront whose tagline already ended in punctuation.
+ */
+function withStop(text: string): string {
+  const t = text.trim();
+  return /[.!?…]$/.test(t) ? t : `${t}.`;
+}
+
 function Hero({ storeName, ds, heroImage, logo }: { storeName: string; ds: StoreDesignSystem; heroImage?: string | null; logo?: StoreLogo | null }) {
-  const tagline = ds.tagline || ds.personality;
+  const tagline = withStop(ds.tagline || ds.personality);
   const eyebrow = "New collection";
 
   if (ds.layout.hero === "split") {
@@ -393,7 +403,7 @@ function Hero({ storeName, ds, heroImage, logo }: { storeName: string; ds: Store
             <div className="uv-rise">
               <p className="uv-eyebrow">{eyebrow}</p>
               <h1 style={{ fontSize: "var(--h1)", marginTop: "1.2rem" }}>{storeName}</h1>
-              <p style={{ marginTop: "1.4rem", maxWidth: "34ch", color: "var(--muted)", fontSize: "1.05rem" }}>{tagline}.</p>
+              <p style={{ marginTop: "1.4rem", maxWidth: "34ch", color: "var(--muted)", fontSize: "1.05rem" }}>{tagline}</p>
               <div style={{ marginTop: "2.2rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
                 <a href="#uv-shop" className="uv-btn">Shop the collection</a>
                 <a href="#uv-shop" className="uv-btn-ghost">Our story</a>
@@ -421,7 +431,7 @@ function Hero({ storeName, ds, heroImage, logo }: { storeName: string; ds: Store
         <div className="uv-wrap uv-rise" style={{ position: "relative", paddingBottom: "clamp(3rem,6vw,6rem)", paddingTop: "6rem" }}>
           <p className="uv-eyebrow">{eyebrow}</p>
           <h1 style={{ fontSize: "var(--h1)", marginTop: "1rem", maxWidth: "16ch" }}>{storeName}</h1>
-          <p style={{ marginTop: "1.3rem", maxWidth: "40ch", color: "var(--muted)", fontSize: "1.1rem" }}>{tagline}.</p>
+          <p style={{ marginTop: "1.3rem", maxWidth: "40ch", color: "var(--muted)", fontSize: "1.1rem" }}>{tagline}</p>
           <a href="#uv-shop" className="uv-btn" style={{ marginTop: "2rem", display: "inline-block" }}>Shop now</a>
         </div>
       </section>
@@ -433,7 +443,7 @@ function Hero({ storeName, ds, heroImage, logo }: { storeName: string; ds: Store
       <section className="uv-wrap uv-rise" style={{ paddingTop: "clamp(4rem,9vw,9rem)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
         <p className="uv-eyebrow">{eyebrow}</p>
         <h1 style={{ fontSize: "var(--h1)", marginTop: "1.4rem", marginLeft: "auto", marginRight: "auto", maxWidth: "14ch" }}>{storeName}</h1>
-        <p style={{ marginTop: "1.6rem", maxWidth: "48ch", marginLeft: "auto", marginRight: "auto", color: "var(--muted)", fontSize: "1.12rem" }}>{tagline}.</p>
+        <p style={{ marginTop: "1.6rem", maxWidth: "48ch", marginLeft: "auto", marginRight: "auto", color: "var(--muted)", fontSize: "1.12rem" }}>{tagline}</p>
         <div style={{ marginTop: "2.4rem" }}>
           <a href="#uv-shop" className="uv-btn">Explore</a>
         </div>
@@ -446,7 +456,7 @@ function Hero({ storeName, ds, heroImage, logo }: { storeName: string; ds: Store
     <section className="uv-wrap uv-rise" style={{ paddingTop: "clamp(3rem,6vw,6rem)", paddingBottom: "var(--pad-y)" }}>
       <p className="uv-eyebrow">{eyebrow}</p>
       <h1 style={{ fontSize: "var(--h1)", marginTop: "1.3rem", maxWidth: "18ch" }}>{storeName}</h1>
-      <p style={{ marginTop: "1.5rem", maxWidth: "44ch", color: "var(--muted)", fontSize: "1.1rem", fontStyle: ds.fonts.headingKey === "playfair" ? "italic" : "normal" }}>{tagline}.</p>
+      <p style={{ marginTop: "1.5rem", maxWidth: "44ch", color: "var(--muted)", fontSize: "1.1rem", fontStyle: ds.fonts.headingKey === "playfair" ? "italic" : "normal" }}>{tagline}</p>
       <a href="#uv-shop" className="uv-btn" style={{ marginTop: "2.2rem", display: "inline-block" }}>Shop the collection</a>
     </section>
   );
