@@ -5,6 +5,13 @@ import { isAdminEmail } from "@/lib/admin";
 import { getFinanceSnapshot, modeledTiers, costPerActionReport } from "@/lib/finance/reporting";
 import { EUR_PER_USD, USD_PER_EUR } from "@/lib/finance/cost-model";
 import { getPlatformSettings, getFoundingStatus } from "@/lib/platform/settings";
+import {
+  getFirstSaleFunnel,
+  getFirstSaleCohorts,
+  firstSaleVerdict,
+  FIRST_SALE_HEALTHY,
+  FIRST_SALE_CRITICAL,
+} from "@/lib/analytics/first-sale";
 import { planName } from "@/lib/plans";
 import { FreeGenerationsSwitch } from "./kill-switch";
 
@@ -46,6 +53,9 @@ export default async function FinanceDashboardPage() {
   const settings = await getPlatformSettings();
   const founding = await getFoundingStatus();
   const actionCosts = await costPerActionReport();
+  const firstSale = await getFirstSaleFunnel();
+  const firstSaleCohorts = await getFirstSaleCohorts(12);
+  const verdict = firstSaleVerdict(firstSale);
   // The mispricing signal: if credit pricing matched cost, €/credit would be
   // flat across every action. Name the spread so the gap is legible.
   const priced = actionCosts.filter((r) => r.costPerCreditEur > 0);
@@ -116,6 +126,77 @@ export default async function FinanceDashboardPage() {
               : " · no daily generation cap set"}
             .
           </p>
+        </Section>
+
+        {/* The number the company steers by — first, and on its own. */}
+        <Section
+          title="First sale"
+          subtitle="Share of published stores that make a real sale, and how long it takes. Every other metric is downstream of this one."
+        >
+          <div
+            className={`rounded-xl border p-5 ${
+              verdict === "healthy"
+                ? "border-emerald-300/30 bg-emerald-300/5"
+                : verdict === "critical"
+                  ? "border-rose-400/30 bg-rose-400/5"
+                  : verdict === "watch"
+                    ? "border-amber-300/30 bg-amber-300/5"
+                    : "border-white/10 bg-white/[0.03]"
+            }`}
+          >
+            <p className="text-xs uppercase tracking-wide text-white/45">First-sale rate</p>
+            <p className="mt-1 text-4xl font-semibold tabular-nums">
+              {firstSale.storesPublished === 0 ? "—" : `${firstSale.firstSaleRate.toFixed(1)}%`}
+            </p>
+            <p className="mt-2 text-sm text-white/60">
+              {verdict === "no_data"
+                ? "No stores published yet. This fills in once merchants go live."
+                : verdict === "healthy"
+                  ? `Healthy — at or above ${FIRST_SALE_HEALTHY}%. The product is working. Scale acquisition.`
+                  : verdict === "critical"
+                    ? `Critical — below ${FIRST_SALE_CRITICAL}%. Merchants are not selling. Fix this before spending anything on growth.`
+                    : `Watch — between ${FIRST_SALE_CRITICAL}% and ${FIRST_SALE_HEALTHY}%. Not yet proven. Improve the path to a first sale before scaling.`}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            <Tile label="Stores published" value={int(firstSale.storesPublished)} />
+            <Tile label="Have sold" value={int(firstSale.storesWithSale)} sub="paid or fulfilled" />
+            <Tile
+              label="Sold in 30 days"
+              value={firstSale.storesPublished === 0 ? "—" : `${firstSale.rateWithin30d.toFixed(1)}%`}
+              sub="leading indicator"
+              accent
+            />
+            <Tile
+              label="Median days"
+              value={firstSale.medianDaysToFirstSale == null ? "—" : firstSale.medianDaysToFirstSale.toFixed(1)}
+              sub="publish → first sale"
+            />
+            <Tile
+              label="7d / 30d / 90d"
+              value={`${int(firstSale.soldWithin7d)} / ${int(firstSale.soldWithin30d)} / ${int(firstSale.soldWithin90d)}`}
+              sub="stores selling within"
+            />
+          </div>
+
+          {firstSaleCohorts.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs text-white/40">
+                By publish week — a blended rate hides whether the product is improving.
+              </p>
+              <Table
+                head={["Cohort week", "Published", "Sold", "Rate", "Median days"]}
+                rows={firstSaleCohorts.map((c) => [
+                  new Date(c.cohortWeek).toLocaleDateString("de-DE", { day: "numeric", month: "short" }),
+                  c.storesPublished,
+                  c.storesWithSale,
+                  `${c.firstSaleRate.toFixed(1)}%`,
+                  c.medianDaysToFirstSale == null ? "—" : c.medianDaysToFirstSale.toFixed(1),
+                ])}
+              />
+            </div>
+          )}
         </Section>
 
         {/* Headline KPIs */}

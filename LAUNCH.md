@@ -81,6 +81,10 @@ Run through them on the deployed staging URL and confirm each:
 - [ ] **Settings** → change name / password; **Sign out** from the account menu.
 - [ ] **Admin** → `/admin/finance` loads for an `ADMIN_EMAILS` address and 404s
       for anyone else. Cost-per-action and the founding tracker render.
+- [ ] **First-sale instrumentation** → publish a store and confirm
+      `stores.published_at` is stamped; unpublish and republish and confirm it
+      does **not** reset. The First sale panel is the number the business is
+      steered by — verify it is recording before real merchants arrive.
 - [ ] **Legal** pages (Impressum / Datenschutz / AGB) load.
 - [ ] `/api/health` still green; check Sentry receives a test error.
 
