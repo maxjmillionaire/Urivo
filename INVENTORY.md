@@ -3,7 +3,7 @@
 A map of what is built, so nothing gets built twice and nothing gets assumed
 missing. Regenerate the counts with the commands at the bottom.
 
-**Scale:** 28 migrations · 33 API routes · 19 pages · 10 AI modules · 58 tests
+**Scale:** 28 migrations · 33 API routes · 19 pages · 10 AI modules · 71 tests
 
 ---
 
@@ -20,6 +20,7 @@ missing. Regenerate the counts with the commands at the bottom.
 | Brand naming + domain availability | `lib/ai/name-studio.ts`, `/api/brand/*` | Shipped |
 | Product optimiser | `lib/ai/product-optimizer.ts` | Shipped |
 | Generative storefront renderer (nav/hero/card/footer variants) | `app/(store)/.../storefront-renderer.tsx` | Shipped |
+| Renderer authors no claims — trust/highlights/story/nav come from the brand or don't render | `lib/storefront/honest-claims.test.ts` | Shipped |
 | Product detail pages | `app/(store)/store/[subdomain]/product/[id]` | Shipped |
 | Store analytics (visits, devices, referrers) | `lib/analytics/visits.ts`, migration 0017 | Shipped |
 | SEO surface | `lib/seo.ts` | Shipped |

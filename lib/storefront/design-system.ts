@@ -69,12 +69,27 @@ export interface StoreBrief {
 
 import { parseNarrative, type NarrativeBlock } from "./narrative";
 
+/** One authored proof point — a promise the brand actually makes. */
+export interface ProofPoint {
+  title: string;
+  detail: string;
+}
+
 export interface StoreDesignSystem {
   personality: string;
   tagline?: string;
   brief?: StoreBrief;
   /** Customer-facing brand narrative for the story section (editorial, honest). */
   story?: string;
+  /**
+   * Risk-reduction promises, AUTHORED for this brand. The renderer never
+   * supplies these: a guarantee the merchant did not make is a commercial term
+   * they are bound to and — for shipping, returns or environmental claims in the
+   * EU — a regulated one. No authored items means no trust section.
+   */
+  trust?: ProofPoint[];
+  /** Reasons to want this brand, authored. Same rule: absent means unrendered. */
+  highlights?: ProofPoint[];
   /** The authored emotional journey — the Creative Director's page composition.
    *  When present, the renderer expresses this instead of a fixed section order. */
   narrative?: NarrativeBlock[];
@@ -259,6 +274,18 @@ function parseBrief(raw: unknown): StoreBrief | undefined {
   };
   return brief.positioning || brief.photographyDirection ? brief : undefined;
 }
+/** Validate authored proof points. Anything half-written is dropped rather than
+ *  padded — a headline with no substantiation is worse than no section. */
+function parseProof(raw: unknown, max: number): ProofPoint[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((it) => {
+      const o = (it ?? {}) as Record<string, unknown>;
+      return { title: str(o.title, 48), detail: str(o.detail, 160) };
+    })
+    .filter((p) => p.title && p.detail)
+    .slice(0, max);
+}
 function snapWeight(v: unknown): number {
   const n = clampNum(v, 300, 900, 600);
   const steps = [300, 400, 500, 600, 700, 800, 900];
@@ -288,6 +315,10 @@ export function parseDesignSystem(raw: unknown, productCount = 999): StoreDesign
   const accent = color(pRaw.accent, "#9C7C4A");
   const accentInk = color(pRaw.accentInk, readableInk(accent));
 
+  const story = typeof r.story === "string" && r.story.trim() ? r.story.trim().slice(0, 400) : undefined;
+  const trust = parseProof(r.trust, 4);
+  const highlights = parseProof(r.highlights, 3);
+
   // section order — keep known keys, dedupe, guarantee the essentials + ends.
   const rawOrder = Array.isArray(lRaw.sectionOrder) ? (lRaw.sectionOrder as unknown[]) : [];
   let order = rawOrder
@@ -296,6 +327,26 @@ export function parseDesignSystem(raw: unknown, productCount = 999): StoreDesign
   order = [...new Set(order)];
   if (!order.includes("hero")) order.unshift("hero");
   if (!order.includes("collection")) order.push("collection");
+
+  /*
+   * Sections are CONTENT-DRIVEN. A section the brand authored copy for is never
+   * left unrendered, and a section with no authored copy is never conjured —
+   * which is what used to happen, with the renderer inventing the shipping,
+   * returns and sustainability promises the merchant then published.
+   */
+  const insertBefore = (key: SectionKey, anchor: SectionKey) => {
+    if (order.includes(key)) return;
+    const at = order.indexOf(anchor);
+    order.splice(at === -1 ? order.length : at, 0, key);
+  };
+  if (story) insertBefore("story", "collection");
+  if (highlights.length) insertBefore("highlights", "collection");
+  // Risk reduction sits AFTER the catalogue — nearest the buying decision.
+  if (trust.length && !order.includes("trust")) {
+    const at = order.indexOf("collection");
+    order.splice(at === -1 ? order.length : at + 1, 0, "trust");
+  }
+
   order = order.filter((k) => k !== "footer");
   order.push("footer");
 
@@ -309,7 +360,9 @@ export function parseDesignSystem(raw: unknown, productCount = 999): StoreDesign
       typeof r.personality === "string" ? r.personality.trim().slice(0, 80) : "Considered, premium",
     tagline: typeof r.tagline === "string" && r.tagline.trim() ? r.tagline.trim().slice(0, 160) : undefined,
     brief: parseBrief(r.brief),
-    story: typeof r.story === "string" && r.story.trim() ? r.story.trim().slice(0, 400) : undefined,
+    story,
+    trust: trust.length ? trust : undefined,
+    highlights: highlights.length ? highlights : undefined,
     narrative: parseNarrative(r.narrative, productCount) ?? undefined,
     palette: { background, surface, ink, muted, line, accent, accentInk },
     fonts: {

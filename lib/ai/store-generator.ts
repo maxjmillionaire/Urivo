@@ -115,6 +115,10 @@ const DesignSchema = z.object({
     shadow: e(SHADOW_LEVELS),
   }),
   space: z.object({ density: e(DENSITIES), container: z.number().min(1040).max(1440) }),
+  // Authored proof. These are the ONLY source for the trust and highlights
+  // sections — the renderer has no defaults to fall back on, by design.
+  trust: z.array(z.object({ title: z.string(), detail: z.string() })).min(3).max(4),
+  highlights: z.array(z.object({ title: z.string(), detail: z.string() })).min(3).max(3),
   layout: z.object({
     nav: e(NAV_VARIANTS),
     card: e(CARD_VARIANTS),
@@ -181,8 +185,11 @@ STEP 2 — Let the brief dictate every choice below. Two different briefs must p
 - shape: radius (0 sharp → 32 very rounded), buttonShape ("sharp" | "soft" | "pill"), borderWidth (0–3), shadow ("none" | "soft" | "elevated"). Minimal luxury tends sharp + shadowless; friendly brands round + soft; streetwear sharp + hard.
 - space: density ("airy" | "balanced" | "tight"), container (1040 intimate → 1440 wide). Premium almost always means MORE whitespace — when unsure, go airier.
 - layout: nav (${NAV_VARIANTS.join(" | ")}), card (${CARD_VARIANTS.join(" | ")}), footer (${FOOTER_VARIANTS.join(" | ")}), imageTreatment (${IMAGE_TREATMENTS.join(" | ")}), motion ("calm" | "lively"), announcement (a short top-bar line, or an empty string for none).
+- trust: 3–4 { title, detail } risk-reduction promises in THIS brand's voice. Treat these as BINDING COMMERCIAL TERMS the merchant will publish — so keep them to what any new store can genuinely honour on day one (a returns window, secure checkout, responsive support, how and when things ship). Never state a specific free-shipping threshold, delivery time, warranty length or price guarantee you were not given. Never make an environmental claim ("carbon neutral", "offset", "climate positive") — those are regulated and unprovable here.
+- highlights: exactly 3 { title, detail } reasons to want this brand — concrete and specific to this catalogue. Ground them in the product itself (what it is made of, what it does, who it is for, how it was designed). Never claim manufacturing facts you were not given, such as small-batch production, a country of origin, ethical sourcing or certification.
 
 Copy standards:
+- HONESTY is absolute. Everything you write will be PUBLISHED BY A REAL MERCHANT and read as their own commitment. This store has no customers and no history, so never invent reviews, ratings, testimonials, customer counts, awards, press mentions, certifications, factories, founding dates or sustainability credentials. Write desire from what is genuinely knowable: the product, the audience and the founder's intent.
 - Premium and specific — write as an experienced founder or luxury copywriter. Never generic filler.
 - Banned words: "Revolutionary", "Unlock", "Dive into", "Game-changing", "In today's digital world", "Elevate", "Unleash". No exclamation marks, no hype.
 - brand.story: 1–2 editorial sentences of honest brand narrative — why this brand exists, what it stands for — customer-facing, no clichés.

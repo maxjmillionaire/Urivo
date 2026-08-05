@@ -142,6 +142,26 @@ async function run() {
       const doubled = await page.locator("p").filter({ hasText: /[.!?]{2,}/ }).count();
       record(doubled === 0, "storefront has no doubled punctuation", `${doubled} paragraph(s)`);
 
+      /*
+       * Regression guard: the renderer's retired boilerplate. These exact lines
+       * were published by every generated store as the merchant's own binding
+       * commercial terms — shipping thresholds, a returns window and a carbon
+       * claim nobody had agreed to. Matched verbatim, so a merchant who really
+       * does offer free shipping can still say so in their own words.
+       */
+      const body = await page.locator("body").innerText().catch(() => "");
+      const FABRICATED = [
+        "On all orders over €60",
+        "No questions asked",
+        "Encrypted end to end",
+        "Considered, never disposable",
+        "Sourced for longevity, not margin",
+        "Quality control on every piece",
+        "Offset on every order",
+      ];
+      const found = FABRICATED.filter((c) => body.includes(c));
+      record(found.length === 0, "storefront makes no promises the merchant didn't author", found.join(" · "));
+
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );

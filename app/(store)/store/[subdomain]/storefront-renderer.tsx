@@ -60,6 +60,12 @@ export interface RenderProduct {
   show_logo?: boolean;
 }
 
+/** A navigation entry. Only ever built for a destination that exists. */
+interface NavLink {
+  label: string;
+  href: string;
+}
+
 function logoAnchor(position: LogoPosition): CSSProperties {
   const pad = "6%";
   switch (position) {
@@ -157,11 +163,11 @@ function scopedCss(ds: StoreDesignSystem): string {
 #uv-store a{ color:inherit; text-decoration:none; }
 #uv-store .uv-navlink{ font-size:.74rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); transition:color .2s ease; }
 #uv-store .uv-navlink:hover{ color:var(--ink); }
-/* Mobile: collapse the header text links to a clean brand + cart. Every link
-   points at the collection anyway, which sits just below the hero. */
+/* Mobile: tighten the header. The nav is now one or two real destinations, so
+   they stay visible instead of being hidden as surplus decoration. */
 @media (max-width: 640px){
-  #uv-store header nav{ gap:0 !important; }
-  #uv-store header a.uv-navlink{ display:none; }
+  #uv-store header nav{ gap:1.1rem !important; }
+  #uv-store header .uv-navlink{ font-size:.66rem; letter-spacing:.1em; }
   #uv-store header .uv-wrap{ padding-top:1.1rem; padding-bottom:1.1rem; }
 }
 #uv-store .uv-btn{
@@ -311,8 +317,16 @@ function monogramOf(alt?: string): string {
 
 /* --------------------------------- NAV ------------------------------------- */
 
-function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
-  const links = ["Shop", "About", "Journal"];
+/**
+ * Navigation over REAL destinations.
+ *
+ * This used to render Shop · About · Journal · Reviews on every store, all four
+ * pointing at the product grid. "Reviews" on a shop that has never had a
+ * customer is invented social proof, and a link that lies about where it goes is
+ * the loudest template tell on the page. The nav now lists only what the store
+ * actually has: the catalogue, and the story when one was written.
+ */
+function Nav({ storeName, ds, links }: { storeName: string; ds: StoreDesignSystem; links: NavLink[] }) {
   const brand = (
     <span className="uv-h" style={{ fontSize: "1.15rem", fontWeight: Math.max(ds.typeStyle.headingWeight, 600) }}>
       {storeName}
@@ -325,15 +339,12 @@ function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
       <header style={{ borderBottom: `var(--border-w) solid ${ds.palette.line}` }}>
         <div className="uv-wrap" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "1rem", padding: "1.4rem 0" }}>
           <nav style={{ display: "flex", gap: "1.6rem" }}>
-            {links.slice(0, 2).map((l) => (
-              <a key={l} href="#uv-shop" className="uv-navlink">{l}</a>
+            {links.map((l) => (
+              <a key={l.href} href={l.href} className="uv-navlink">{l.label}</a>
             ))}
           </nav>
           <div style={{ justifySelf: "center" }}>{brand}</div>
-          <div style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: "1.4rem" }}>
-            <a href="#uv-shop" className="uv-navlink">Reviews</a>
-            {cart}
-          </div>
+          <div style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: "1.4rem" }}>{cart}</div>
         </div>
       </header>
     );
@@ -344,8 +355,8 @@ function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 1.4rem" }}>
           {brand}
           <nav style={{ display: "flex", gap: "1.8rem" }}>
-            {[...links, "Reviews"].map((l) => (
-              <a key={l} href="#uv-shop" className="uv-navlink">{l}</a>
+            {links.map((l) => (
+              <a key={l.href} href={l.href} className="uv-navlink">{l.label}</a>
             ))}
           </nav>
           {cart}
@@ -369,8 +380,8 @@ function Nav({ storeName, ds }: { storeName: string; ds: StoreDesignSystem }) {
       <div className="uv-wrap" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.35rem 0" }}>
         {brand}
         <nav style={{ display: "flex", alignItems: "center", gap: "1.9rem" }}>
-          {[...links, "Reviews"].map((l) => (
-            <a key={l} href="#uv-shop" className="uv-navlink">{l}</a>
+          {links.map((l) => (
+            <a key={l.href} href={l.href} className="uv-navlink">{l.label}</a>
           ))}
           {cart}
         </nav>
@@ -391,7 +402,7 @@ function withStop(text: string): string {
   return /[.!?…]$/.test(t) ? t : `${t}.`;
 }
 
-function Hero({ storeName, ds, heroImage, logo }: { storeName: string; ds: StoreDesignSystem; heroImage?: string | null; logo?: StoreLogo | null }) {
+function Hero({ storeName, ds, heroImage, logo, storyHref }: { storeName: string; ds: StoreDesignSystem; heroImage?: string | null; logo?: StoreLogo | null; storyHref?: string | null }) {
   const tagline = withStop(ds.tagline || ds.personality);
   const eyebrow = "New collection";
 
@@ -406,7 +417,8 @@ function Hero({ storeName, ds, heroImage, logo }: { storeName: string; ds: Store
               <p style={{ marginTop: "1.4rem", maxWidth: "34ch", color: "var(--muted)", fontSize: "1.05rem" }}>{tagline}</p>
               <div style={{ marginTop: "2.2rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
                 <a href="#uv-shop" className="uv-btn">Shop the collection</a>
-                <a href="#uv-shop" className="uv-btn-ghost">Our story</a>
+                {/* Only offered when there is a story to go to. */}
+                {storyHref && <a href={storyHref} className="uv-btn-ghost">Our story</a>}
               </div>
             </div>
             <div style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: "var(--radius)", overflow: "hidden" }} className="uv-card">
@@ -594,20 +606,25 @@ function Marquee({ ds, storeName }: { ds: StoreDesignSystem; storeName: string }
   );
 }
 
+/*
+ * Risk reduction — rendered ONLY from promises this brand authored.
+ *
+ * This section used to ship a fixed list: free shipping over €60, 30-day
+ * returns, encrypted checkout. Every store published it, so every merchant was
+ * publishing binding commercial terms they had never agreed to. The renderer
+ * does not get to make promises on a merchant's behalf; no authored items, no
+ * section.
+ */
 function Trust({ ds }: { ds: StoreDesignSystem }) {
-  const items = [
-    ["Free shipping", "On all orders over €60"],
-    ["30-day returns", "No questions asked"],
-    ["Secure checkout", "Encrypted end to end"],
-    ["Made to last", "Considered, never disposable"],
-  ];
+  const items = ds.trust ?? [];
+  if (!items.length) return null;
   return (
     <section className="uv-wrap" style={{ paddingTop: "calc(var(--pad-y) * .5)", paddingBottom: "calc(var(--pad-y) * .5)" }}>
       <div style={{ display: "grid", gap: "1.5rem", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", borderTop: `var(--border-w) solid ${ds.palette.line}`, paddingTop: "2.2rem" }}>
-        {items.map(([h, s]) => (
-          <div key={h}>
-            <p className="uv-h" style={{ fontSize: ".98rem" }}>{h}</p>
-            <p style={{ marginTop: ".4rem", fontSize: ".84rem", color: "var(--muted)" }}>{s}</p>
+        {items.map((it) => (
+          <div key={it.title}>
+            <p className="uv-h" style={{ fontSize: ".98rem" }}>{it.title}</p>
+            <p style={{ marginTop: ".4rem", fontSize: ".84rem", color: "var(--muted)", lineHeight: 1.55 }}>{it.detail}</p>
           </div>
         ))}
       </div>
@@ -616,14 +633,15 @@ function Trust({ ds }: { ds: StoreDesignSystem }) {
 }
 
 function Story({ ds, storeName }: { ds: StoreDesignSystem; storeName: string }) {
-  // The real, on-brand narrative the Creative Director wrote (Design Engine 2.0).
-  // Fall back to a considered, honest line only for legacy stores without one.
-  const narrative =
-    ds.story?.trim() ||
-    "Made in small runs with materials chosen to age well. Nothing rushed, nothing disposable — only work we would be proud to keep for years.";
+  // The real, on-brand narrative the Creative Director wrote. The old fallback
+  // asserted small production runs and long-lived materials on behalf of any
+  // brand that lacked a story — a manufacturing claim the renderer cannot know
+  // to be true. A brand with no story told tells none.
+  const narrative = ds.story?.trim();
+  if (!narrative) return null;
   const positioning = ds.brief?.positioning?.trim();
   return (
-    <section className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)" }}>
+    <section id="uv-story" className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)", scrollMarginTop: "5rem" }}>
       <div style={{ display: "grid", gap: "2.5rem", gridTemplateColumns: "1fr", maxWidth: "64ch" }}>
         <div>
           <p className="uv-eyebrow">The story</p>
@@ -639,20 +657,20 @@ function Story({ ds, storeName }: { ds: StoreDesignSystem; storeName: string }) 
   );
 }
 
+/* Reasons to want the brand — authored, or absent. The previous fixed list
+ * claimed considered materials, small production runs and carbon-offset
+ * delivery for every store ever generated, including ones selling none of it. */
 function Highlights({ ds }: { ds: StoreDesignSystem }) {
-  const items = [
-    ["Considered materials", "Sourced for longevity, not margin."],
-    ["Made in small runs", "Quality control on every piece."],
-    ["Carbon-aware delivery", "Offset on every order."],
-  ];
+  const items = ds.highlights ?? [];
+  if (!items.length) return null;
   return (
     <section className="uv-wrap" style={{ paddingTop: "calc(var(--pad-y) * .6)", paddingBottom: "calc(var(--pad-y) * .6)" }}>
       <div style={{ display: "grid", gap: "1.6rem", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
-        {items.map(([h, s], i) => (
-          <div key={h} style={{ padding: "1.6rem", border: `var(--border-w) solid ${ds.palette.line}`, borderRadius: "var(--radius)", background: "var(--surface)" }}>
+        {items.map((it, i) => (
+          <div key={it.title} style={{ padding: "1.6rem", border: `var(--border-w) solid ${ds.palette.line}`, borderRadius: "var(--radius)", background: "var(--surface)" }}>
             <span className="uv-h" style={{ color: "var(--accent)", fontSize: "1.4rem" }}>{String(i + 1).padStart(2, "0")}</span>
-            <p className="uv-h" style={{ fontSize: "1.05rem", marginTop: ".8rem" }}>{h}</p>
-            <p style={{ marginTop: ".5rem", fontSize: ".88rem", color: "var(--muted)" }}>{s}</p>
+            <p className="uv-h" style={{ fontSize: "1.05rem", marginTop: ".8rem" }}>{it.title}</p>
+            <p style={{ marginTop: ".5rem", fontSize: ".88rem", color: "var(--muted)", lineHeight: 1.55 }}>{it.detail}</p>
           </div>
         ))}
       </div>
@@ -678,7 +696,13 @@ function Newsletter({ ds, storeName }: { ds: StoreDesignSystem; storeName: strin
   );
 }
 
-function Footer({ ds, storeName }: { ds: StoreDesignSystem; storeName: string }) {
+function Footer({ ds, storeName, catalog, storeBase, links }: {
+  ds: StoreDesignSystem;
+  storeName: string;
+  catalog: RenderProduct[];
+  storeBase: string;
+  links: NavLink[];
+}) {
   if (ds.layout.footer === "bold") {
     return (
       <footer style={{ background: ds.palette.accent, color: ds.palette.accentInk }}>
@@ -702,26 +726,42 @@ function Footer({ ds, storeName }: { ds: StoreDesignSystem; storeName: string })
       </footer>
     );
   }
-  // editorial
-  const cols = [
-    ["Shop", ["New in", "Best sellers", "Collections", "Gift cards"]],
-    ["About", ["Our story", "Materials", "Sustainability", "Contact"]],
-    ["Support", ["Shipping", "Returns", "FAQ", "Care guide"]],
-  ] as const;
+  /*
+   * The editorial footer used to print twelve links — New in, Best sellers,
+   * Gift cards, Materials, Sustainability, Shipping, Returns, FAQ, Care guide —
+   * every one of them pointing at the product grid. None of those pages exist,
+   * "Best sellers" claims sales this store has never made, and "Sustainability"
+   * is a regulated claim rendered as furniture. It now lists the real catalogue
+   * and the real anchors, which is also what a good small brand's footer does.
+   */
+  const cols: { heading: string; items: NavLink[] }[] = [];
+  if (catalog.length) {
+    cols.push({
+      heading: "The collection",
+      items: catalog.slice(0, 6).map((p) => ({ label: p.title, href: `${storeBase}/product/${p.id}` })),
+    });
+  }
+  if (links.length) cols.push({ heading: "Explore", items: links });
+
   return (
     <footer style={{ borderTop: `var(--border-w) solid ${ds.palette.line}` }}>
       <div className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "2.4rem" }}>
-        <div style={{ display: "grid", gap: "2.4rem", gridTemplateColumns: "1.4fr 1fr 1fr 1fr" }} className="uv-foot-grid">
+        <div
+          className="uv-foot-grid"
+          style={{ display: "grid", gap: "2.4rem", gridTemplateColumns: `1.4fr ${cols.map(() => "1fr").join(" ")}`.trim() }}
+        >
           <div>
             <p className="uv-h" style={{ fontSize: "1.35rem" }}>{storeName}</p>
             <p style={{ marginTop: ".9rem", color: "var(--muted)", fontSize: ".9rem", maxWidth: "28ch" }}>{ds.personality}.</p>
           </div>
-          {cols.map(([h, items]) => (
-            <div key={h}>
-              <p className="uv-eyebrow">{h}</p>
+          {cols.map((col) => (
+            <div key={col.heading}>
+              <p className="uv-eyebrow">{col.heading}</p>
               <ul style={{ listStyle: "none", padding: 0, margin: "1rem 0 0", display: "grid", gap: ".6rem" }}>
-                {items.map((it) => (
-                  <li key={it}><a href="#uv-shop" className="uv-navlink" style={{ textTransform: "none", letterSpacing: 0, fontSize: ".88rem" }}>{it}</a></li>
+                {col.items.map((it) => (
+                  <li key={it.href}>
+                    <a href={it.href} className="uv-navlink" style={{ textTransform: "none", letterSpacing: 0, fontSize: ".88rem" }}>{it.label}</a>
+                  </li>
                 ))}
               </ul>
             </div>
@@ -875,7 +915,7 @@ function NProof({ block, ds }: { block: ProofBlock; ds: StoreDesignSystem }) {
 
 function NStory({ block }: { block: StoryBlock }) {
   return (
-    <section className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)" }}>
+    <section id="uv-story" className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)", scrollMarginTop: "5rem" }}>
       <div style={{ maxWidth: "64ch" }}>
         {block.eyebrow && <p className="uv-eyebrow">{block.eyebrow}</p>}
         <h2 className="uv-h" style={{ fontSize: "var(--h2)", marginTop: block.eyebrow ? "1.2rem" : 0, maxWidth: "26ch" }}>{block.headline}</h2>
@@ -998,17 +1038,31 @@ export function StorefrontRenderer({
   const rootDomain = (process.env.ROOT_DOMAIN ?? "localhost:3000").toLowerCase();
   const storeBase = rootDomain.startsWith("localhost") ? `/store/${subdomain}` : "";
 
+  /*
+   * Navigation is derived from the page that is about to be rendered, so a link
+   * can never point at a section that isn't there. Both engines are considered:
+   * the authored narrative may carry a story beat, and a legacy store may have
+   * one in its section order.
+   */
+  const hasStory = ds.narrative?.length
+    ? ds.narrative.some((b) => b.kind === "story")
+    : ds.layout.sectionOrder.includes("story") && Boolean(ds.story?.trim());
+  const navLinks: NavLink[] = [
+    ...(catalog.length ? [{ label: "Shop", href: "#uv-shop" }] : []),
+    ...(hasStory ? [{ label: "Story", href: "#uv-story" }] : []),
+  ];
+
   const render = (key: SectionKey) => {
     switch (key) {
       case "announcement": return <Announcement key={key} ds={ds} />;
-      case "hero": return <Hero key={key} storeName={storeName} ds={ds} heroImage={heroImage} logo={logo} />;
+      case "hero": return <Hero key={key} storeName={storeName} ds={ds} heroImage={heroImage} logo={logo} storyHref={hasStory ? "#uv-story" : null} />;
       case "marquee": return <Marquee key={key} ds={ds} storeName={storeName} />;
       case "trust": return <Trust key={key} ds={ds} />;
       case "collection": return <Collection key={key} ds={ds} catalog={catalog} logo={logo} storeBase={storeBase} />;
       case "story": return <Story key={key} ds={ds} storeName={storeName} />;
       case "highlights": return <Highlights key={key} ds={ds} />;
       case "newsletter": return <Newsletter key={key} ds={ds} storeName={storeName} />;
-      case "footer": return <Footer key={key} ds={ds} storeName={storeName} />;
+      case "footer": return <Footer key={key} ds={ds} storeName={storeName} catalog={catalog} storeBase={storeBase} links={navLinks} />;
       default: return null;
     }
   };
@@ -1023,7 +1077,7 @@ export function StorefrontRenderer({
     content = (
       <>
         {narrative.map((block, i) => renderBlock(block, i, ctx))}
-        <Footer ds={ds} storeName={storeName} />
+        <Footer ds={ds} storeName={storeName} catalog={catalog} storeBase={storeBase} links={navLinks} />
       </>
     );
   } else {
@@ -1039,7 +1093,7 @@ export function StorefrontRenderer({
       <div id="uv-store" style={buildVars(ds)}>
         <StoreCartProvider subdomain={subdomain} currency={currency}>
           {ds.layout.announcement && <Announcement ds={ds} />}
-          <Nav storeName={storeName} ds={ds} />
+          <Nav storeName={storeName} ds={ds} links={navLinks} />
           {content}
         </StoreCartProvider>
       </div>

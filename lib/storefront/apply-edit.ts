@@ -54,9 +54,12 @@ export function applyDesignPatch(current: StoreDesignSystem, patch: DesignPatch)
     personality: patch.personality ?? current.personality,
     tagline: patch.tagline ?? current.tagline,
     // Carry through the authored intelligence a palette/type tweak must not wipe:
-    // the emotional journey, the creative brief and the brand story.
+    // the emotional journey, the creative brief, the brand story and the
+    // merchant's own promises (which nothing but the merchant may author).
     brief: current.brief,
     story: current.story,
+    trust: current.trust,
+    highlights: current.highlights,
     narrative: current.narrative,
     palette: { ...current.palette },
     fonts: { ...current.fonts },
