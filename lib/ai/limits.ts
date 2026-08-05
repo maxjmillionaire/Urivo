@@ -19,25 +19,25 @@
  *    out; ~4 chars/token). Recomputed from the live max_tokens and the credit
  *    prices in lib/credit-costs.ts ─────────────────────────────────────────────
  *   Store generation (20 cr): ~€0.61  → ~€0.030/credit   (16k + 8k out, two calls)
- *   Market research   (3 cr): ~€0.11  → ~€0.035/credit
- *   Ad studio         (3 cr): ~€0.11  → ~€0.035/credit
- *   Store editor      (1 cr): ~€0.08  → ~€0.075/credit
- *   Ask Urivo         (1 cr): ~€0.09  → ~€0.087/credit
- * Every action stays under the €0.10/credit planning figure, and far below the
- * €0.10–0.18 break-even of even the deepest creator price. The "worst case" is
- * engineered out, not hoped away.
+ *   Market research   (4 cr): ~€0.11  → ~€0.026/credit
+ *   Ad studio         (4 cr): ~€0.11  → ~€0.026/credit
+ *   Store editor      (2 cr): ~€0.08  → ~€0.038/credit
+ *   Ask Urivo         (2 cr): ~€0.09  → ~€0.044/credit
+ * Every action stays well under the €0.10/credit planning figure, and far below
+ * the €0.10–0.18 break-even of even the deepest creator price. The "worst case"
+ * is engineered out, not hoped away.
  *
- * Ask Urivo is now the tightest row, by design. Its output ceiling was raised
- * from 700 to 2,400 tokens so a hard question — "why is nobody buying?", "give
- * me a 30-day launch plan" — can actually be answered; five sentences could
- * not. That ceiling also covers extended thinking, which is what keeps the
- * bound real. Typical turns cost a fraction of it: most replies are short, and
- * the system prompt is cached across the conversation.
+ * Ask Urivo's output ceiling was raised from 700 to 2,400 tokens so a hard
+ * question — "why is nobody buying?", "give me a 30-day launch plan" — can
+ * actually be answered; five sentences could not. That ceiling also covers
+ * extended thinking, which is what keeps the bound real. At 1 credit that put
+ * it at ~€0.087/credit, nearly three times the cost-per-credit of every other
+ * action; it now charges 2 credits and sits in the same band as the rest.
+ * Typical turns cost a fraction of the ceiling: most replies are short, and the
+ * system prompt is cached across the conversation.
  *
  * If you raise any `max_tokens` or a budget here, re-check the row above: the
- * invariant is worst-case-cost(action) ≤ its credit budget × €0.10. Ask Urivo
- * has ~€0.013/credit of headroom left — raising its ceiling again means
- * charging more than one credit for a turn.
+ * invariant is worst-case-cost(action) ≤ its credit budget × €0.10.
  */
 
 export const AI_INPUT_BUDGET = {

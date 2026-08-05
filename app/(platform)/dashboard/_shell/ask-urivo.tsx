@@ -8,7 +8,9 @@ import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { IconSpark, IconArrow } from "./icons";
 import { Markdown } from "./markdown";
 
-const MESSAGE_COST = CREDIT_COSTS.askMessage;
+/* Widened from the literal type so the pluralisation below survives a
+   repricing — at the literal `2`, comparing to 1 is a type error. */
+const MESSAGE_COST: number = CREDIT_COSTS.askMessage;
 
 /*
  * Interactive "Ask Urivo" — the conversational half of the companion rail.
@@ -485,7 +487,7 @@ export function AskUrivo({
                   : "Urivo is working it out…"
                 : outOfCredits
                   ? "Out of credits"
-                  : `${MESSAGE_COST} credit · ${creditsLeft} left`}
+                  : `${MESSAGE_COST} credit${MESSAGE_COST === 1 ? "" : "s"} · ${creditsLeft} left`}
             </span>
             {busy ? (
               /* A long answer is a feature, but never a trap — stop keeps what
