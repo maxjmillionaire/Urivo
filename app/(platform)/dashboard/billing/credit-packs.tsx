@@ -89,7 +89,9 @@ export function CreditPacks({ compact = false }: { compact?: boolean }) {
             </div>
             <p className="mt-2 text-sm text-ivory">
               {pack.credits} credits
-              <span className="text-mist"> · {packStores(pack)} stores</span>
+              <span className="text-mist">
+                {" "}· {packStores(pack)} store{packStores(pack) === 1 ? "" : "s"}
+              </span>
             </p>
             <div className={compact ? "mt-3" : "mt-5"}>
               <BuyButton pack={pack} highlight={popular} />

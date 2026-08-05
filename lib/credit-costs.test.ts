@@ -43,6 +43,22 @@ describe("pricing never closes the top of the funnel", () => {
     expect(PLANS.pro.monthlyCredits).toBeGreaterThan(PLANS.core.monthlyCredits * 2);
   });
 
+  /*
+   * The ladder invariant, and the one that was actually broken: Pro shipped at
+   * 500 credits for €199, which is €0.398/credit against Founder's €0.327 — so
+   * the expensive tier was 22% WORSE value and no rational customer would ever
+   * climb it. A tier must get cheaper per unit as you go up, or it is not a
+   * tier, it is a penalty. Pro needs to clear 610 credits just to draw level.
+   */
+  it("makes every step up the ladder cheaper per credit, never more expensive", () => {
+    const rate = (p: (typeof PLANS)[keyof typeof PLANS]) => p.price.regular / p.monthlyCredits;
+    const founder = rate(PLANS.core);
+    const pro = rate(PLANS.pro);
+    expect(pro).toBeLessThan(founder);
+    // And by enough to feel like an upgrade rather than a rounding difference.
+    expect(1 - pro / founder).toBeGreaterThanOrEqual(0.2);
+  });
+
   it("prices every pack above the subscription rate, so packs never undercut a plan", () => {
     const founderRate = PLANS.core.price.regular / PLANS.core.monthlyCredits;
     for (const pack of Object.values(CREDIT_PACKS)) {

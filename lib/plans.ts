@@ -99,8 +99,8 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
   pro: {
     key: "pro",
     name: "Pro",
-    tagline: "The most credits, highest generation priority, and Advanced Evolution.",
-    monthlyCredits: 500,
+    tagline: "Built to run a portfolio — five times the credits, highest priority, Advanced Evolution.",
+    monthlyCredits: 800,
     signupCredits: 0,
     priority: "highest",
     generationsPerMinute: 15,
@@ -114,7 +114,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
     },
     price: { currency: "EUR", launch: 199, regular: 199, founding: 149 },
     highlights: [
-      "500 AI credits every month",
+      "800 AI credits every month",
       "Advanced Evolution Lab",
       "Highest AI generation priority",
       "Premium support",
