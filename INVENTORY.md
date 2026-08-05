@@ -3,7 +3,7 @@
 A map of what is built, so nothing gets built twice and nothing gets assumed
 missing. Regenerate the counts with the commands at the bottom.
 
-**Scale:** 28 migrations · 33 API routes · 19 pages · 10 AI modules · 71 tests
+**Scale:** 28 migrations · 33 API routes · 19 pages · 10 AI modules · 98 tests
 
 ---
 
@@ -13,7 +13,7 @@ missing. Regenerate the counts with the commands at the bottom.
 | --- | --- | --- |
 | Store generation (brand, catalogue, full design system) | `lib/ai/store-generator.ts`, `/api/generate-store` | Shipped |
 | AI product photography (Higgsfield → Gemini fallback → branded placeholder) | `lib/ai/image-generator.ts` | Shipped (needs key) |
-| Ask Urivo — grounded assistant | `lib/ai/assistant.ts`, `/api/ask` | Shipped |
+| Ask Urivo — streaming assistant grounded in real traffic, orders and revenue | `lib/ai/assistant.ts`, `lib/ai/context.ts`, `/api/ask` | Shipped |
 | Ask Urivo — propose → confirm → apply a real store edit | `lib/ai/store-editor.ts`, `lib/storefront/apply-edit.ts` | Shipped |
 | Market research / product discovery | `lib/ai/market-research.ts`, `/dashboard/research` | Shipped |
 | Ad Studio | `lib/ai/ad-studio.ts`, `/dashboard/ads` | Shipped |

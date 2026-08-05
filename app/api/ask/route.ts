@@ -1,31 +1,31 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
-import { parseTheme } from "@/lib/storefront";
 import { getPlanForUser } from "@/lib/plan-access";
 import { getCreditBalance, spendCredits } from "@/lib/credits";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { rateLimit } from "@/lib/ratelimit";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
-import {
-  streamAssistantReply,
-  ASSISTANT_MODEL,
-  type StoreContext,
-} from "@/lib/ai/assistant";
+import { streamAssistant, ASSISTANT_MODEL } from "@/lib/ai/assistant";
+import { loadAssistantContext, type AssistantContext } from "@/lib/ai/context";
 import { recordAiUsage } from "@/lib/finance/ledger";
 import type { TokenUsage } from "@/lib/finance/cost-model";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /*
- * "Ask Urivo" conversation endpoint (companion rail).
+ * "Ask Urivo" — the single conversation endpoint.
  *
- * Streams a grounded, store-aware assistant reply as text/plain chunks so the
- * rail renders token-by-token. Grounding context is loaded server-side from the
- * authenticated user's active store — never trusted from the client.
+ * Streams newline-delimited JSON events so the rail can render prose as it
+ * arrives, show the reasoning phase, and surface a proposed store change as a
+ * card the founder approves. One endpoint whether or not a store exists: the
+ * assistant's grounding changes, its capability does not.
+ *
+ * Grounding is loaded server-side from the authenticated user's own data and is
+ * never accepted from the client.
  */
 
 const BodySchema = z.object({
@@ -42,38 +42,6 @@ const BodySchema = z.object({
 
 function fail(status: number, error: string, message: string) {
   return NextResponse.json({ error, message }, { status });
-}
-
-async function loadStoreContext(userId: string): Promise<StoreContext | null> {
-  const supabase = await supabaseServer();
-  const { data: stores } = await supabase
-    .from("stores")
-    .select("id, store_name, subdomain, is_active, theme_config, created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-  if (!stores || stores.length === 0) return null;
-
-  const top = stores.find((s) => s.is_active) ?? stores[0];
-  const theme = parseTheme(top.theme_config);
-  const { data: products } = await supabase
-    .from("products")
-    .select("title, description, price_eur")
-    .eq("store_id", top.id)
-    .order("position", { ascending: true })
-    .limit(8);
-
-  return {
-    name: top.store_name,
-    subdomain: top.subdomain,
-    tagline: theme.tagline,
-    isLive: top.is_active,
-    palette: { background: theme.background, structure: theme.structure, accent: theme.accent },
-    products: (products ?? []).map((p) => ({
-      title: p.title,
-      description: p.description,
-      priceEUR: Number(p.price_eur),
-    })),
-  };
 }
 
 export async function POST(request: NextRequest) {
@@ -123,50 +91,79 @@ export async function POST(request: NextRequest) {
   }
 
   const requestId = newRequestId();
-  let store: StoreContext | null = null;
+  let context: AssistantContext;
   try {
-    store = await loadStoreContext(user.id);
+    context = await loadAssistantContext(user.id);
   } catch (err) {
-    captureException(err, { requestId, userId: user.id, route: "ask" });
-    // Non-fatal: continue without grounding rather than failing the chat.
+    captureException(err, { requestId, userId: user.id, route: "ask:context" });
+    // Non-fatal: an ungrounded answer beats a failed conversation. The prompt
+    // forbids inventing numbers, so a missing snapshot costs specificity only.
+    context = {
+      store: null,
+      metrics: null,
+      account: { plan: plan.name, credits: balance, storeCount: 0, canTakePayments: false },
+      unavailable: true,
+    };
   }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const send = (event: unknown) =>
+        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+
+      let usage: TokenUsage | null = null;
+      let produced = false;
       try {
-        let usage: TokenUsage | null = null;
-        for await (const chunk of streamAssistantReply(
-          apiKey,
-          body.messages,
-          store,
-          (u) => {
-            usage = u;
-          },
-        )) {
-          controller.enqueue(encoder.encode(chunk));
+        for await (const event of streamAssistant(apiKey, body.messages, context)) {
+          if (event.type === "usage") {
+            usage = event.usage;
+            continue;
+          }
+          if (event.type === "edit") {
+            produced = true;
+            /*
+             * Name the store the proposal was reasoned about. The rail and this
+             * route each pick "the founder's top store" independently; if those
+             * rules ever drift, an Apply button would write a change to a
+             * different store than the one Urivo was looking at. Carrying the
+             * id makes that impossible rather than merely unlikely.
+             */
+            send({ ...event, storeId: context.store?.id ?? null });
+            continue;
+          }
+          if (event.type === "text") produced = true;
+          send(event);
         }
-        // Charge for the completed message BEFORE closing the stream — after
-        // close() a serverless function may freeze before the charge runs.
-        // A failed message never reaches here, so it never costs (spec 6.2 §19).
-        try {
-          await spendCredits(user.id, CREDIT_COSTS.askMessage, "Ask Urivo message", "ask");
-          await recordAiUsage({
-            userId: user.id,
-            feature: "askMessage",
-            credits: CREDIT_COSTS.askMessage,
-            usage: usage ?? undefined,
-            model: ASSISTANT_MODEL,
-            requestId,
-          });
-        } catch (err) {
-          captureException(err, { requestId, userId: user.id, route: "ask:charge" });
+
+        // Charge for the completed turn BEFORE closing the stream — after
+        // close() a serverless function may freeze before the charge runs. A
+        // turn that produced nothing is not charged (spec 6.2 §19).
+        if (produced) {
+          try {
+            await spendCredits(user.id, CREDIT_COSTS.askMessage, "Ask Urivo message", "ask");
+            await recordAiUsage({
+              userId: user.id,
+              feature: "askMessage",
+              credits: CREDIT_COSTS.askMessage,
+              usage: usage ?? undefined,
+              model: ASSISTANT_MODEL,
+              requestId,
+            });
+          } catch (err) {
+            captureException(err, { requestId, userId: user.id, route: "ask:charge" });
+          }
         }
       } catch (err) {
         captureException(err, { requestId, userId: user.id, route: "ask" });
-        controller.enqueue(
-          encoder.encode("\n\nSomething interrupted that response. Please try again."),
-        );
+        // Reported in-band so a mid-stream failure is visible as an error the
+        // founder can retry, not as prose appended to a half-written answer.
+        send({
+          type: "error",
+          message: produced
+            ? "That response was cut short. Retry to pick it up again."
+            : "Ask Urivo couldn't answer that just now. Please try again.",
+        });
       } finally {
         controller.close();
       }
@@ -175,7 +172,7 @@ export async function POST(request: NextRequest) {
 
   return new Response(stream, {
     headers: {
-      "Content-Type": "text/plain; charset=utf-8",
+      "Content-Type": "application/x-ndjson; charset=utf-8",
       "Cache-Control": "no-store",
       "X-Accel-Buffering": "no",
     },

@@ -17,6 +17,7 @@ import {
   SECTION_KEYS,
   type StoreDesignSystem,
 } from "@/lib/storefront/design-system";
+import { AIEditPlanSchema } from "./edit-plan";
 import { AI_INPUT_BUDGET, boundHistory, clampText } from "./limits";
 import type { TokenUsage } from "@/lib/finance/cost-model";
 
@@ -30,52 +31,9 @@ import type { TokenUsage } from "@/lib/finance/cost-model";
 
 export const EDITOR_MODEL = modelFor("storeEdit");
 
-const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
-const en = <T extends readonly string[]>(v: T) => z.enum(v as unknown as [string, ...string[]]);
-
-const DesignPatchSchema = z
-  .object({
-    name: z.string().min(2).max(60).optional(),
-    tagline: z.string().min(2).max(160).optional(),
-    personality: z.string().min(3).max(80).optional(),
-    background: hex.optional(),
-    ink: hex.optional(),
-    accent: hex.optional(),
-    headingKey: en(FONT_KEYS).optional(),
-    bodyKey: en(FONT_KEYS).optional(),
-    radius: z.number().min(0).max(32).optional(),
-    buttonShape: en(BUTTON_SHAPES).optional(),
-    shadow: en(SHADOW_LEVELS).optional(),
-    density: en(DENSITIES).optional(),
-    nav: en(NAV_VARIANTS).optional(),
-    hero: en(HERO_VARIANTS).optional(),
-    card: en(CARD_VARIANTS).optional(),
-    footer: en(FOOTER_VARIANTS).optional(),
-    imageTreatment: en(IMAGE_TREATMENTS).optional(),
-    motion: en(MOTION_LEVELS).optional(),
-    announcement: z.string().max(120).nullable().optional(),
-    sectionOrder: en(SECTION_KEYS).array().optional(),
-  })
-  .optional();
-
-const ProductEditSchema = z.object({
-  action: z.enum(["add", "update", "remove"]),
-  index: z.number().int().min(0).optional(),
-  title: z.string().min(1).max(120).optional(),
-  description: z.string().min(1).max(400).optional(),
-  priceEUR: z.number().positive().max(100000).optional(),
-});
-
 const AIEditSchema = z.object({
   reply: z.string().min(1).max(1200),
-  edit: z
-    .object({
-      summary: z.string().min(3).max(200),
-      design: DesignPatchSchema,
-      products: ProductEditSchema.array().max(8).optional(),
-      setLive: z.boolean().optional(),
-    })
-    .nullable(),
+  edit: AIEditPlanSchema.nullable(),
 });
 
 export type AIEdit = z.infer<typeof AIEditSchema>;

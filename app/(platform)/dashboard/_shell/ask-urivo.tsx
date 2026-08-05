@@ -6,16 +6,20 @@ import { useRouter } from "next/navigation";
 import { nextPlan } from "@/lib/plans";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { IconSpark, IconArrow } from "./icons";
+import { Markdown } from "./markdown";
 
 const MESSAGE_COST = CREDIT_COSTS.askMessage;
 
 /*
  * Interactive "Ask Urivo" — the conversational half of the companion rail.
  *
- * With a live store it becomes an editor: the founder describes a change, Urivo
- * proposes it, and one tap applies it to the real store (copy, palette, fonts,
- * layout, products) — the storefront preview updates in place. Without a store
- * it streams grounded advice to help shape the first one.
+ * ONE assistant, one streaming path. It used to fork on whether a store
+ * existed: storeless founders got a streaming chat, and everyone else got a
+ * blocking edit-proposer, so the rail sat on three bouncing dots for the whole
+ * call and then dropped a wall of text. Now every turn streams, and a proposed
+ * change arrives as a card mid-conversation — so one answer can diagnose a
+ * problem AND offer the fix, which is the point of an assistant that can see
+ * your business.
  */
 
 interface ProposedEdit {
@@ -25,16 +29,31 @@ interface ProposedEdit {
   setLive?: boolean;
 }
 
+type Phase = "thinking" | "writing";
+
 interface Msg {
   id: string;
   role: "user" | "assistant";
   content: string;
   edit?: ProposedEdit | null;
+  /** The store the proposal was reasoned about — authoritative over the prop. */
+  editStoreId?: string | null;
   applied?: boolean;
+  /** Set when the turn failed; the bubble stays put and offers a retry. */
+  error?: string | null;
+  phase?: Phase | null;
 }
 
-const SUGGESTIONS_STORE = ["Rewrite my hero headline", "Add one more product", "Make it feel more minimal", "Warm up the palette"];
+const SUGGESTIONS_STORE = [
+  "Why is nobody buying?",
+  "What should I fix first?",
+  "Rewrite my hero headline",
+  "Give me a 30-day launch plan",
+];
 const SUGGESTIONS_EMPTY = ["Help me name my brand", "What should I sell first?", "Shape my store idea"];
+
+const TRANSCRIPT_KEY = "urivo_ask_transcript";
+const MAX_PERSISTED = 24;
 
 let idSeq = 0;
 const nextId = () => `m${++idSeq}-${Date.now()}`;
@@ -77,58 +96,120 @@ export function AskUrivo({
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const streamChat = useCallback(async (history: Msg[], assistantId: string, signal: AbortSignal) => {
-    const res = await fetch("/api/ask", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: history.map((m) => ({ role: m.role, content: m.content })) }),
-      signal,
-    });
-    if (!res.ok || !res.body) {
-      let message = "Ask Urivo is unavailable right now. Please try again.";
-      try {
-        const data = await res.json();
-        if (data?.message) message = data.message;
-      } catch {
-        /* non-JSON */
-      }
-      const err = new Error(message);
-      if (res.status === 402) (err as Error & { code?: string }).code = "INSUFFICIENT_CREDITS";
-      throw err;
-    }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let acc = "";
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      acc += decoder.decode(value, { stream: true });
-      setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: acc } : m)));
-    }
-    if (!acc.trim()) {
-      setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: "I didn't catch that — try again?" } : m)));
+  /*
+   * The transcript survives navigation and reload. Losing a long, carefully
+   * built conversation to a stray refresh is the fastest way to make an
+   * assistant feel disposable. Session-scoped: it belongs to this tab and this
+   * sitting, and it never touches disk.
+   */
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    try {
+      const raw = sessionStorage.getItem(TRANSCRIPT_KEY);
+      if (!raw) return;
+      const saved: unknown = JSON.parse(raw);
+      if (!Array.isArray(saved)) return;
+      const clean = saved.filter(
+        (m): m is Msg =>
+          !!m && typeof m === "object" &&
+          (m as Msg).role !== undefined && typeof (m as Msg).content === "string",
+      );
+      // Never restore a turn mid-flight: a stream cannot resume after a reload.
+      if (clean.length) setMessages(clean.map((m) => ({ ...m, phase: null })));
+    } catch {
+      /* a corrupt transcript is simply not restored */
     }
   }, []);
 
-  const editPropose = useCallback(
+  useEffect(() => {
+    if (!restored.current) return;
+    try {
+      if (messages.length === 0) sessionStorage.removeItem(TRANSCRIPT_KEY);
+      else sessionStorage.setItem(TRANSCRIPT_KEY, JSON.stringify(messages.slice(-MAX_PERSISTED)));
+    } catch {
+      /* storage full or blocked — the conversation still works in memory */
+    }
+  }, [messages]);
+
+  /*
+   * Consume the NDJSON event stream. Text is appended as it arrives, the
+   * reasoning phase is surfaced honestly, and a proposed change becomes a card.
+   * Partial lines are buffered — a chunk boundary can land mid-JSON.
+   */
+  const runTurn = useCallback(
     async (history: Msg[], assistantId: string, signal: AbortSignal) => {
-      const res = await fetch(`/api/stores/${storeId}/edit`, {
+      const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history.map((m) => ({ role: m.role, content: m.content })) }),
+        body: JSON.stringify({
+          messages: history
+            .filter((m) => m.content.trim() && !m.error)
+            .map((m) => ({ role: m.role, content: m.content })),
+        }),
         signal,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        const err = new Error(data?.message || "Ask Urivo is unavailable right now. Please try again.");
+
+      if (!res.ok || !res.body) {
+        let message = "Ask Urivo is unavailable right now. Please try again.";
+        try {
+          const data = await res.json();
+          if (data?.message) message = data.message;
+        } catch {
+          /* non-JSON */
+        }
+        const err = new Error(message);
         if (res.status === 402) (err as Error & { code?: string }).code = "INSUFFICIENT_CREDITS";
         throw err;
       }
-      setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, content: data.reply || "Done.", edit: data.edit ?? null } : m)),
-      );
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      const patch = (fn: (m: Msg) => Msg) =>
+        setMessages((prev) => prev.map((m) => (m.id === assistantId ? fn(m) : m)));
+
+      let buffer = "";
+      let acc = "";
+      let charged = true;
+
+      const handle = (line: string) => {
+        let event: {
+          type?: string; text?: string; phase?: Phase;
+          edit?: ProposedEdit; storeId?: string | null; message?: string;
+        };
+        try {
+          event = JSON.parse(line);
+        } catch {
+          return; // a malformed frame is skipped, never rendered
+        }
+        if (event.type === "text" && typeof event.text === "string") {
+          acc += event.text;
+          patch((m) => ({ ...m, content: acc, phase: "writing" }));
+        } else if (event.type === "phase" && event.phase) {
+          patch((m) => ({ ...m, phase: event.phase as Phase }));
+        } else if (event.type === "edit" && event.edit) {
+          patch((m) => ({ ...m, edit: event.edit as ProposedEdit, editStoreId: event.storeId ?? null }));
+        } else if (event.type === "error") {
+          charged = false;
+          patch((m) => ({ ...m, error: event.message ?? "Something interrupted that response." }));
+        }
+      };
+
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) if (line.trim()) handle(line);
+      }
+      if (buffer.trim()) handle(buffer);
+
+      patch((m) => ({ ...m, phase: null }));
+      return { produced: acc.trim().length > 0, charged };
     },
-    [storeId],
+    [],
   );
 
   const send = useCallback(
@@ -142,7 +223,7 @@ export function AskUrivo({
       }
       setError(null);
       const userMsg: Msg = { id: nextId(), role: "user", content };
-      const assistantMsg: Msg = { id: nextId(), role: "assistant", content: "" };
+      const assistantMsg: Msg = { id: nextId(), role: "assistant", content: "", phase: "thinking" };
       const history = [...messages, userMsg];
       setMessages([...history, assistantMsg]);
       setDraft("");
@@ -151,25 +232,54 @@ export function AskUrivo({
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        if (storeId) await editPropose(history, assistantMsg.id, controller.signal);
-        else await streamChat(history, assistantMsg.id, controller.signal);
-        setCreditsLeft((c) => Math.max(0, c - MESSAGE_COST));
+        const { produced, charged } = await runTurn(history, assistantMsg.id, controller.signal);
+        // Only a turn that actually produced an answer is charged server-side,
+        // so the visible balance must follow the same rule.
+        if (produced && charged) setCreditsLeft((c) => Math.max(0, c - MESSAGE_COST));
       } catch (err) {
-        if ((err as Error).name === "AbortError") return;
+        if ((err as Error).name === "AbortError") {
+          // Keep whatever streamed before the stop — it is still an answer.
+          setMessages((prev) =>
+            prev
+              .map((m) => (m.id === assistantMsg.id ? { ...m, phase: null } : m))
+              .filter((m) => m.id !== assistantMsg.id || m.content.trim().length > 0),
+          );
+          return;
+        }
+        const message = err instanceof Error ? err.message : "Something went wrong.";
         if ((err as Error & { code?: string }).code === "INSUFFICIENT_CREDITS") {
           setCreditsLeft(0);
           setCreditNudge(true);
         }
-        setError(err instanceof Error ? err.message : "Something went wrong.");
-        setMessages((prev) => prev.filter((m) => m.id !== assistantMsg.id));
+        // The turn stays in place carrying its error, so the founder can retry
+        // it rather than losing the exchange and retyping the question.
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantMsg.id ? { ...m, phase: null, error: message } : m)),
+        );
       } finally {
         setBusy(false);
         abortRef.current = null;
         taRef.current?.focus();
       }
     },
-    [messages, busy, storeId, editPropose, streamChat, creditsLeft],
+    [messages, busy, runTurn, creditsLeft],
   );
+
+  /** Re-ask the question that produced a failed turn, in place. */
+  const retry = useCallback(
+    (assistantId: string) => {
+      if (busy) return;
+      const at = messages.findIndex((m) => m.id === assistantId);
+      if (at < 1) return;
+      const question = messages[at - 1];
+      if (question.role !== "user") return;
+      setMessages(messages.slice(0, at - 1));
+      void send(question.content);
+    },
+    [messages, busy, send],
+  );
+
+  const stop = useCallback(() => abortRef.current?.abort(), []);
 
   // The Home "Ask Urivo" command bar dispatches prompts here (via a window
   // event) so the signature input and the companion rail are one assistant, not
@@ -189,11 +299,14 @@ export function AskUrivo({
 
   const applyEdit = useCallback(
     async (msg: Msg) => {
-      if (!storeId || !msg.edit || applyingId) return;
+      // Apply to the store Urivo actually reasoned about, not whichever one
+      // the rail happens to be showing.
+      const target = msg.editStoreId ?? storeId;
+      if (!target || !msg.edit || applyingId) return;
       setError(null);
       setApplyingId(msg.id);
       try {
-        const res = await fetch(`/api/stores/${storeId}/edit/apply`, {
+        const res = await fetch(`/api/stores/${target}/edit/apply`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ plan: msg.edit }),
@@ -228,6 +341,7 @@ export function AskUrivo({
 
   const suggestions = hasStore ? SUGGESTIONS_STORE : SUGGESTIONS_EMPTY;
   const hasTranscript = messages.length > 0;
+  const livePhase = messages[messages.length - 1]?.phase ?? null;
 
   if (!canAsk) {
     return (
@@ -311,12 +425,13 @@ export function AskUrivo({
           <div className="space-y-3 pb-2">
             {messages.map((m) => (
               <div key={m.id} className="u-msg-in">
-                <MessageBubble msg={m} busy={busy} />
+                <MessageBubble msg={m} onRetry={() => retry(m.id)} canRetry={!busy} />
                 {m.role === "assistant" && m.edit && (
                   <EditCard
                     edit={m.edit}
                     applied={!!m.applied}
                     applying={applyingId === m.id}
+                    canApply={!!(m.editStoreId ?? storeId)}
                     onApply={() => applyEdit(m)}
                   />
                 )}
@@ -365,19 +480,34 @@ export function AskUrivo({
           <div className="flex items-center justify-between px-2.5 pb-2.5">
             <span className="pl-1 text-[10px] text-mist-dim">
               {busy
-                ? "Urivo is thinking…"
+                ? livePhase === "writing"
+                  ? "Urivo is writing…"
+                  : "Urivo is working it out…"
                 : outOfCredits
                   ? "Out of credits"
                   : `${MESSAGE_COST} credit · ${creditsLeft} left`}
             </span>
-            <button
-              onClick={() => void send(draft)}
-              disabled={busy || !draft.trim() || outOfCredits}
-              className="u-gold flex h-7 w-7 items-center justify-center rounded-lg transition-transform active:scale-[0.92] disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Send"
-            >
-              <IconArrow width={15} height={15} />
-            </button>
+            {busy ? (
+              /* A long answer is a feature, but never a trap — stop keeps what
+                 has streamed so far. */
+              <button
+                onClick={stop}
+                className="flex h-7 items-center gap-1.5 rounded-lg border border-hair bg-panel px-2.5 text-[11px] font-semibold text-cloud transition-colors hover:border-hair-strong hover:text-ivory active:scale-[0.96]"
+                aria-label="Stop generating"
+              >
+                <span aria-hidden className="h-2 w-2 rounded-[2px] bg-cloud" />
+                Stop
+              </button>
+            ) : (
+              <button
+                onClick={() => void send(draft)}
+                disabled={!draft.trim() || outOfCredits}
+                className="u-gold flex h-7 w-7 items-center justify-center rounded-lg transition-transform active:scale-[0.92] disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Send"
+              >
+                <IconArrow width={15} height={15} />
+              </button>
+            )}
           </div>
         </div>
         <p className="mt-2 text-center text-[10px] leading-tight text-mist-dim">
@@ -392,11 +522,13 @@ function EditCard({
   edit,
   applied,
   applying,
+  canApply,
   onApply,
 }: {
   edit: ProposedEdit;
   applied: boolean;
   applying: boolean;
+  canApply: boolean;
   onApply: () => void;
 }) {
   return (
@@ -413,7 +545,7 @@ function EditCard({
           </svg>
           Applied to your store
         </p>
-      ) : (
+      ) : canApply ? (
         <button
           onClick={onApply}
           disabled={applying}
@@ -421,12 +553,25 @@ function EditCard({
         >
           {applying ? "Applying…" : "Apply to my store"}
         </button>
+      ) : (
+        /* Proposed before a store exists — honest about why there is no button. */
+        <p className="mt-2 text-[11px] leading-relaxed text-mist">
+          Generate a store first and this becomes one tap.
+        </p>
       )}
     </div>
   );
 }
 
-function MessageBubble({ msg, busy }: { msg: Msg; busy: boolean }) {
+function MessageBubble({
+  msg,
+  onRetry,
+  canRetry,
+}: {
+  msg: Msg;
+  onRetry: () => void;
+  canRetry: boolean;
+}) {
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
@@ -436,13 +581,65 @@ function MessageBubble({ msg, busy }: { msg: Msg; busy: boolean }) {
       </div>
     );
   }
-  const isThinking = busy && msg.content.length === 0;
+
+  const empty = msg.content.trim().length === 0;
   return (
     <div className="flex justify-start">
       <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-hair bg-panel/70 px-3 py-2 text-[13px] leading-relaxed text-cloud">
-        {isThinking ? <ThinkingDots /> : <span className="whitespace-pre-wrap">{msg.content}</span>}
+        {empty && msg.phase ? (
+          <Reasoning phase={msg.phase} />
+        ) : (
+          <>
+            {/* Markdown, so a structured answer reads as one — the reply used
+                to render its own asterisks and hyphens as literal characters. */}
+            <Markdown source={msg.content} />
+            {msg.phase === "writing" && <Caret />}
+          </>
+        )}
+        {msg.error && (
+          <div className={empty ? "" : "mt-2 border-t border-hair pt-2"}>
+            <p className="text-[12px] leading-relaxed text-alert" role="alert">
+              {msg.error}
+            </p>
+            {canRetry && (
+              <button
+                onClick={onRetry}
+                className="mt-1.5 rounded-md text-[11px] font-semibold text-gold-soft underline decoration-gold/40 underline-offset-2 transition-colors hover:text-gold active:scale-[0.97]"
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+/*
+ * The reasoning phase, shown honestly. Urivo genuinely spends longer on a hard
+ * question than an easy one, and saying so is better than an undifferentiated
+ * spinner that makes every wait feel like a stall.
+ */
+function Reasoning({ phase }: { phase: Phase }) {
+  return (
+    <span className="inline-flex items-center gap-2 py-0.5">
+      <ThinkingDots />
+      <span className="text-[11px] text-mist">
+        {phase === "thinking" ? "Working it out" : "Writing"}
+      </span>
+    </span>
+  );
+}
+
+/** A blinking caret while text streams, so the reply reads as being written. */
+function Caret() {
+  return (
+    <span
+      aria-hidden
+      className="ml-0.5 inline-block h-[0.95em] w-[2px] translate-y-[0.15em] bg-gold/80"
+      style={{ animation: "urivo-thinking 1s infinite ease-in-out" }}
+    />
   );
 }
 
