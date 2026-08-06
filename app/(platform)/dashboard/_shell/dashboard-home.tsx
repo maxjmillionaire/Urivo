@@ -67,6 +67,7 @@ export function DashboardHome({ overview }: { overview: DashboardOverview }) {
     creditsExpiry,
     storeCount,
     liveWithoutPayments,
+    volumeNotice,
   } = overview;
 
   return (
@@ -78,6 +79,10 @@ export function DashboardHome({ overview }: { overview: DashboardOverview }) {
         this is not a tip, it is lost revenue happening right now.
       */}
       {liveWithoutPayments > 0 && <PaymentsBlockedBanner liveStores={liveWithoutPayments} />}
+
+      {/* Outgrowing the plan is good news and is written as such. Selling never
+          stops — this is an invitation, not a wall. */}
+      {volumeNotice && <VolumeNotice title={volumeNotice.title} detail={volumeNotice.detail} />}
 
       {moment && <MomentRibbon emoji={moment.emoji} text={moment.text} />}
 
@@ -157,6 +162,23 @@ export function DashboardHome({ overview }: { overview: DashboardOverview }) {
  * two minutes away. Loud enough to be acted on, calm enough not to feel like a
  * failure on the day they published.
  */
+function VolumeNotice({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="u-float flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-live/30 bg-live/[0.06] px-5 py-4">
+      <div className="min-w-0">
+        <p className="text-[14px] font-semibold text-ivory">{title}</p>
+        <p className="mt-1 text-[13px] leading-relaxed text-mist">{detail}</p>
+      </div>
+      <Link
+        href="/dashboard/billing"
+        className="u-gold u-lift shrink-0 rounded-xl px-5 py-2.5 text-[13px] font-semibold"
+      >
+        See plans
+      </Link>
+    </div>
+  );
+}
+
 function PaymentsBlockedBanner({ liveStores }: { liveStores: number }) {
   const many = liveStores > 1;
   return (

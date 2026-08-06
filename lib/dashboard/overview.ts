@@ -1,7 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCreditBalance, getCreditExpiry, STORE_GENERATION_COST, type CreditExpiry } from "@/lib/credits";
-import { planName, canPublish as planCanPublish } from "@/lib/plans";
+import { planName, canPublish as planCanPublish, volumeMessage } from "@/lib/plans";
 import { storeStatsFor, sumStats, type StoreStats } from "@/lib/analytics/visits";
 
 /*
@@ -118,6 +118,9 @@ export interface DashboardOverview {
   storeCount: number;
   /** Live stores that cannot take a payment — money is being turned away now. */
   liveWithoutPayments: number;
+  /** Paid orders this calendar month, against the tier's allowance. */
+  ordersThisMonth: number;
+  volumeNotice: { title: string; detail: string } | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -426,6 +429,18 @@ export async function buildDashboardOverview(
     /* pre-0029 environment — cards simply show no list yet */
   }
 
+  /*
+   * Order volume against the plan's tier boundary. Best-effort: on an
+   * environment without migration 0033 the merchant simply sees no prompt.
+   */
+  let ordersThisMonth = 0;
+  try {
+    const { data } = await admin.rpc("monthly_paid_orders", { p_user_id: userId });
+    ordersThisMonth = Number(data) || 0;
+  } catch {
+    /* pre-0033 — no prompt rather than a wrong one */
+  }
+
   const storeCards: StoreCard[] = stores.map((s) => {
     const st = stats.get(s.id) ?? sumStats([]);
     const prod = productsByStore.get(s.id) ?? 0;
@@ -474,6 +489,8 @@ export async function buildDashboardOverview(
     creditsExpiry,
     storeCount: stores.length,
     liveWithoutPayments: paymentsConnected ? 0 : liveStores,
+    ordersThisMonth,
+    volumeNotice: volumeMessage(plan, ordersThisMonth),
   };
 }
 

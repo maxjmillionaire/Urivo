@@ -37,6 +37,18 @@ export interface PlanConfig {
    * measurably different response to it.
    */
   maxLiveStores: number | null;
+  /**
+   * Paid orders a month this tier carries. null = uncapped (Pro).
+   *
+   * This is a TIER BOUNDARY, not a take rate and not a hard limit. Urivo takes
+   * no percentage of a merchant's sales — a percentage would tax exactly the
+   * merchants who succeed and grow forever, and give the best of them a
+   * standing reason to leave. A tier is capped: at €5k a month Founder is 4% of
+   * revenue, at €50k it is 0.4%. Success gets cheaper.
+   *
+   * Crossing it never blocks a sale. Nothing on the checkout path reads it.
+   */
+  maxMonthlyOrders: number | null;
   features: {
     /** Take a generated store live (publish to its subdomain). */
     publish: boolean;
@@ -78,6 +90,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
     generationsPerMinute: 3,
     askPerMinute: 5,
     maxLiveStores: 1,
+    maxMonthlyOrders: 25,
     features: {
       // A free user must reach "my store is LIVE". Showing them a preview
       // behind a paywall means they never own anything, and people do not pay
@@ -101,6 +114,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
     generationsPerMinute: 8,
     askPerMinute: 20,
     maxLiveStores: 3,
+    maxMonthlyOrders: 100,
     features: {
       publish: true,
       askUrivo: true,
@@ -128,6 +142,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
     generationsPerMinute: 15,
     askPerMinute: 40,
     maxLiveStores: null,
+    maxMonthlyOrders: null,
     features: {
       publish: true,
       askUrivo: true,
@@ -266,4 +281,49 @@ export function annualSavingEur(key: string | null | undefined): number {
   const plan = getPlan(key);
   if (plan.price.regular <= 0 || plan.price.annual <= 0) return 0;
   return plan.price.regular * 12 - plan.price.annual;
+}
+
+/** Paid orders a month this tier carries. null = uncapped. */
+export function maxMonthlyOrders(key: string | null | undefined): number | null {
+  return getPlan(key).maxMonthlyOrders;
+}
+
+export type VolumeStanding = "fine" | "approaching" | "over";
+
+/**
+ * Where a merchant sits against their tier's volume.
+ *
+ * "approaching" starts at 80% so the upgrade is a decision they make with a
+ * week's warning, never a surprise. Success is the moment to ask — and the
+ * worst moment to interrupt.
+ */
+export function volumeStanding(key: string | null | undefined, ordersThisMonth: number): VolumeStanding {
+  const max = maxMonthlyOrders(key);
+  if (max === null) return "fine";
+  if (ordersThisMonth >= max) return "over";
+  return ordersThisMonth >= Math.floor(max * 0.8) ? "approaching" : "fine";
+}
+
+/** What the merchant reads. Congratulates the volume; never scolds it. */
+export function volumeMessage(
+  key: string | null | undefined,
+  ordersThisMonth: number,
+): { title: string; detail: string } | null {
+  const standing = volumeStanding(key, ordersThisMonth);
+  if (standing === "fine") return null;
+  const max = maxMonthlyOrders(key) ?? 0;
+  const next = nextPlan(key);
+  const nextLine = next
+    ? `${next.name} carries ${next.maxMonthlyOrders === null ? "unlimited orders" : `${next.maxMonthlyOrders} a month`}.`
+    : "";
+
+  return standing === "over"
+    ? {
+        title: `${ordersThisMonth} orders this month — you've outgrown ${getPlan(key).name}`,
+        detail: `Nothing stops: your stores keep selling and every order still reaches you. ${nextLine}`.trim(),
+      }
+    : {
+        title: `${ordersThisMonth} of ${max} orders this month`,
+        detail: `You're close to what ${getPlan(key).name} carries. ${nextLine}`.trim(),
+      };
 }

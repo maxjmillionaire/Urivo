@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   getPlan,
+  maxMonthlyOrders,
+  volumeStanding,
+  volumeMessage,
   priceForInterval,
   annualMonthsFree,
   annualSavingEur,
@@ -142,5 +145,86 @@ describe("annual billing", () => {
   it("reports no saving for a free plan rather than dividing by zero", () => {
     expect(annualSavingEur("free")).toBe(0);
     expect(annualMonthsFree("free")).toBe(0);
+  });
+});
+
+/*
+ * Order volume moves a merchant up a tier. It is NOT a take rate, and the
+ * distinction is the whole point: a percentage grows forever and punishes the
+ * merchants who succeed, a tier is capped so success gets proportionally
+ * cheaper. At €5k a month Founder is ~4% of revenue; at €50k it is ~0.4%.
+ */
+describe("order volume tiering", () => {
+  it("carries a real business on Founder before asking anything", () => {
+    // 100 orders at a €50 average is ~€5,000 a month. A merchant below that is
+    // still building and must never be interrupted.
+    expect(maxMonthlyOrders("core")).toBe(100);
+    expect(volumeStanding("core", 40)).toBe("fine");
+    expect(volumeStanding("core", 79)).toBe("fine");
+  });
+
+  it("warns before it arrives, never on the day", () => {
+    expect(volumeStanding("core", 80)).toBe("approaching");
+    expect(volumeStanding("core", 99)).toBe("approaching");
+    expect(volumeStanding("core", 100)).toBe("over");
+  });
+
+  it("never asks a merchant who has not sold anything", () => {
+    // The north star is the FIRST sale. Nothing about volume may touch the
+    // path to it.
+    for (const plan of ["free", "core", "pro"]) {
+      expect(volumeStanding(plan, 0)).toBe("fine");
+      expect(volumeMessage(plan, 0)).toBeNull();
+    }
+  });
+
+  it("leaves Pro uncapped, so success is never a bill", () => {
+    expect(maxMonthlyOrders("pro")).toBeNull();
+    expect(volumeStanding("pro", 100_000)).toBe("fine");
+    expect(volumeMessage("pro", 100_000)).toBeNull();
+  });
+
+  it("climbs the ladder monotonically", () => {
+    const rank = (k: string) => maxMonthlyOrders(k) ?? Number.POSITIVE_INFINITY;
+    expect(rank("core")).toBeGreaterThan(rank("free"));
+    expect(rank("pro")).toBeGreaterThan(rank("core"));
+  });
+
+  it("congratulates the volume rather than scolding it", () => {
+    const msg = volumeMessage("core", 140)!;
+    expect(msg.title).toContain("140 orders");
+    // Selling never stops, and the merchant is told so in the same breath.
+    expect(msg.detail.toLowerCase()).toContain("nothing stops");
+    expect(`${msg.title} ${msg.detail}`.toLowerCase()).not.toMatch(
+      /exceed|violat|limit reached|blocked|suspend|overage|penalt/,
+    );
+  });
+
+  it("names what the next tier carries, so the decision is obvious", () => {
+    expect(volumeMessage("free", 30)!.detail).toContain("100");
+    expect(volumeMessage("core", 120)!.detail.toLowerCase()).toContain("unlimited");
+  });
+});
+
+/*
+ * The invariant that makes this defensible at all. Refusing a merchant's
+ * customer to force an upgrade would take money out of their pocket — strictly
+ * worse than the take rate we declined to charge.
+ */
+describe("volume never blocks a sale", () => {
+  it("is not consulted anywhere on the checkout path", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const paths = [
+      "../app/api/store/[subdomain]/checkout/route.ts",
+      "../lib/commerce/checkout.ts",
+      "../lib/commerce/readiness.ts",
+    ];
+    for (const rel of paths) {
+      const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
+      expect(src, `${rel} must not read order volume`).not.toMatch(
+        /maxMonthlyOrders|volumeStanding|monthly_paid_orders/,
+      );
+    }
   });
 });
