@@ -105,7 +105,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
   const { error } = await supabaseAdmin()
     .from("products")
-    .update({ image_url: imageUrl })
+    .update({ image_url: imageUrl, image_source: "ai" })
     .eq("id", id);
   if (error) {
     return fail(500, "INTERNAL", "Generated the image but couldn't save it. Please try again.");
@@ -137,7 +137,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
       : fail(404, "NOT_FOUND", "Product not found.");
   }
 
-  const { error } = await supabaseAdmin().from("products").update({ image_url: null }).eq("id", id);
+  const { error } = await supabaseAdmin().from("products").update({ image_url: null, image_source: null }).eq("id", id);
   if (error) return fail(500, "INTERNAL", "Could not remove the image. Please try again.");
   // The catalogue changed — the live storefront must not serve the old one.
   revalidateStore(auth.store.subdomain);

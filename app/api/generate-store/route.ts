@@ -180,6 +180,9 @@ export async function POST(request: NextRequest) {
     description: p.description,
     price_eur: p.priceEUR,
     image_url: imageUrls[i] ?? null,
+    // Provenance recorded at the moment of creation — the disclosure on the
+    // storefront is only as honest as this field (EU AI Act Art. 50).
+    image_source: imageUrls[i] ? "ai" : null,
     inventory_count: 100,
   }));
 

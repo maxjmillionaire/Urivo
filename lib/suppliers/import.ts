@@ -187,6 +187,7 @@ export async function importProducts(
         description: product.description ?? "",
         price_eur: retailEur,
         image_url: imageUrl,
+        image_source: "supplier",
         inventory_count: Math.max(0, variant?.inventory ?? 100),
         position: position++,
       })

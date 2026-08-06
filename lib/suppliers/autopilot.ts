@@ -271,6 +271,7 @@ export async function autoSourceStore(
         description,
         price_eur: p.priceEur,
         image_url: p.images[0] ?? null,
+        image_source: p.images[0] ? "supplier" : null,
         inventory_count: Math.max(0, p.inventory ?? 100),
         position: i,
       })

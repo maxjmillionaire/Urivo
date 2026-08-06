@@ -28,6 +28,7 @@ import type {
 import { toCents } from "@/lib/commerce/types";
 import { StoreCartProvider, AddToCart, CartButton } from "./cart/store-cart";
 import { NewsletterForm } from "./newsletter-form";
+import { needsAiDisclosure, aiDisclosureFor } from "@/lib/storefront/ai-disclosure";
 
 /** Build the client cart payload (display snapshot) from a catalogue product. */
 function cartProduct(p: RenderProduct) {
@@ -59,6 +60,8 @@ export interface RenderProduct {
   price_eur: number | string;
   image_url?: string | null;
   show_logo?: boolean;
+  /** 'ai' | 'uploaded' | 'supplier' | 'placeholder' | null (unknown). */
+  image_source?: string | null;
 }
 
 /** A navigation entry. Only ever built for a destination that exists. */
@@ -561,6 +564,15 @@ function ProductCard({ ds, product, index, logo, href }: { ds: StoreDesignSystem
 }
 
 function Collection({ ds, catalog, logo, storeBase, title }: { ds: StoreDesignSystem; catalog: RenderProduct[]; logo?: StoreLogo | null; storeBase: string; title?: string }) {
+  /*
+   * EU AI Act Art. 50 disclosure, placed under the grid rather than on the
+   * imagery. A badge stamped on a product shot reads as a defect and costs the
+   * sale; a quiet line beneath the collection reads as a brand being straight
+   * with you. Rendered only when the store actually publishes AI imagery.
+   */
+  const aiNotice = needsAiDisclosure(catalog)
+    ? aiDisclosureFor(ds.story || ds.tagline || ds.personality)
+    : null;
   if (catalog.length === 0) {
     return (
       <section className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
@@ -587,6 +599,11 @@ function Collection({ ds, catalog, logo, storeBase, title }: { ds: StoreDesignSy
           <ProductCard key={product.id} ds={ds} product={product} index={i} logo={logo} href={`${storeBase}/product/${product.id}`} />
         ))}
       </div>
+      {aiNotice && (
+        <p style={{ marginTop: "1.6rem", fontSize: ".76rem", color: "var(--muted)", letterSpacing: ".01em" }}>
+          {aiNotice}
+        </p>
+      )}
     </section>
   );
 }

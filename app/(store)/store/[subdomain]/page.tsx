@@ -56,11 +56,17 @@ const loadStorefront = cache(async (slug: string) => {
     .maybeSingle();
   if (!store) return null;
 
-  const { data: products } = await supabase
+  // Same fallback as the cached path: an optional column must never cost the
+  // merchant their whole catalogue on an un-migrated environment.
+  const PRODUCT_CORE = "id, title, description, price_eur, image_url, show_logo";
+  const full = await supabase
     .from("products")
-    .select("id, title, description, price_eur, image_url, show_logo")
+    .select(`${PRODUCT_CORE}, image_source`)
     .eq("store_id", store.id)
     .order("position", { ascending: true });
+  const products = full.error
+    ? (await supabase.from("products").select(PRODUCT_CORE).eq("store_id", store.id).order("position", { ascending: true })).data
+    : full.data;
 
   return { store, products: products ?? [], isPreview: !store.is_active };
 });

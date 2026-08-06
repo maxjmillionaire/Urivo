@@ -26,6 +26,29 @@ function isAdminRequest(email: string | null | undefined): boolean {
     .includes(email.toLowerCase());
 }
 
+/*
+ * Is this Host a merchant's own domain?
+ *
+ * Deliberately strict. An earlier version asked only "does it contain a dot",
+ * which made 127.0.0.1 a custom domain and rewrote /login to /store/127.0.0.1 —
+ * every non-storefront route on the deployment 404'd. A host qualifies only if
+ * it is not ours, not an IP literal, and ends in something that looks like a
+ * real TLD.
+ */
+const IP_LITERAL = /^\d{1,3}(?:\.\d{1,3}){3}$|^\[?[0-9a-f:]+\]?$/i;
+
+function isCustomDomainCandidate(host: string, rootDomain: string): boolean {
+  if (!host || host === rootDomain || host === `www.${rootDomain}`) return false;
+  if (host.endsWith(`.${rootDomain}`)) return false;
+  // Local development never has custom domains, and "localhost" has no dot.
+  if (rootDomain.startsWith("localhost") || host === "localhost") return false;
+  if (IP_LITERAL.test(host)) return false;
+  const labels = host.split(".");
+  if (labels.length < 2) return false;
+  // A real TLD: letters only, at least two of them.
+  return /^[a-z]{2,}$/.test(labels[labels.length - 1]);
+}
+
 export async function middleware(request: NextRequest) {
   // --- Tenant subdomain rewrite -------------------------------------
   const rootDomain = (process.env.ROOT_DOMAIN ?? "localhost:3000")
@@ -55,7 +78,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.rewrite(url);
     }
     // Malformed subdomain: fall through to the main site untouched.
-  } else if (host && host !== rootDomain && host !== `www.${rootDomain}` && host.includes(".")) {
+  } else if (isCustomDomainCandidate(host, rootDomain)) {
     /*
      * A CUSTOM DOMAIN — a hostname that is not ours at all.
      *

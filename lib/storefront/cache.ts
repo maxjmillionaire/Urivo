@@ -77,6 +77,8 @@ export interface CachedProduct {
   price_eur: number;
   image_url: string | null;
   show_logo: boolean | null;
+  /** Where the photo came from — drives the AI disclosure (EU AI Act Art. 50). */
+  image_source: string | null;
 }
 
 export interface CachedStorefront {
@@ -103,11 +105,29 @@ export function getPublishedStorefront(subdomain: string) {
       if (error) throw new Error(error.message);
       if (!store) return null;
 
-      const { data: products } = await admin
+      /*
+       * image_source arrives with migration 0032. Naming it in the select on an
+       * environment that has not applied that migration does not degrade the
+       * result — PostgREST rejects the whole query, and the storefront renders
+       * with NO PRODUCTS AT ALL. A catalogue is not something to lose over an
+       * optional column, so the full select falls back to the columns that have
+       * existed since 0001.
+       */
+      const CORE = "id, title, description, price_eur, image_url, show_logo";
+      const full = await admin
         .from("products")
-        .select("id, title, description, price_eur, image_url, show_logo")
+        .select(`${CORE}, image_source`)
         .eq("store_id", store.id)
         .order("position", { ascending: true });
+      const products = full.error
+        ? (
+            await admin
+              .from("products")
+              .select(CORE)
+              .eq("store_id", store.id)
+              .order("position", { ascending: true })
+          ).data
+        : full.data;
 
       return { store: store as CachedStore, products: (products ?? []) as CachedProduct[] };
     },
