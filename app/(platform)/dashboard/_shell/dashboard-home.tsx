@@ -780,6 +780,13 @@ function StoreMiniCard({ store, canPublish }: { store: StoreCard; canPublish: bo
         <div className="flex items-center gap-2">
           <HealthDot score={store.health} />
           <span className="text-[11px] text-mist">{store.products} product{store.products === 1 ? "" : "s"}</span>
+          {/* Before the first sale, the list IS the result. Shown as soon as
+              there is one, never as an empty "0 subscribers". */}
+          {store.subscribers > 0 && (
+            <span className="text-[11px] text-gold-soft">
+              · {store.subscribers} subscriber{store.subscribers === 1 ? "" : "s"}
+            </span>
+          )}
         </div>
         <span className="flex items-center gap-1 text-[11px] font-semibold text-gold-soft transition-colors group-hover:text-gold">
           Manage <IconArrow width={12} height={12} />

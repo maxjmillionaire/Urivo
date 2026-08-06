@@ -86,6 +86,8 @@ export interface StoreCard {
   products: number;
   health: number;
   latestAction: string | null;
+  /** Emails captured from the storefront — the merchant's pre-first-sale asset. */
+  subscribers: number;
 }
 
 export interface Moment {
@@ -409,6 +411,21 @@ export async function buildDashboardOverview(
     sources,
     new Map(stores.map((s) => [s.id, s.store_name])),
   );
+  /*
+   * Storefront email captures. Best-effort: on an environment that has not run
+   * migration 0029 yet, a missing count costs a number on a card, never the
+   * dashboard.
+   */
+  const subscribersByStore = new Map<string, number>();
+  try {
+    const { data: subRows } = await admin.rpc("store_subscriber_counts", { p_user_id: userId });
+    for (const r of (subRows ?? []) as { store_id: string; subscribers: number }[]) {
+      subscribersByStore.set(r.store_id, Number(r.subscribers) || 0);
+    }
+  } catch {
+    /* pre-0029 environment — cards simply show no list yet */
+  }
+
   const storeCards: StoreCard[] = stores.map((s) => {
     const st = stats.get(s.id) ?? sumStats([]);
     const prod = productsByStore.get(s.id) ?? 0;
@@ -424,6 +441,7 @@ export async function buildDashboardOverview(
       products: prod,
       health: storeHealth(s.is_active, prod, paymentsConnected),
       latestAction: latestByStore.get(s.id) ?? null,
+      subscribers: subscribersByStore.get(s.id) ?? 0,
     };
   });
 

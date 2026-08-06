@@ -27,6 +27,7 @@ import type {
 } from "@/lib/storefront/narrative";
 import { toCents } from "@/lib/commerce/types";
 import { StoreCartProvider, AddToCart, CartButton } from "./cart/store-cart";
+import { NewsletterForm } from "./newsletter-form";
 
 /** Build the client cart payload (display snapshot) from a catalogue product. */
 function cartProduct(p: RenderProduct) {
@@ -678,19 +679,13 @@ function Highlights({ ds }: { ds: StoreDesignSystem }) {
   );
 }
 
-function Newsletter({ ds, storeName }: { ds: StoreDesignSystem; storeName: string }) {
+function Newsletter({ ds, storeName, subdomain }: { ds: StoreDesignSystem; storeName: string; subdomain: string }) {
   return (
     <section style={{ background: "var(--surface)", borderTop: `var(--border-w) solid ${ds.palette.line}` }}>
       <div className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
         <h2 className="uv-h" style={{ fontSize: "var(--h2)", maxWidth: "20ch", margin: "0 auto" }}>Join the {storeName} list</h2>
-        <p style={{ marginTop: "1rem", color: "var(--muted)" }}>Early access, quiet drops, nothing else.</p>
-        <div style={{ marginTop: "1.8rem", display: "flex", gap: ".6rem", justifyContent: "center", flexWrap: "wrap" }}>
-          <input
-            placeholder="you@email.com"
-            style={{ padding: ".9rem 1.1rem", minWidth: "260px", borderRadius: "var(--btn-radius)", border: `var(--border-w) solid ${ds.palette.line}`, background: "var(--bg)", color: "var(--ink)", fontFamily: "var(--font-b)" }}
-          />
-          <button className="uv-btn">Subscribe</button>
-        </div>
+        <p style={{ marginTop: "1rem", color: "var(--muted)" }}>News from {storeName}, and nothing else.</p>
+        <NewsletterForm subdomain={subdomain} source="newsletter" />
       </div>
     </section>
   );
@@ -789,6 +784,7 @@ interface NarrativeCtx {
   storeBase: string;
   logo?: StoreLogo | null;
   heroImage: string | null;
+  subdomain: string;
 }
 
 const npad = (e: Emphasis): string => (e === "bold" ? "var(--pad-y)" : "calc(var(--pad-y) * .62)");
@@ -979,16 +975,13 @@ function NCta({ block }: { block: CtaBlock }) {
   );
 }
 
-function NNewsletter({ block, ds }: { block: NewsletterBlock; ds: StoreDesignSystem }) {
+function NNewsletter({ block, ds, subdomain }: { block: NewsletterBlock; ds: StoreDesignSystem; subdomain: string }) {
   return (
     <section style={{ background: "var(--surface)", borderTop: `var(--border-w) solid ${ds.palette.line}` }}>
       <div className="uv-wrap" style={{ paddingTop: "var(--pad-y)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
         <h2 className="uv-h" style={{ fontSize: "var(--h2)", maxWidth: "22ch", margin: "0 auto" }}>{block.headline}</h2>
         <p style={{ marginTop: "1rem", color: "var(--muted)" }}>{block.subhead}</p>
-        <div style={{ marginTop: "1.8rem", display: "flex", gap: ".6rem", justifyContent: "center", flexWrap: "wrap" }}>
-          <input placeholder="you@email.com" style={{ padding: ".9rem 1.1rem", minWidth: "260px", borderRadius: "var(--btn-radius)", border: `var(--border-w) solid ${ds.palette.line}`, background: "var(--bg)", color: "var(--ink)", fontFamily: "var(--font-b)" }} />
-          <button className="uv-btn">Subscribe</button>
-        </div>
+        <NewsletterForm subdomain={subdomain} source="newsletter" />
       </div>
     </section>
   );
@@ -1008,7 +1001,7 @@ function renderBlock(block: NarrativeBlock, i: number, ctx: NarrativeCtx): React
     case "faq": return <NFaq key={key} block={block} ds={ctx.ds} />;
     case "collection": return <Collection key={key} ds={ctx.ds} catalog={ctx.catalog} logo={ctx.logo} storeBase={ctx.storeBase} title={block.title ?? undefined} />;
     case "cta": return <NCta key={key} block={block} />;
-    case "newsletter": return <NNewsletter key={key} block={block} ds={ctx.ds} />;
+    case "newsletter": return <NNewsletter key={key} block={block} ds={ctx.ds} subdomain={ctx.subdomain} />;
     default: return null;
   }
 }
@@ -1064,7 +1057,7 @@ export function StorefrontRenderer({
       case "collection": return <Collection key={key} ds={ds} catalog={catalog} logo={logo} storeBase={storeBase} />;
       case "story": return <Story key={key} ds={ds} storeName={storeName} />;
       case "highlights": return <Highlights key={key} ds={ds} />;
-      case "newsletter": return <Newsletter key={key} ds={ds} storeName={storeName} />;
+      case "newsletter": return <Newsletter key={key} ds={ds} storeName={storeName} subdomain={subdomain} />;
       case "footer": return <Footer key={key} ds={ds} storeName={storeName} catalog={catalog} storeBase={storeBase} links={navLinks} />;
       default: return null;
     }
@@ -1075,7 +1068,7 @@ export function StorefrontRenderer({
   const narrative = ds.narrative;
   let content: React.ReactNode;
   if (narrative && narrative.length) {
-    const ctx: NarrativeCtx = { ds, storeName, catalog, storeBase, logo, heroImage };
+    const ctx: NarrativeCtx = { ds, storeName, catalog, storeBase, logo, heroImage, subdomain };
     // The narrative never includes the footer — it's the fixed shell close.
     content = (
       <>
