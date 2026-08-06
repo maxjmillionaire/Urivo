@@ -2502,8 +2502,13 @@ create index if not exists idx_store_subscribers_store
 
 alter table public.store_subscribers enable row level security;
 
+-- Postgres has no `create policy if not exists`, so each policy is dropped
+-- first. Without this a re-run fails with 42710 and the whole catch-up
+-- script rolls back — which is exactly what happened in production.
+
 -- The merchant reads and manages their own stores' lists. Nobody else can read
 -- them at all: a subscriber list is the merchant's asset and contains PII.
+drop policy if exists "store_subscribers: owner read" on public.store_subscribers;
 create policy "store_subscribers: owner read" on public.store_subscribers
     for select using (
         exists (
@@ -2512,6 +2517,7 @@ create policy "store_subscribers: owner read" on public.store_subscribers
         )
     );
 
+drop policy if exists "store_subscribers: owner update" on public.store_subscribers;
 create policy "store_subscribers: owner update" on public.store_subscribers
     for update using (
         exists (
@@ -2520,6 +2526,7 @@ create policy "store_subscribers: owner update" on public.store_subscribers
         )
     );
 
+drop policy if exists "store_subscribers: owner delete" on public.store_subscribers;
 create policy "store_subscribers: owner delete" on public.store_subscribers
     for delete using (
         exists (
@@ -2745,6 +2752,9 @@ create index if not exists idx_store_domains_active
 
 alter table public.store_domains enable row level security;
 
+-- Dropped first for the same reason as 0029: policies have no IF NOT EXISTS.
+
+drop policy if exists "store_domains: owner read" on public.store_domains;
 create policy "store_domains: owner read" on public.store_domains
     for select using (
         exists (

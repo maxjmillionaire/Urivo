@@ -55,6 +55,9 @@ create index if not exists idx_store_domains_active
 
 alter table public.store_domains enable row level security;
 
+-- Dropped first for the same reason as 0029: policies have no IF NOT EXISTS.
+
+drop policy if exists "store_domains: owner read" on public.store_domains;
 create policy "store_domains: owner read" on public.store_domains
     for select using (
         exists (
