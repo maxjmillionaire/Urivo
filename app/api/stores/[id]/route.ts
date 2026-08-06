@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { requireStoreOwner } from "@/lib/tenant";
 import { getPlanForUser } from "@/lib/plan-access";
+import { nextPlan } from "@/lib/plans";
 import { StoreUpdateSchema } from "@/lib/validation";
 import { notifyStorePublished, notifyPaymentsMissing } from "@/lib/notifications/events";
 import { storeSellReadiness } from "@/lib/commerce/readiness";
@@ -66,18 +67,57 @@ export async function PATCH(
   const update: Record<string, unknown> = { theme_config: nextTheme };
   if (body.storeName !== undefined) update.store_name = body.storeName;
   if (body.isActive !== undefined) {
-    // Publishing (going live) is a paid capability. Unpublishing is always allowed.
     if (body.isActive === true) {
       const plan = await getPlanForUser(owner.userId);
       if (!plan.features.publish) {
         return fail(
           403,
           "UPGRADE_REQUIRED",
-          "Publishing your store is available on Founder and Pro. Upgrade to take it live.",
+          "Publishing your store is available on a paid plan. Upgrade to take it live.",
         );
       }
+
+      /*
+       * Capacity is enforced in the database, not here. Counting live stores in
+       * application code and then writing is a race: two publishes arriving
+       * together would both read the same count and both succeed. publish_store
+       * locks the merchant's rows first, so the cap holds under any concurrency.
+       */
+      const { data: pub, error: pubErr } = await supabaseAdmin().rpc("publish_store", {
+        p_store_id: id,
+        p_max_live: plan.maxLiveStores,
+      });
+      const outcome = (Array.isArray(pub) ? pub[0] : pub) as
+        | { published: boolean; live_count: number; reason: string }
+        | null
+        | undefined;
+
+      if (pubErr || !outcome) {
+        return fail(500, "INTERNAL", "Could not take your store live. Please try again.");
+      }
+      if (!outcome.published) {
+        if (outcome.reason === "AT_CAPACITY") {
+          const next = nextPlan(plan.key);
+          return NextResponse.json(
+            {
+              error: "AT_CAPACITY",
+              message:
+                `You're running ${outcome.live_count} live store${outcome.live_count === 1 ? "" : "s"}, which is everything this plan carries. ` +
+                (next
+                  ? `${next.name} runs ${next.maxLiveStores === null ? "as many as you like" : `up to ${next.maxLiveStores}`}.`
+                  : "Pause one to take another live."),
+              liveCount: outcome.live_count,
+              capacity: plan.maxLiveStores,
+            },
+            { status: 409 },
+          );
+        }
+        return fail(404, "NOT_FOUND", "Store not found.");
+      }
+      // publish_store already flipped the flag atomically.
+    } else {
+      update.is_active = false;
     }
-    update.is_active = body.isActive;
   }
 
   // RLS ("stores: own all") enforces ownership again at the row level.

@@ -28,6 +28,15 @@ export interface PlanConfig {
   /** Priority made concrete: how many generations / assistant messages per minute. */
   generationsPerMinute: number;
   askPerMinute: number;
+  /**
+   * How many stores may be LIVE at once. null = unlimited.
+   *
+   * Capacity is the product's natural unit — Urivo makes stores, so "how many
+   * can you run" is what a tier sells. Framed to the merchant as capacity
+   * ("run up to 3 live stores"), never as a restriction: the same fact, and a
+   * measurably different response to it.
+   */
+  maxLiveStores: number | null;
   features: {
     /** Take a generated store live (publish to its subdomain). */
     publish: boolean;
@@ -55,21 +64,26 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
   free: {
     key: "free",
     name: "Free",
-    tagline: "Explore Urivo and generate your first store.",
+    tagline: "Generate your first store and take it live.",
     monthlyCredits: 0,
-    signupCredits: 20,
+    // 20 buys the store, the rest buys a taste of the assistant that sells Pro.
+    signupCredits: 25,
     priority: "standard",
     generationsPerMinute: 3,
-    askPerMinute: 0,
+    askPerMinute: 5,
+    maxLiveStores: 1,
     features: {
-      publish: false,
-      askUrivo: false,
+      // A free user must reach "my store is LIVE". Showing them a preview
+      // behind a paywall means they never own anything, and people do not pay
+      // to keep something they have never had.
+      publish: true,
+      askUrivo: true,
       evolution: "none",
       premiumSupport: false,
       earlyAccess: false,
     },
     price: { currency: "EUR", launch: 0, regular: 0 },
-    highlights: ["20 welcome AI credits", "Generate your first store", "Explore the platform"],
+    highlights: ["25 welcome AI credits", "One live store, on a urivo.ai address", "A taste of the AI Store Assistant"],
   },
   core: {
     key: "core",
@@ -80,6 +94,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
     priority: "priority",
     generationsPerMinute: 8,
     askPerMinute: 20,
+    maxLiveStores: 3,
     features: {
       publish: true,
       askUrivo: true,
@@ -90,6 +105,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
     price: { currency: "EUR", launch: 49, regular: 49, founding: 29 },
     highlights: [
       "150 AI credits every month",
+      "Run up to 3 live stores",
       "AI Store Assistant",
       "Evolution Lab",
       "Publish your stores",
@@ -105,6 +121,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
     priority: "highest",
     generationsPerMinute: 15,
     askPerMinute: 40,
+    maxLiveStores: null,
     features: {
       publish: true,
       askUrivo: true,
@@ -115,6 +132,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
     price: { currency: "EUR", launch: 199, regular: 199, founding: 149 },
     highlights: [
       "800 AI credits every month",
+      "Unlimited live stores",
       "Advanced Evolution Lab",
       "Highest AI generation priority",
       "Premium support",
@@ -195,4 +213,15 @@ export function evolutionTier(key: string | null | undefined): EvolutionTier {
 /** Format a EUR price for display (whole euros, no cents). */
 export function formatPrice(euros: number): string {
   return euros === 0 ? "€0" : `€${euros}`;
+}
+
+/** Live-store capacity for a plan. null = unlimited (Pro). */
+export function maxLiveStores(key: string | null | undefined): number | null {
+  return getPlan(key).maxLiveStores;
+}
+
+/** Capacity as the merchant should read it — capacity, never restriction. */
+export function capacityLabel(key: string | null | undefined): string {
+  const max = maxLiveStores(key);
+  return max === null ? "Unlimited live stores" : `Run up to ${max} live store${max === 1 ? "" : "s"}`;
 }

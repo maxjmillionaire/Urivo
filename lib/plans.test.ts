@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   getPlan,
+  maxLiveStores,
+  capacityLabel,
   monthlyPrice,
   isLaunchWindow,
   nextPlan,
@@ -37,7 +39,9 @@ describe("plans — tier + price logic (money-critical)", () => {
     expect(isPaid("free")).toBe(false);
     expect(isPaid("core")).toBe(true);
     expect(isPaid("pro")).toBe(true);
-    expect(canPublish("free")).toBe(false);
+    // Free publishes too now — one store. A merchant who has never had a live
+    // store has nothing to keep, and people do not pay to keep nothing.
+    expect(canPublish("free")).toBe(true);
     expect(canPublish("core")).toBe(true);
   });
 
@@ -63,5 +67,34 @@ describe("plans — tier + price logic (money-critical)", () => {
     expect(planName("pro")).toBe("Pro");
     expect(formatPrice(0)).toBe("€0");
     expect(formatPrice(39)).toBe("€39");
+  });
+});
+
+describe("live-store capacity", () => {
+  it("gives Free exactly one live store — the magic moment, not a portfolio", () => {
+    expect(maxLiveStores("free")).toBe(1);
+  });
+
+  it("gives Founder room to run a few brands without ever feeling capped", () => {
+    expect(maxLiveStores("core")).toBe(3);
+  });
+
+  it("leaves Pro genuinely unlimited", () => {
+    expect(maxLiveStores("pro")).toBeNull();
+  });
+
+  it("climbs monotonically — a higher tier never runs fewer stores", () => {
+    const rank = (k: string) => maxLiveStores(k) ?? Number.POSITIVE_INFINITY;
+    expect(rank("core")).toBeGreaterThan(rank("free"));
+    expect(rank("pro")).toBeGreaterThan(rank("core"));
+  });
+
+  it("speaks capacity, never restriction", () => {
+    expect(capacityLabel("core")).toBe("Run up to 3 live stores");
+    expect(capacityLabel("free")).toBe("Run up to 1 live store");
+    expect(capacityLabel("pro")).toBe("Unlimited live stores");
+    for (const k of ["free", "core", "pro"]) {
+      expect(capacityLabel(k).toLowerCase()).not.toMatch(/limited to|only|restrict|max\b/);
+    }
   });
 });
