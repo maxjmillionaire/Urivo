@@ -76,17 +76,54 @@ export async function notifyPayoutsRestricted(userId: string): Promise<void> {
 }
 
 /** A store went live. Deduped per store per day so toggling doesn't spam. */
-export async function notifyStorePublished(userId: string, storeId: string, storeName: string): Promise<void> {
+export async function notifyStorePublished(
+  userId: string,
+  storeId: string,
+  storeName: string,
+  canSell = true,
+): Promise<void> {
   await notifyOnce(
     userId,
     `store_live:${storeId}`,
     {
       kind: "store_live",
       title: `${storeName} is live`,
-      body: `${storeName} is now published and open for orders.`,
+      body: canSell
+        ? `${storeName} is now published and open for orders.`
+        : `${storeName} is now published. Connect Stripe and it can start taking orders too.`,
       href: `/dashboard/stores/${storeId}`,
       severity: "success",
     },
     1,
+  );
+}
+
+/*
+ * The store is live and cannot take a single euro.
+ *
+ * Separate from the celebration above, and deliberately urgent: a merchant can
+ * publish, share the link, drive traffic and never learn that every shopper who
+ * tried to buy hit a wall. This is the notification that protects the first
+ * sale, which is the metric the whole business is steered by.
+ *
+ * Re-armed weekly rather than sent once — this is not news to be read and
+ * dismissed, it is a broken business that stays broken until it is fixed.
+ */
+export async function notifyPaymentsMissing(
+  userId: string,
+  storeId: string,
+  storeName: string,
+): Promise<void> {
+  await notifyOnce(
+    userId,
+    `payments_missing:${storeId}`,
+    {
+      kind: "payouts_restricted",
+      title: `${storeName} can't accept payments`,
+      body: `Your store is live, but checkout is closed until you connect Stripe. Anyone trying to buy right now is turned away.`,
+      href: "/dashboard/billing",
+      severity: "warning",
+    },
+    7,
   );
 }

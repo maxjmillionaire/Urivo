@@ -1022,6 +1022,7 @@ export function StorefrontRenderer({
   logo,
   subdomain,
   currency = "eur",
+  canSell = true,
 }: {
   storeName: string;
   ds: StoreDesignSystem;
@@ -1029,6 +1030,8 @@ export function StorefrontRenderer({
   logo?: StoreLogo | null;
   subdomain: string;
   currency?: string;
+  /** False when the merchant cannot take payment yet — the cart says so plainly. */
+  canSell?: boolean;
 }) {
   const fontsHref = googleFontsUrl(ds);
   // A hero image lifts the split/fullbleed heroes; use the first product photo.
@@ -1091,7 +1094,7 @@ export function StorefrontRenderer({
       {fontsHref && <link rel="stylesheet" href={fontsHref} />}
       <style dangerouslySetInnerHTML={{ __html: scopedCss(ds) }} />
       <div id="uv-store" style={buildVars(ds)}>
-        <StoreCartProvider subdomain={subdomain} currency={currency}>
+        <StoreCartProvider subdomain={subdomain} currency={currency} canSell={canSell}>
           {ds.layout.announcement && <Announcement ds={ds} />}
           <Nav storeName={storeName} ds={ds} links={navLinks} />
           {content}

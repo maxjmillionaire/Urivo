@@ -4,7 +4,9 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { requireStoreOwner } from "@/lib/tenant";
 import { getPlanForUser } from "@/lib/plan-access";
 import { StoreUpdateSchema } from "@/lib/validation";
-import { notifyStorePublished } from "@/lib/notifications/events";
+import { notifyStorePublished, notifyPaymentsMissing } from "@/lib/notifications/events";
+import { storeSellReadiness } from "@/lib/commerce/readiness";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,9 +91,17 @@ export async function PATCH(
     return fail(500, "INTERNAL", "Could not save your changes. Please try again.");
   }
 
-  // A store going live (draft → published) is a moment worth marking.
+  /*
+   * A store going live (draft → published) is a moment worth marking — and the
+   * moment to check whether it can actually take money. Publishing is never
+   * blocked: it is the emotional high point of the product. But a merchant must
+   * not be congratulated on being "open for orders" while every shopper who
+   * tries to buy is turned away.
+   */
   if (body.isActive === true && !wasLive && data) {
-    await notifyStorePublished(owner.userId, data.id, data.store_name);
+    const { canSell } = await storeSellReadiness(supabaseAdmin(), data.id);
+    await notifyStorePublished(owner.userId, data.id, data.store_name, canSell);
+    if (!canSell) await notifyPaymentsMissing(owner.userId, data.id, data.store_name);
   }
 
   return NextResponse.json({ success: true, store: data });

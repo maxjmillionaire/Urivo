@@ -66,10 +66,19 @@ export function DashboardHome({ overview }: { overview: DashboardOverview }) {
     canPublish,
     creditsExpiry,
     storeCount,
+    liveWithoutPayments,
   } = overview;
 
   return (
     <div className="space-y-6">
+      {/*
+        The most expensive state in the product: a published store turning away
+        every shopper who tries to buy. It sits ABOVE the greeting because it
+        outranks anything else on this page, and it stays until it is fixed —
+        this is not a tip, it is lost revenue happening right now.
+      */}
+      {liveWithoutPayments > 0 && <PaymentsBlockedBanner liveStores={liveWithoutPayments} />}
+
       {moment && <MomentRibbon emoji={moment.emoji} text={moment.text} />}
 
       {/* ── Daily briefing ─────────────────────────────────────────────── */}
@@ -140,6 +149,48 @@ export function DashboardHome({ overview }: { overview: DashboardOverview }) {
 }
 
 /* ── Moment ribbon ────────────────────────────────────────────────────── */
+/*
+ * Live, and unable to take a euro.
+ *
+ * Deliberately not dismissible and deliberately not styled as an error: nothing
+ * is broken with the merchant's store, it is simply unfinished, and the fix is
+ * two minutes away. Loud enough to be acted on, calm enough not to feel like a
+ * failure on the day they published.
+ */
+function PaymentsBlockedBanner({ liveStores }: { liveStores: number }) {
+  const many = liveStores > 1;
+  return (
+    <div
+      role="alert"
+      className="u-float flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gold/35 bg-gold/[0.07] px-5 py-4"
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <span
+          aria-hidden
+          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gold/20 text-[13px] font-bold text-gold"
+        >
+          !
+        </span>
+        <div className="min-w-0">
+          <p className="text-[14px] font-semibold text-ivory">
+            {many ? `Your ${liveStores} live stores can't accept payments yet` : "Your store is live but can't accept payments yet"}
+          </p>
+          <p className="mt-1 text-[13px] leading-relaxed text-mist">
+            Anyone trying to buy right now is turned away at checkout. Connect Stripe and orders start
+            flowing — it takes a couple of minutes.
+          </p>
+        </div>
+      </div>
+      <Link
+        href="/dashboard/billing"
+        className="u-gold u-lift shrink-0 rounded-xl px-5 py-2.5 text-[13px] font-semibold"
+      >
+        Connect Stripe
+      </Link>
+    </div>
+  );
+}
+
 function MomentRibbon({ emoji, text }: { emoji: string; text: string }) {
   const [open, setOpen] = useState(true);
   if (!open) return null;

@@ -5,6 +5,8 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/storefront";
 import { parseDesignSystem, themeToDesignSystem, parseLogo } from "@/lib/storefront/design-system";
 import { storeJsonLd, jsonLdScript } from "@/lib/seo";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { storeSellReadiness, shopperNotice } from "@/lib/commerce/readiness";
 import { StorefrontRenderer } from "./storefront-renderer";
 import { VisitBeacon } from "./visit-beacon";
 
@@ -96,6 +98,15 @@ export default async function StorefrontPage({ params }: Props) {
   const isPreview = !store.is_active;
   const products = await loadProducts(store.id);
 
+  /*
+   * Can this store take money? A shopper used to find out only after browsing,
+   * choosing, adding to the cart and pressing Checkout — the point of maximum
+   * invested effort and zero recovery. They are told up front instead, and the
+   * cart's checkout button is honest rather than a dead end.
+   */
+  const readiness = await storeSellReadiness(supabaseAdmin(), store.id);
+  const notice = readiness.canSell ? null : shopperNotice(readiness.blocker ?? "no_account");
+
   // New stores persist a full `designSystem`; older ones are adapted from their
   // legacy palette so nothing breaks while the generator is upgraded.
   const config = (store.theme_config ?? {}) as Record<string, unknown>;
@@ -145,6 +156,37 @@ export default async function StorefrontPage({ params }: Props) {
         </div>
       )}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }} />
+      {/*
+        Told BEFORE the cart, in the merchant's own colours rather than Urivo's,
+        because to the shopper this is that brand's storefront and nothing else.
+        Calm and specific: browsing still works, ordering does not yet.
+      */}
+      {notice && !isPreview && (
+        <div
+          role="status"
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 49,
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "baseline",
+            justifyContent: "center",
+            gap: "0.45rem",
+            padding: "0.7rem 1rem",
+            background: ds.palette.surface,
+            color: ds.palette.ink,
+            borderBottom: `1px solid ${ds.palette.accent}`,
+            fontSize: "13px",
+            lineHeight: 1.45,
+            fontFamily: "system-ui, sans-serif",
+            textAlign: "center",
+          }}
+        >
+          <strong style={{ color: ds.palette.accent }}>{notice.title}</strong>
+          <span style={{ opacity: 0.8 }}>{notice.detail}</span>
+        </div>
+      )}
       {!isPreview && <VisitBeacon subdomain={subdomain} />}
       <StorefrontRenderer
         storeName={store.store_name}
@@ -153,6 +195,7 @@ export default async function StorefrontPage({ params }: Props) {
         logo={logo}
         subdomain={subdomain}
         currency={(store as { currency?: string }).currency ?? "eur"}
+        canSell={readiness.canSell}
       />
     </>
   );

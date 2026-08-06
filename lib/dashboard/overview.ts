@@ -114,6 +114,8 @@ export interface DashboardOverview {
   credits: number;
   creditsExpiry: CreditExpiry | null;
   storeCount: number;
+  /** Live stores that cannot take a payment — money is being turned away now. */
+  liveWithoutPayments: number;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -175,12 +177,12 @@ export async function buildDashboardOverview(
   const now = new Date();
 
   const [{ data: profile }, credits, creditsExpiry, { data: storeRows }] = await Promise.all([
-    admin.from("profiles").select("plan").eq("id", userId).single(),
+    admin.from("profiles").select("plan, stripe_charges_enabled").eq("id", userId).single(),
     getCreditBalance(userId).catch(() => 0),
     getCreditExpiry(userId).catch(() => null),
     admin
       .from("stores")
-      .select("id, store_name, subdomain, is_active, stripe_charges_enabled, created_at")
+      .select("id, store_name, subdomain, is_active, created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
   ]);
@@ -240,7 +242,14 @@ export async function buildDashboardOverview(
   const total = sumStats(stats.values());
   const liveStores = stores.filter((s) => s.is_active).length;
   const productCount = products.length;
-  const paymentsConnected = stores.some((s) => s.stripe_charges_enabled);
+  /*
+   * Payment readiness lives on the PROFILE, not the store (migration 0026 moved
+   * payout accounts to the merchant). This read used to come from the store's
+   * deprecated column, which nothing has written since — so a merchant who had
+   * successfully connected Stripe was still told they had not, forever, and lost
+   * 22 points of health score for it.
+   */
+  const paymentsConnected = profile?.stripe_charges_enabled === true;
 
   // Per-store product counts.
   const productsByStore = new Map<string, number>();
@@ -413,7 +422,7 @@ export async function buildDashboardOverview(
       visitorsToday: st.visitorsToday,
       conversionPct: pct(st.ordersToday, st.visitorsToday),
       products: prod,
-      health: storeHealth(s.is_active, prod, s.stripe_charges_enabled),
+      health: storeHealth(s.is_active, prod, paymentsConnected),
       latestAction: latestByStore.get(s.id) ?? null,
     };
   });
@@ -446,6 +455,7 @@ export async function buildDashboardOverview(
     credits,
     creditsExpiry,
     storeCount: stores.length,
+    liveWithoutPayments: paymentsConnected ? 0 : liveStores,
   };
 }
 
@@ -474,7 +484,6 @@ interface StoreRow {
   store_name: string;
   subdomain: string;
   is_active: boolean;
-  stripe_charges_enabled: boolean;
   created_at: string;
 }
 

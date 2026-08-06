@@ -6,6 +6,7 @@ import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
 import { isStripeConfigured, stripe } from "@/lib/commerce/stripe";
 import { loadStoreForCheckout, validateCart } from "@/lib/commerce/checkout";
+import { storeSellReadiness, shopperNotice } from "@/lib/commerce/readiness";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,9 +63,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const store = await loadStoreForCheckout(admin, subdomain);
   if (!store) return fail(404, "NOT_FOUND", "Store not found.");
 
-  // Commerce readiness — graceful until Stripe + the merchant's payout account exist.
-  if (!isStripeConfigured() || !store.stripe_account_id || !store.stripe_charges_enabled) {
-    return fail(503, "CHECKOUT_UNAVAILABLE", "This store isn't accepting orders just yet. Please check back soon.");
+  /*
+   * Commerce readiness, from the same helper the storefront uses to warn the
+   * shopper BEFORE they fill a cart. This is the last line of defence rather
+   * than the first thing the customer learns.
+   */
+  const readiness = await storeSellReadiness(admin, store.id);
+  if (!readiness.canSell) {
+    const notice = shopperNotice(readiness.blocker ?? "no_account");
+    return fail(503, "CHECKOUT_UNAVAILABLE", `${notice.title}. ${notice.detail}`);
   }
 
   const cart = await validateCart(admin, store.id, body.items, store.currency);
@@ -99,7 +106,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         cancel_url: `${origin}?checkout=cancelled`,
         billing_address_collection: "auto",
       },
-      { stripeAccount: store.stripe_account_id },
+      { stripeAccount: readiness.accountId! },
     );
 
     if (!session.url) throw new Error("NO_SESSION_URL");

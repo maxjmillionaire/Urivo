@@ -31,6 +31,8 @@ interface CartCtx {
   clear: () => void;
   open: boolean;
   setOpen: (v: boolean) => void;
+  /** False when the merchant has no working payout account yet. */
+  canSell: boolean;
 }
 
 const Ctx = createContext<CartCtx | null>(null);
@@ -46,10 +48,12 @@ export function StoreCartProvider({
   subdomain,
   currency,
   children,
+  canSell = true,
 }: {
   subdomain: string;
   currency: string;
   children: React.ReactNode;
+  canSell?: boolean;
 }) {
   const storageKey = `uv-cart:${subdomain}`;
   const [lines, setLines] = useState<CartLine[]>([]);
@@ -107,8 +111,8 @@ export function StoreCartProvider({
   const value = useMemo<CartCtx>(() => {
     const count = lines.reduce((s, l) => s + l.quantity, 0);
     const subtotal = lines.reduce((s, l) => s + l.priceCents * l.quantity, 0);
-    return { lines, count, subtotal, currency, add, setQty, remove, clear, open, setOpen };
-  }, [lines, currency, add, setQty, remove, clear, open]);
+    return { lines, count, subtotal, currency, add, setQty, remove, clear, open, setOpen, canSell };
+  }, [lines, currency, add, setQty, remove, clear, open, canSell]);
 
   return (
     <Ctx.Provider value={value}>
@@ -230,7 +234,7 @@ export function CartButton({ className }: { className?: string }) {
 }
 
 function CartDrawer({ subdomain }: { subdomain: string }) {
-  const { lines, count, subtotal, currency, setQty, remove, open, setOpen } = useCart();
+  const { lines, count, subtotal, currency, setQty, remove, open, setOpen, canSell } = useCart();
   const [checkingOut, setCheckingOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -358,9 +362,35 @@ function CartDrawer({ subdomain }: { subdomain: string }) {
               </div>
               <p style={{ color: "var(--muted)", fontSize: ".76rem" }}>Taxes and shipping calculated at checkout.</p>
               {error && <p role="alert" style={{ color: "#c0392b", fontSize: ".82rem" }}>{error}</p>}
+              {/*
+                A store that cannot charge shows why, here, instead of firing a
+                request that comes back 503 after the shopper has committed.
+              */}
+              {!canSell ? (
+                <div
+                  role="status"
+                  style={{
+                    width: "100%",
+                    padding: ".85rem 1rem",
+                    borderRadius: "var(--btn-radius)",
+                    border: "var(--border-w) solid var(--line)",
+                    background: "var(--surface)",
+                    textAlign: "center",
+                    fontSize: ".82rem",
+                    lineHeight: 1.5,
+                    color: "var(--muted)",
+                  }}
+                >
+                  <strong style={{ display: "block", color: "var(--ink)", fontSize: ".86rem" }}>
+                    Ordering isn&apos;t open yet
+                  </strong>
+                  This store is finishing its payment setup. Your bag is saved.
+                </div>
+              ) : (
               <button type="button" className="uv-btn" onClick={checkout} disabled={checkingOut} style={{ width: "100%", opacity: checkingOut ? 0.7 : 1, cursor: checkingOut ? "wait" : "pointer" }}>
                 {checkingOut ? "Taking you to checkout…" : "Checkout"}
               </button>
+              )}
             </footer>
           </>
         )}
