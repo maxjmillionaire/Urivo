@@ -29,6 +29,39 @@ const TTL_SECONDS = 300;
 
 const tag = (subdomain: string) => `store:${subdomain.toLowerCase()}`;
 
+/**
+ * Resolve a custom domain to the subdomain that owns it.
+ *
+ * Cached hard and by hostname, because this sits on the request path of every
+ * visit to every custom domain. Busted when a domain is verified or removed.
+ * Returns null for an unknown host, which the caller turns into a 404 — an
+ * unrecognised Host must never fall through to Urivo's own marketing site.
+ */
+export function resolveCustomDomain(hostname: string) {
+  const key = hostname.toLowerCase();
+  return unstable_cache(
+    async (): Promise<string | null> => {
+      const { data, error } = await supabaseAdmin().rpc("store_for_domain", { p_hostname: key });
+      // Never cache a failed lookup as "no such domain".
+      if (error) throw new Error(error.message);
+      const row = (Array.isArray(data) ? data[0] : data) as { subdomain?: string } | null | undefined;
+      return row?.subdomain ?? null;
+    },
+    ["custom-domain", key],
+    { tags: [`domain:${key}`], revalidate: TTL_SECONDS },
+  )();
+}
+
+/** Drop a resolved hostname — call when a domain is verified, moved or removed. */
+export function revalidateDomain(hostname: string | null | undefined): void {
+  if (!hostname) return;
+  try {
+    revalidateTag(`domain:${hostname.toLowerCase()}`);
+  } catch {
+    /* outside a request scope — the TTL still applies */
+  }
+}
+
 export interface CachedStore {
   id: string;
   store_name: string;

@@ -6,7 +6,7 @@ import { parseTheme } from "@/lib/storefront";
 import { parseDesignSystem, themeToDesignSystem, parseLogo } from "@/lib/storefront/design-system";
 import { storeJsonLd, jsonLdScript } from "@/lib/seo";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getPublishedStorefront } from "@/lib/storefront/cache";
+import { getPublishedStorefront, resolveCustomDomain } from "@/lib/storefront/cache";
 import { storeSellReadiness, shopperNotice } from "@/lib/commerce/readiness";
 import { StorefrontRenderer } from "./storefront-renderer";
 import { VisitBeacon } from "./visit-beacon";
@@ -30,7 +30,19 @@ interface Props {
  * how an owner previews their own draft — and why that path is never cached:
  * the result depends on who is asking.
  */
-const loadStorefront = cache(async (subdomain: string) => {
+const loadStorefront = cache(async (slug: string) => {
+  /*
+   * The slug is either a subdomain (nordwerk) or a merchant's own hostname
+   * (shop.nordwerk.de), rewritten here by the middleware. The two can never be
+   * confused: a subdomain cannot contain a dot.
+   */
+  let subdomain = slug.toLowerCase();
+  if (subdomain.includes(".")) {
+    const owner = await resolveCustomDomain(subdomain).catch(() => null);
+    // An unrecognised Host is a 404, never a fall-through to Urivo's own site.
+    if (!owner) return null;
+    subdomain = owner;
+  }
   if (!SUBDOMAIN_PATTERN.test(subdomain)) return null;
 
   const published = await getPublishedStorefront(subdomain).catch(() => null);

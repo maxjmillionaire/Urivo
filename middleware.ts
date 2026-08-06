@@ -55,6 +55,27 @@ export async function middleware(request: NextRequest) {
       return NextResponse.rewrite(url);
     }
     // Malformed subdomain: fall through to the main site untouched.
+  } else if (host && host !== rootDomain && host !== `www.${rootDomain}` && host.includes(".")) {
+    /*
+     * A CUSTOM DOMAIN — a hostname that is not ours at all.
+     *
+     * Rewritten into the SAME storefront route as a subdomain, carrying the
+     * hostname where the subdomain normally goes. Product pages, the cart, the
+     * checkout API and the order-success page all come along unchanged, and
+     * the resolver distinguishes the two without ambiguity because a subdomain
+     * can never contain a dot.
+     *
+     * The lookup deliberately does NOT happen here: middleware runs on every
+     * request in the edge runtime, and a database round trip on the hot path
+     * would cost every visitor. The storefront route resolves it in Node, where
+     * the result is already cached.
+     */
+    const p = request.nextUrl.pathname;
+    if (!p.startsWith("/api") && !p.startsWith("/_next") && !p.startsWith("/store/")) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/store/${host}${p === "/" ? "" : p}`;
+      return NextResponse.rewrite(url);
+    }
   }
 
   // --- Auth session + protected routes ------------------------------
