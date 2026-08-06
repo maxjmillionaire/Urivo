@@ -42,9 +42,19 @@ export type ModelId = keyof typeof MODELS;
 export const ACTIVE_MODEL: ModelId = "claude-opus-4-8";
 
 // ── Image pricing (USD per generated image) ──────────────────────────────────
-// ⚠️ ESTIMATE — Higgsfield's exact per-image rate is not yet confirmed in code.
-// This is the ONE cost input still to be replaced with a measured value. When
-// the image route logs real spend, this becomes a fallback only.
+/*
+ * ⚠️ ESTIMATE, and the largest single assumption in the business: five images
+ * per generated store makes imagery roughly two thirds of what a free signup
+ * costs, so if the real rate is double this, the variable cost of the entire
+ * free tier doubles with it.
+ *
+ * This constant is now only the FALLBACK. The effective rate lives in
+ * platform_settings.image_cost_usd (see lib/finance/image-cost.ts), so it can
+ * be corrected without a deploy and carries whether it is estimated or
+ * measured. Historical ledger rows are rebased exactly by the
+ * rebase_image_costs RPC, because the ledger stores image counts alongside
+ * cost — nothing has to be re-derived from a guess.
+ */
 export const IMAGE_COST_USD = 0.07;
 
 // ── FX ───────────────────────────────────────────────────────────────────────
@@ -143,9 +153,15 @@ export function costOfActionExact(
   usage: TokenUsage,
   images: number,
   model: string = ACTIVE_MODEL,
+  /**
+   * The per-image rate in force. The ledger writer resolves this from settings
+   * so a corrected price takes effect on the next action without a deploy;
+   * callers that are only modelling may leave it at the fallback.
+   */
+  imageRateUsd: number = IMAGE_COST_USD,
 ): ActionCost {
   const anthropicUsd = anthropicCostUsd(usage, model);
-  const imageUsd = images * IMAGE_COST_USD;
+  const imageUsd = images * imageRateUsd;
   const totalUsd = anthropicUsd + imageUsd;
   return { anthropicUsd, imageUsd, totalUsd, totalEur: usdToEur(totalUsd) };
 }

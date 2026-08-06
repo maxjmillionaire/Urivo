@@ -19,6 +19,7 @@ import {
 } from "@/lib/billing/subscription";
 import { applyAccountUpdate } from "@/lib/billing/connect";
 import { notifyPayoutsReady, notifyPayoutsRestricted } from "@/lib/notifications/events";
+import { recordRevenue } from "@/lib/finance/revenue";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId, logger } from "@/lib/logger";
 
@@ -233,11 +234,11 @@ async function handlePlatformEvent(event: Stripe.Event) {
   switch (event.type) {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded": {
-      await handlePlatformCheckout(event.data.object as Stripe.Checkout.Session);
+      await handlePlatformCheckout(event, event.data.object as Stripe.Checkout.Session);
       break;
     }
     case "invoice.paid": {
-      await handleInvoicePaid(event.data.object as Stripe.Invoice);
+      await handleInvoicePaid(event, event.data.object as Stripe.Invoice);
       break;
     }
     case "customer.subscription.updated": {
@@ -248,13 +249,30 @@ async function handlePlatformEvent(event: Stripe.Event) {
       await cancelSubscription(event.data.object as Stripe.Subscription);
       break;
     }
+    /*
+     * A refund is revenue leaving. Recorded as a negative amount so the
+     * month's total is a plain sum — a figure that has to remember to subtract
+     * something eventually forgets.
+     */
+    case "charge.refunded": {
+      const charge = event.data.object as Stripe.Charge;
+      await recordRevenue({
+        stripeEventId: event.id,
+        kind: "refund",
+        amountCents: -Math.abs(charge.amount_refunded ?? 0),
+        currency: charge.currency ?? "eur",
+        stripeObjectId: charge.id,
+        occurredAt: new Date(event.created * 1000),
+      });
+      break;
+    }
     default:
-      // Everything else (payment_intent.*, charge.*, etc.) is informational here.
+      // Everything else (payment_intent.*, etc.) is informational here.
       break;
   }
 }
 
-async function handlePlatformCheckout(session: Stripe.Checkout.Session) {
+async function handlePlatformCheckout(event: Stripe.Event, session: Stripe.Checkout.Session) {
   const kind = session.metadata?.kind;
   const userId = session.metadata?.user_id ?? session.client_reference_id ?? null;
 
@@ -264,6 +282,12 @@ async function handlePlatformCheckout(session: Stripe.Checkout.Session) {
     if (!subId || !userId) return;
     const sub = await stripe().subscriptions.retrieve(subId);
     await linkSubscription(userId, sub);
+    /*
+     * Deliberately NOT recorded as revenue here. Every subscription checkout
+     * also produces an invoice.paid carrying the same money, and recording
+     * both would double the first month of every customer we ever sign — the
+     * one month a founder looks at hardest.
+     */
     return;
   }
 
@@ -273,6 +297,17 @@ async function handlePlatformCheckout(session: Stripe.Checkout.Session) {
     const packId = session.metadata?.pack;
     if (!packId || !userId) return;
     await grantCreditPack(userId, packId, session.id);
+    // A pack produces no invoice, so this is its only record.
+    await recordRevenue({
+      stripeEventId: event.id,
+      kind: "credit_pack",
+      amountCents: session.amount_total ?? 0,
+      currency: session.currency ?? "eur",
+      userId,
+      pack: packId,
+      stripeObjectId: session.id,
+      occurredAt: new Date(event.created * 1000),
+    });
     return;
   }
 }
@@ -282,12 +317,30 @@ function invoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
   return idOf(invoice.parent?.subscription_details?.subscription);
 }
 
-async function handleInvoicePaid(invoice: Stripe.Invoice) {
+async function handleInvoicePaid(event: Stripe.Event, invoice: Stripe.Invoice) {
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return; // not a subscription invoice
 
   const sub = await stripe().subscriptions.retrieve(subId);
   const userId = await resolveUserForSubscription(sub);
+
+  /*
+   * Recorded before the user lookup can turn us away. Money that arrived is
+   * money that arrived; an invoice we cannot attribute to a profile still
+   * belongs in the total, or revenue silently under-reports exactly when
+   * something else has gone wrong.
+   */
+  await recordRevenue({
+    stripeEventId: event.id,
+    kind: "subscription",
+    amountCents: invoice.amount_paid ?? 0,
+    currency: invoice.currency ?? "eur",
+    userId,
+    plan: planFromSubscription(sub),
+    stripeObjectId: invoice.id ?? subId,
+    occurredAt: new Date(event.created * 1000),
+  });
+
   if (!userId) {
     logger.info("invoice.paid for unknown user", { invoice: invoice.id, subscription: subId });
     return;

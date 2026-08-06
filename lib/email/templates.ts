@@ -218,17 +218,50 @@ export function newOrderEmail(storeName: string, amount: string, isFirst: boolea
   });
 }
 
-export function spendAlertEmail(freeUsd: string, paidUsd: string, thresholdUsd: string): RenderedEmail {
-  return build("Urivo alert: free-tier AI spend over threshold", {
-    preheader: `Free-account AI spend has crossed ${thresholdUsd} today.`,
-    heading: "Free-tier spend is over the daily threshold.",
-    paragraphs: [
-      `Today's AI inference spend from FREE accounts is ${freeUsd}, which has crossed your ${thresholdUsd} alert threshold.`,
-      `Paid-account spend today is ${paidUsd} — expected cost of goods, shown for contrast; only the free number is a concern.`,
-      "If this is unexpected, you can suspend free generations instantly from Admin → Finance.",
-    ],
-    cta: { label: "Open admin", url: `${APP_URL()}/admin/finance` },
-    footnote: "At most one of these is sent per day.",
+export interface SpendAlertContent {
+  thresholdEur: string;
+  totalEur: string;
+  freeEur: string;
+  paidEur: string;
+  revenueEur: string;
+  /** Formatted margin, or null when no revenue was recorded today. */
+  marginPct: string | null;
+  /** The costliest surface today, already formatted for reading. */
+  topOperation: string | null;
+  /** What to actually do, decided from the numbers by the caller. */
+  recommendation: string;
+  /** Set when any figure in the mail depends on the estimated image price. */
+  estimateNote?: string;
+}
+
+/*
+ * The daily spend alert.
+ *
+ * The old version stated two numbers and left the reading to the recipient at
+ * whatever hour it arrived. An alert that requires you to open a dashboard
+ * before you can decide anything has not alerted you — it has interrupted you.
+ * So this one carries the whole picture: what went out, what came in, what the
+ * margin was, which surface dominated, and a recommendation derived from those
+ * figures rather than a generic reminder that a kill switch exists.
+ */
+export function spendAlertEmail(d: SpendAlertContent): RenderedEmail {
+  const paragraphs = [
+    `AI spend today is ${d.totalEur}, past your ${d.thresholdEur} threshold. Free accounts account for ${d.freeEur}; paid accounts ${d.paidEur} — the paid half is expected cost of goods.`,
+    d.marginPct
+      ? `Revenue recorded today is ${d.revenueEur}, a gross margin of ${d.marginPct}.`
+      : `No revenue has been recorded today, so there is no margin to report — today's spend is entirely acquisition.`,
+  ];
+  if (d.topOperation) paragraphs.push(`Most of it went to ${d.topOperation}.`);
+  paragraphs.push(d.recommendation);
+
+  return build(`Urivo: AI spend past ${d.thresholdEur} today`, {
+    preheader: `${d.totalEur} spent today · ${d.freeEur} of it from free accounts.`,
+    heading: `Today's AI spend has passed ${d.thresholdEur}.`,
+    paragraphs,
+    cta: { label: "Open finance", url: `${APP_URL()}/admin/finance` },
+    footnote: d.estimateNote
+      ? `${d.estimateNote} Each threshold alerts at most once per day.`
+      : "Each threshold alerts at most once per day, so a runaway day escalates rather than going quiet.",
   });
 }
 

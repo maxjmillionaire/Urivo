@@ -13,7 +13,12 @@ import {
   FIRST_SALE_CRITICAL,
 } from "@/lib/analytics/first-sale";
 import { planName } from "@/lib/plans";
+import { monthStart } from "@/lib/finance/reporting";
+import { getTodaySnapshot, getBudgetStatus, getMarginByPlan } from "@/lib/finance/today";
+import { getRevenue } from "@/lib/finance/revenue";
+import { getImageCost } from "@/lib/finance/image-cost";
 import { FreeGenerationsSwitch } from "./kill-switch";
+import { CostControls } from "./cost-controls";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,6 +61,17 @@ export default async function FinanceDashboardPage() {
   const firstSale = await getFirstSaleFunnel();
   const firstSaleCohorts = await getFirstSaleCohorts(12);
   const verdict = firstSaleVerdict(firstSale);
+
+  // Measured economics: today, the budget, real revenue, real margin per plan.
+  const [today, revenue, planMargins, imageCost] = await Promise.all([
+    getTodaySnapshot(),
+    getRevenue(monthStart()),
+    getMarginByPlan(),
+    getImageCost(),
+  ]);
+  const budget = await getBudgetStatus(snap.totalCostEur);
+  const measuredMarginPct =
+    revenue.totalEur > 0 ? ((revenue.totalEur - snap.totalCostEur) / revenue.totalEur) * 100 : null;
   // The mispricing signal: if credit pricing matched cost, €/credit would be
   // flat across every action. Name the spread so the gap is legible.
   const priced = actionCosts.filter((r) => r.costPerCreditEur > 0);
@@ -98,6 +114,126 @@ export default async function FinanceDashboardPage() {
           </div>
         </header>
 
+        {/*
+          * Provenance first. Every euro below that involves a generated photo
+          * rests on this one rate, and an unlabelled estimate on a finance
+          * dashboard is how a guess becomes a decision.
+          */}
+        {imageCost.isEstimate && (
+          <div className="rounded-xl border border-amber-300/30 bg-amber-300/5 p-4 text-sm">
+            <p className="font-semibold text-amber-200">
+              Image cost is still an estimate (${imageCost.rateUsd.toFixed(3)} per image).
+            </p>
+            <p className="mt-1 text-white/60">
+              Five photos go into every generated store, so this is roughly two thirds of what a
+              free signup costs — the largest single assumption in these numbers. Enter the real
+              rate under Cost controls below and the whole history is recalculated at it.
+            </p>
+          </div>
+        )}
+
+        {/* Today — the only view in which a runaway day is visible while it is
+            still today. A monthly average hides a tenfold day until it is over. */}
+        <Section
+          title="Today"
+          subtitle={`${today.day} · measured from the usage ledger and recorded Stripe events`}
+        >
+          {/*
+            * When the read failed, every tile shows a dash rather than €0.00.
+            * A zero that means "unknown" is the most dangerous number a finance
+            * dashboard can print: it is indistinguishable from a quiet day, and
+            * it is the one a founder would act on.
+            */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <Tile
+              label="AI spend today"
+              value={today.available ? eur(today.costEur) : "—"}
+              sub={
+                today.available
+                  ? `${int(today.actions)} actions · ${int(today.users)} accounts`
+                  : "not readable"
+              }
+              accent={today.available}
+            />
+            <Tile
+              label="Free vs paid"
+              value={today.available ? eur(today.freeCostEur) : "—"}
+              sub={today.available ? `free · ${eur(today.paidCostEur)} paid` : undefined}
+            />
+            <Tile
+              label="Revenue today"
+              value={today.available ? eur(today.revenueEur) : "—"}
+              sub={
+                !today.available
+                  ? undefined
+                  : today.revenueEur > 0
+                    ? "recorded from Stripe"
+                    : "nothing recorded yet"
+              }
+            />
+            <Tile
+              label="Margin today"
+              value={today.available && today.marginPct !== null ? pct(today.marginPct) : "—"}
+              sub={
+                !today.available
+                  ? undefined
+                  : today.marginPct === null
+                    ? "no revenue to divide by"
+                    : "gross"
+              }
+            />
+          </div>
+          {today.topFeature && (
+            <p className="text-sm text-white/50">
+              Costliest surface today: <strong className="text-white/80">
+                {FEATURE_LABEL[today.topFeature] ?? today.topFeature}
+              </strong>{" "}
+              at {eur(today.topFeatureEur)} across {int(today.topFeatureActions)} actions.
+            </p>
+          )}
+          {!today.available && (
+            <p className="text-sm text-amber-200/80">
+              Today&rsquo;s figures could not be read. If migration 0037 has not been applied yet,
+              that is why.
+            </p>
+          )}
+        </Section>
+
+        {/* Budget — "remaining" as a number rather than a feeling. */}
+        <Section
+          title="Budget"
+          subtitle={
+            budget.hasBudget
+              ? `Day ${budget.daysElapsed} of ${budget.daysInMonth}`
+              : "No monthly budget set — set one under Cost controls to make the projection actionable."
+          }
+        >
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <Tile label="Spent this month" value={eur(budget.spentEur)} />
+            <Tile
+              label="Budget"
+              value={budget.hasBudget ? eur(budget.budgetEur) : "—"}
+              sub={budget.hasBudget ? pct(budget.usedPct) + " used" : undefined}
+            />
+            <Tile
+              label="Remaining"
+              value={budget.hasBudget ? eur(budget.remainingEur) : "—"}
+            />
+            <Tile
+              label="Projected month end"
+              value={eur(budget.projectedEur)}
+              sub="straight-line from the run rate"
+              accent={budget.projectedOver}
+            />
+          </div>
+          {budget.projectedOver && (
+            <p className="text-sm text-amber-200">
+              At today&rsquo;s run rate the month lands at {eur(budget.projectedEur)} —{" "}
+              {eur(budget.projectedEur - budget.budgetEur)} over budget.
+            </p>
+          )}
+        </Section>
+
         {/* Founding members — the first 50 (private tracker, no public counter) */}
         <Section
           title="Founding members"
@@ -125,15 +261,75 @@ export default async function FinanceDashboardPage() {
         </Section>
 
         {/* Cost controls */}
-        <Section title="Cost controls" subtitle="The levers for runaway free-tier spend — changeable without a deploy">
+        <Section title="Cost controls" subtitle="The levers for runaway spend — every one changeable without a deploy">
           <FreeGenerationsSwitch initial={settings.freeGenerationsEnabled} />
+          <CostControls
+            thresholds={settings.dailySpendThresholdsEur}
+            budgetEur={settings.monthlyAiBudgetEur}
+            imageCostUsd={imageCost.rateUsd}
+            imageCostSource={imageCost.source}
+          />
           <p className="text-xs text-white/40">
-            Spend alert fires once/day when free-account AI cost crosses ${settings.dailyFreeSpendAlertUsd.toFixed(2)}
+            Alerts at €{settings.dailySpendThresholdsEur.join(", €")} of AI spend in a day, each
+            once
             {settings.freeDailyGenerationCap > 0
               ? ` · daily free-generation cap: ${settings.freeDailyGenerationCap}`
               : " · no daily generation cap set"}
             .
           </p>
+        </Section>
+
+        {/*
+          * Both halves measured. The tier table further down models margin from
+          * list prices and a cost profile; this one divides recorded revenue by
+          * recorded cost, and the two disagreeing is information rather than a
+          * bug — it is where the model is wrong about the business.
+          */}
+        <Section
+          title="Gross margin by plan (measured)"
+          subtitle="Cost from the usage ledger, revenue from recorded Stripe events. Neither side modelled."
+        >
+          {planMargins.length === 0 ? (
+            <p className="text-sm text-white/45">
+              Nothing recorded yet this month. Revenue appears here as soon as the first Stripe
+              payment arrives; cost appears as soon as anyone runs an AI action.
+            </p>
+          ) : (
+            <Table
+              head={["Plan", "Accounts", "Actions", "Credits", "Cost", "Revenue", "Profit", "Margin"]}
+              rows={planMargins.map((p) => [
+                p.name,
+                int(p.users),
+                int(p.actions),
+                int(p.credits),
+                eur(p.costEur),
+                eur(p.revenueEur),
+                eur(p.profitEur),
+                p.marginPct === null ? "—" : pct(p.marginPct),
+              ])}
+            />
+          )}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <Tile label="Revenue this month" value={eur(revenue.totalEur)} sub={`${int(revenue.events)} payments`} />
+            <Tile label="Subscriptions" value={eur(revenue.subscriptionEur)} />
+            <Tile
+              label="Credit packs"
+              value={eur(revenue.packEur)}
+              sub={revenue.refundEur < 0 ? `${eur(revenue.refundEur)} refunded` : undefined}
+            />
+            <Tile
+              label="Margin overall"
+              value={measuredMarginPct === null ? "—" : pct(measuredMarginPct)}
+              sub={measuredMarginPct === null ? "no revenue recorded yet" : "measured, not modelled"}
+              accent
+            />
+          </div>
+          {revenue.nonEurEvents > 0 && (
+            <p className="text-sm text-amber-200/80">
+              {int(revenue.nonEurEvents)} payment(s) in another currency are excluded from these
+              totals rather than converted at an invented rate.
+            </p>
+          )}
         </Section>
 
         {/* The number the company steers by — first, and on its own. */}

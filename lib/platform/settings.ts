@@ -15,21 +15,39 @@ export interface PlatformSettings {
   freeDailyGenerationCap: number; // 0 = no cap
   dailyFreeSpendAlertUsd: number;
   spendAlertLastSentOn: string | null; // YYYY-MM-DD
+  /** Ascending euro thresholds; each alerts once per day so a bad day escalates. */
+  dailySpendThresholdsEur: number[];
+  /** Highest threshold already alerted today — reset when the day rolls over. */
+  spendAlertHighWaterEur: number;
+  /** 0 = no budget set. Drives "remaining budget" on the finance dashboard. */
+  monthlyAiBudgetEur: number;
 }
+
+const DEFAULT_THRESHOLDS = [25, 50, 100];
 
 const DEFAULTS: PlatformSettings = {
   freeGenerationsEnabled: true,
   freeDailyGenerationCap: 0,
   dailyFreeSpendAlertUsd: 50,
   spendAlertLastSentOn: null,
+  dailySpendThresholdsEur: DEFAULT_THRESHOLDS,
+  spendAlertHighWaterEur: 0,
+  monthlyAiBudgetEur: 0,
 };
+
+/** Ascending, positive, de-duplicated — the alert logic depends on the order. */
+function normaliseThresholds(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return DEFAULT_THRESHOLDS;
+  const clean = [...new Set(raw.map(Number).filter((n) => Number.isFinite(n) && n > 0))];
+  return clean.length > 0 ? clean.sort((a, b) => a - b) : DEFAULT_THRESHOLDS;
+}
 
 export async function getPlatformSettings(): Promise<PlatformSettings> {
   try {
     const { data } = await supabaseAdmin()
       .from("platform_settings")
       .select(
-        "free_generations_enabled, free_daily_generation_cap, daily_free_spend_alert_usd, spend_alert_last_sent_on",
+        "free_generations_enabled, free_daily_generation_cap, daily_free_spend_alert_usd, spend_alert_last_sent_on, daily_spend_thresholds_eur, spend_alert_high_water_eur, monthly_ai_budget_eur",
       )
       .eq("id", true)
       .maybeSingle();
@@ -39,10 +57,55 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
       freeDailyGenerationCap: data.free_daily_generation_cap ?? 0,
       dailyFreeSpendAlertUsd: Number(data.daily_free_spend_alert_usd ?? 50),
       spendAlertLastSentOn: data.spend_alert_last_sent_on ?? null,
+      dailySpendThresholdsEur: normaliseThresholds(data.daily_spend_thresholds_eur),
+      spendAlertHighWaterEur: Number(data.spend_alert_high_water_eur ?? 0),
+      monthlyAiBudgetEur: Number(data.monthly_ai_budget_eur ?? 0),
     };
   } catch {
-    return DEFAULTS; // fail open — never block on a settings read
+    /*
+     * Fail open. This is read on the hot path guarding free generations, so a
+     * transient error must never block a paying customer — and the columns
+     * above do not exist until migration 0037 is applied, which would otherwise
+     * take the whole generation path down on a half-migrated deployment.
+     */
+    return DEFAULTS;
   }
+}
+
+/** Alert thresholds and the monthly budget — the founder's two spend dials. */
+export async function setSpendControls(input: {
+  thresholdsEur?: number[];
+  monthlyBudgetEur?: number;
+}): Promise<void> {
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.thresholdsEur !== undefined) {
+    patch.daily_spend_thresholds_eur = normaliseThresholds(input.thresholdsEur);
+    // A changed ladder means today's alerts should be reconsidered against it.
+    patch.spend_alert_high_water_eur = 0;
+  }
+  if (input.monthlyBudgetEur !== undefined) {
+    patch.monthly_ai_budget_eur = Math.max(0, input.monthlyBudgetEur);
+  }
+  const { error } = await supabaseAdmin().from("platform_settings").update(patch).eq("id", true);
+  if (error) throw new Error(`Failed to update spend controls: ${error.message}`);
+}
+
+/**
+ * Record that today's spend has alerted up to a given threshold.
+ *
+ * Stored as a high-water mark rather than a boolean, so €25 alerting does not
+ * silence €100 later the same day. A day that runs away should get louder, not
+ * quieter.
+ */
+export async function markSpendAlertSentAt(day: string, thresholdEur: number): Promise<void> {
+  await supabaseAdmin()
+    .from("platform_settings")
+    .update({
+      spend_alert_last_sent_on: day,
+      spend_alert_high_water_eur: thresholdEur,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", true);
 }
 
 /** Flip the free-generation kill switch (admin only — caller must authorize). */

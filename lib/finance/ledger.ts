@@ -6,6 +6,7 @@ import {
   type AiFeature,
   type TokenUsage,
 } from "./cost-model";
+import { getImageCost } from "./image-cost";
 
 /*
  * AI usage ledger writer — records the REAL cost of one AI action.
@@ -38,7 +39,14 @@ export async function recordAiUsage(input: RecordAiUsageInput): Promise<void> {
     const usage: TokenUsage = input.usage ?? { inputTokens: 0, outputTokens: 0 };
     const images = input.images ?? 0;
     const model = input.model ?? ACTIVE_MODEL;
-    const cost = costOfActionExact(usage, images, model);
+    /*
+     * Resolve the per-image rate in force rather than using the code default,
+     * so a corrected Higgsfield price applies from the next action onward with
+     * no deploy. Only read when the action actually produced images — no reason
+     * to pay a settings round-trip on a text-only call.
+     */
+    const imageRate = images > 0 ? (await getImageCost()).rateUsd : undefined;
+    const cost = costOfActionExact(usage, images, model, imageRate);
 
     await supabaseAdmin()
       .from("ai_usage_ledger")
