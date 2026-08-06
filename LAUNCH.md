@@ -185,7 +185,11 @@ All of the following is **already written**. This block is about proving it
 against live keys, not building it.
 
 - [ ] Stripe account + `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
-- [ ] Create the products/prices and point the plan config at them.
+- [ ] **No products or prices to create in Stripe.** Both checkout routes pass
+      inline `price_data` built from `lib/plans` and `lib/credit-packs`, so the
+      price a customer is charged always comes from the source of truth and can
+      never drift from what the pricing page shows. Changing a price is a code
+      change, not a dashboard change.
 - [ ] **Webhook endpoint** registered at `/api/webhooks/stripe`. The handler
       already covers `checkout.session.completed`,
       `checkout.session.async_payment_succeeded`, `invoice.paid`,

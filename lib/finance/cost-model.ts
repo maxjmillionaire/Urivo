@@ -18,6 +18,8 @@
  * ceiling the input/output limits guarantee).
  */
 
+import { CREDIT_COSTS } from "@/lib/credit-costs";
+
 // ── Provider pricing (USD per token) ─────────────────────────────────────────
 // Source: Anthropic list price. Opus 4.8 = $5.00 / 1M input, $25.00 / 1M output.
 // Keep this table so a model swap is a one-line change and the simulator can
@@ -74,7 +76,7 @@ export interface TokenUsage {
  *   - outMax === the max_tokens cap enforced in the corresponding lib/ai module.
  *   - inMax === system prompt + the input budget cap from lib/ai/limits.ts.
  *   - typical === a realistic middle, to be replaced by measured medians.
- * credits === the price in CREDIT_COSTS (kept in sync; asserted in tests).
+ * credits === the price in CREDIT_COSTS, imported rather than copied.
  */
 export interface ActionProfile {
   credits: number;
@@ -86,19 +88,34 @@ export interface ActionProfile {
   imagesMax: number;
 }
 
+/*
+ * The credit price is READ from CREDIT_COSTS, never repeated here.
+ *
+ * It used to be repeated, with a comment promising a test kept the two in step.
+ * There was no such test, and the copies went stale the moment prices moved:
+ * this table still said Ask cost 1 credit after it went to 2, and research and
+ * ads still said 3 after they went to 4. Everything downstream divides by these
+ * numbers — cost per credit, the modeled tiers, the margin table on the admin
+ * dashboard — so the figures used to reason about PRICING were computed from
+ * prices the product had not charged for weeks, and Ask looked twice as
+ * expensive per credit as it really is.
+ *
+ * A store edit is charged as an Ask message (see app/api/stores/[id]/edit),
+ * which is why it reads askMessage rather than having a price of its own.
+ */
 export const ACTION_PROFILES: Record<AiFeature, ActionProfile> = {
   // System ~1900t + prompt ≤600 chars. Output cap 16000 (incl. thinking). 3–8 images.
-  storeGeneration: { credits: 20, inTypical: 2000, outTypical: 7000, inMax: 2100, outMax: 16000, imagesTypical: 5, imagesMax: 8 },
+  storeGeneration: { credits: CREDIT_COSTS.storeGeneration, inTypical: 2000, outTypical: 7000, inMax: 2100, outMax: 16000, imagesTypical: 5, imagesMax: 8 },
   // System ~600t + context ~700t + history ≤12000 chars (~3000t). Output cap 700.
-  askMessage: { credits: 1, inTypical: 1500, outTypical: 350, inMax: 4300, outMax: 700, imagesTypical: 0, imagesMax: 0 },
+  askMessage: { credits: CREDIT_COSTS.askMessage, inTypical: 1500, outTypical: 350, inMax: 4300, outMax: 700, imagesTypical: 0, imagesMax: 0 },
   // System ~1000t + context ~800t + history ≤14000 chars (~3500t). Output cap 2000.
-  storeEdit: { credits: 1, inTypical: 2000, outTypical: 600, inMax: 5300, outMax: 2000, imagesTypical: 0, imagesMax: 0 },
+  storeEdit: { credits: CREDIT_COSTS.askMessage, inTypical: 2000, outTypical: 600, inMax: 5300, outMax: 2000, imagesTypical: 0, imagesMax: 0 },
   // System ~750t + prompt ≤600 chars. Output cap 4000.
-  marketResearch: { credits: 3, inTypical: 900, outTypical: 2500, inMax: 900, outMax: 4000, imagesTypical: 0, imagesMax: 0 },
+  marketResearch: { credits: CREDIT_COSTS.marketResearch, inTypical: 900, outTypical: 2500, inMax: 900, outMax: 4000, imagesTypical: 0, imagesMax: 0 },
   // System ~750t + store context ~800t. Output cap 4000.
-  adStudio: { credits: 3, inTypical: 1550, outTypical: 2800, inMax: 1550, outMax: 4000, imagesTypical: 0, imagesMax: 0 },
+  adStudio: { credits: CREDIT_COSTS.adStudio, inTypical: 1550, outTypical: 2800, inMax: 1550, outMax: 4000, imagesTypical: 0, imagesMax: 0 },
   // Pure image action (no LLM tokens).
-  productImage: { credits: 2, inTypical: 0, outTypical: 0, inMax: 0, outMax: 0, imagesTypical: 1, imagesMax: 1 },
+  productImage: { credits: CREDIT_COSTS.productImage, inTypical: 0, outTypical: 0, inMax: 0, outMax: 0, imagesTypical: 1, imagesMax: 1 },
 };
 
 // ── Cost functions ───────────────────────────────────────────────────────────
