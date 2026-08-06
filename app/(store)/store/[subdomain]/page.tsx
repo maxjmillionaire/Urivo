@@ -6,6 +6,7 @@ import { parseTheme } from "@/lib/storefront";
 import { parseDesignSystem, themeToDesignSystem, parseLogo } from "@/lib/storefront/design-system";
 import { storeJsonLd, jsonLdScript } from "@/lib/seo";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getPublishedStorefront } from "@/lib/storefront/cache";
 import { storeSellReadiness, shopperNotice } from "@/lib/commerce/readiness";
 import { StorefrontRenderer } from "./storefront-renderer";
 import { VisitBeacon } from "./visit-beacon";
@@ -23,25 +24,33 @@ interface Props {
 // No is_active filter: RLS lets the public read active stores and the OWNER read
 // their own draft. So a null result means "not found or someone else's draft"
 // (→ 404), and a returned inactive store is the owner previewing before publish.
-const loadStore = cache(async (subdomain: string) => {
+/*
+ * Published stores are served from the tag-busted cache (lib/storefront/cache).
+ * A store that is NOT published falls through to this RLS-scoped read, which is
+ * how an owner previews their own draft — and why that path is never cached:
+ * the result depends on who is asking.
+ */
+const loadStorefront = cache(async (subdomain: string) => {
   if (!SUBDOMAIN_PATTERN.test(subdomain)) return null;
+
+  const published = await getPublishedStorefront(subdomain).catch(() => null);
+  if (published) return { ...published, isPreview: false };
+
   const supabase = await supabaseServer();
   const { data: store } = await supabase
     .from("stores")
     .select("id, store_name, theme_config, currency, is_active")
     .eq("subdomain", subdomain)
     .maybeSingle();
-  return store ?? null;
-});
+  if (!store) return null;
 
-const loadProducts = cache(async (storeId: string) => {
-  const supabase = await supabaseServer();
-  const { data } = await supabase
+  const { data: products } = await supabase
     .from("products")
     .select("id, title, description, price_eur, image_url, show_logo")
-    .eq("store_id", storeId)
+    .eq("store_id", store.id)
     .order("position", { ascending: true });
-  return data ?? [];
+
+  return { store, products: products ?? [], isPreview: !store.is_active };
 });
 
 function storeUrl(subdomain: string): string {
@@ -51,10 +60,11 @@ function storeUrl(subdomain: string): string {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { subdomain } = await params;
-  const store = await loadStore(subdomain);
-  if (!store) return { title: "Store not found" };
+  const sf = await loadStorefront(subdomain);
+  if (!sf) return { title: "Store not found" };
+  const { store, products } = sf;
   const theme = parseTheme(store.theme_config);
-  const products = await loadProducts(store.id);
+
   const description = theme.tagline || store.store_name;
   const url = storeUrl(subdomain);
   const ogImage = products.find((p) => p.image_url)?.image_url ?? undefined;
@@ -85,18 +95,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // match their canvas, not Urivo's navy. Overrides the root themeColor here.
 export async function generateViewport({ params }: Props): Promise<Viewport> {
   const { subdomain } = await params;
-  const store = await loadStore(subdomain);
+  const store = (await loadStorefront(subdomain))?.store ?? null;
   const theme = store ? parseTheme(store.theme_config) : null;
   return { themeColor: theme?.background ?? "#ffffff" };
 }
 
 export default async function StorefrontPage({ params }: Props) {
   const { subdomain } = await params;
-  const store = await loadStore(subdomain);
-  if (!store) notFound();
-
-  const isPreview = !store.is_active;
-  const products = await loadProducts(store.id);
+  const sf = await loadStorefront(subdomain);
+  if (!sf) notFound();
+  const { store, products, isPreview } = sf;
 
   /*
    * Can this store take money? A shopper used to find out only after browsing,

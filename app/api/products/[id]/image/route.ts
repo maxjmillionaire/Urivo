@@ -13,6 +13,7 @@ import {
   isImageGenerationConfigured,
 } from "@/lib/ai/image-generator";
 import { recordAiUsage } from "@/lib/finance/ledger";
+import { revalidateStore } from "@/lib/storefront/cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -121,6 +122,9 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     requestId,
   });
 
+  // The catalogue changed — the live storefront must not serve the old one.
+  revalidateStore(auth.store.subdomain);
+
   return NextResponse.json({ success: true, imageUrl });
 }
 
@@ -135,5 +139,8 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   const { error } = await supabaseAdmin().from("products").update({ image_url: null }).eq("id", id);
   if (error) return fail(500, "INTERNAL", "Could not remove the image. Please try again.");
+  // The catalogue changed — the live storefront must not serve the old one.
+  revalidateStore(auth.store.subdomain);
+
   return NextResponse.json({ success: true });
 }

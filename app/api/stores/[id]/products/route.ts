@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { requireStoreOwner } from "@/lib/tenant";
 import { ProductCreateSchema } from "@/lib/validation";
+import { revalidateStoreById } from "@/lib/storefront/cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,5 +60,8 @@ export async function POST(
   if (error) {
     return fail(500, "INTERNAL", "Could not add the product. Please try again.");
   }
+  // A new product must appear on the live storefront at once.
+  await revalidateStoreById(storeId);
+
   return NextResponse.json({ success: true, product: data }, { status: 201 });
 }

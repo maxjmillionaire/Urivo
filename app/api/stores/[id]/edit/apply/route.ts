@@ -28,6 +28,7 @@ import {
   type DesignPatch,
   type ProductEdit,
 } from "@/lib/storefront/apply-edit";
+import { revalidateStoreById } from "@/lib/storefront/cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -218,6 +219,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         if (error) throw error;
       }
     }
+
+    // Design and catalogue both changed — the live storefront must follow.
+    await revalidateStoreById(id);
 
     return NextResponse.json({ success: true });
   } catch (err) {

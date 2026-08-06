@@ -6,6 +6,7 @@ import { getPlanForUser } from "@/lib/plan-access";
 import { StoreUpdateSchema } from "@/lib/validation";
 import { notifyStorePublished, notifyPaymentsMissing } from "@/lib/notifications/events";
 import { storeSellReadiness } from "@/lib/commerce/readiness";
+import { revalidateStoreById } from "@/lib/storefront/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -103,6 +104,9 @@ export async function PATCH(
     await notifyStorePublished(owner.userId, data.id, data.store_name, canSell);
     if (!canSell) await notifyPaymentsMissing(owner.userId, data.id, data.store_name);
   }
+
+  // The public storefront must not keep serving the previous version.
+  await revalidateStoreById(id);
 
   return NextResponse.json({ success: true, store: data });
 }

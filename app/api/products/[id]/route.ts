@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ProductUpdateSchema } from "@/lib/validation";
+import { revalidateStoreById } from "@/lib/storefront/cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +40,8 @@ async function authorizeProduct(productId: string) {
   if (!product || ownerId !== user.id) {
     return { ok: false as const, reason: "NOT_FOUND" as const };
   }
-  return { ok: true as const };
+  // The store id rides along so writers can bust that storefront's cache.
+  return { ok: true as const, storeId: product.store_id as string };
 }
 
 export async function PATCH(
@@ -85,6 +87,9 @@ export async function PATCH(
   if (error) {
     return fail(500, "INTERNAL", "Could not save the product. Please try again.");
   }
+  // The catalogue changed — the live storefront must not serve the old one.
+  await revalidateStoreById(auth.storeId);
+
   return NextResponse.json({ success: true, product: data });
 }
 
@@ -106,5 +111,8 @@ export async function DELETE(
   if (error) {
     return fail(500, "INTERNAL", "Could not remove the product. Please try again.");
   }
+  // The catalogue changed — the live storefront must not serve the old one.
+  await revalidateStoreById(auth.storeId);
+
   return NextResponse.json({ success: true });
 }

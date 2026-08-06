@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireStoreOwner } from "@/lib/tenant";
 import { parseLogo, LOGO_POSITIONS } from "@/lib/storefront/design-system";
+import { revalidateStoreById } from "@/lib/storefront/cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,6 +83,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { error } = await saveTheme(id, theme);
   if (error) return fail(500, "INTERNAL", "Could not save the logo. Please try again.");
 
+  // The logo is rendered into the storefront — bust the cached page.
+  await revalidateStoreById(id);
+
   return NextResponse.json({ success: true, logo: parseLogo(theme) });
 }
 
@@ -115,6 +119,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   theme.logo = { ...logo, ...body };
   const { error } = await saveTheme(id, theme);
   if (error) return fail(500, "INTERNAL", "Could not save your changes. Please try again.");
+
+  // The logo is rendered into the storefront — bust the cached page.
+  await revalidateStoreById(id);
 
   return NextResponse.json({ success: true, logo: parseLogo(theme) });
 }

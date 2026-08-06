@@ -435,8 +435,18 @@ function Hero({ storeName, ds, heroImage, logo, storyHref }: { storeName: string
     return (
       <section style={{ position: "relative", minHeight: "72vh", display: "flex", alignItems: "flex-end", overflow: "hidden" }}>
         {heroImage ? (
+          // The hero is the LCP element on every storefront, so it is never
+          // lazy or low-priority: the merchant paid for this click and the
+          // first paint decides whether it converts. Decorative (the headline
+          // carries the meaning), hence the empty alt.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={heroImage} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+          <img
+            src={heroImage}
+            alt=""
+            fetchPriority="high"
+            decoding="async"
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          />
         ) : (
           <div style={{ position: "absolute", inset: 0, ...planeStyle(ds) }} />
         )}
