@@ -4,7 +4,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isStripeConfigured, stripe } from "@/lib/commerce/stripe";
 import { resolveStripeCustomer } from "@/lib/billing/customer";
-import { getPlan, priceForUser, isLaunchWindow } from "@/lib/plans";
+import { getPlan, priceForInterval, isLaunchWindow } from "@/lib/plans";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId } from "@/lib/logger";
 
@@ -24,7 +24,11 @@ export const dynamic = "force-dynamic";
  * here (the client can't be trusted to confirm payment).
  */
 
-const BodySchema = z.object({ plan: z.enum(["core", "pro"]) });
+const BodySchema = z.object({
+  plan: z.enum(["core", "pro"]),
+  /** Defaults to monthly so an older client keeps working unchanged. */
+  interval: z.enum(["month", "year"]).default("month"),
+});
 
 function appOrigin(): string {
   return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -71,8 +75,19 @@ export async function POST(request: NextRequest) {
   // the standard price. The price tag is stamped at signup (migration 0023).
   const priceType =
     profile?.price_type === "founding" ? "founding" : isLaunchWindow() ? "launch" : "standard";
-  const priceEUR = priceForUser(body.plan, priceType);
-  const meta = { kind: "subscription", user_id: user.id, plan: body.plan, price_type: priceType };
+  /*
+   * Annual is a flat published price, not a discount stacked on the founding
+   * rate — the founding lock is a MONTHLY lifetime price and compounding the
+   * two would give the tier away.
+   */
+  const priceEUR = priceForInterval(body.plan, body.interval, priceType);
+  const meta = {
+    kind: "subscription",
+    user_id: user.id,
+    plan: body.plan,
+    price_type: priceType,
+    interval: body.interval,
+  };
 
   const requestId = newRequestId();
   const origin = appOrigin();
@@ -88,8 +103,10 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: "eur",
             unit_amount: Math.round(priceEUR * 100),
-            recurring: { interval: "month" },
-            product_data: { name: `Urivo ${plan.name}` },
+            recurring: { interval: body.interval },
+            product_data: {
+              name: `Urivo ${plan.name}${body.interval === "year" ? " · annual" : ""}`,
+            },
           },
         },
       ],

@@ -11,23 +11,25 @@ export function UpgradeButton({
   plan,
   label,
   highlight,
+  interval = "month",
 }: {
   plan: "core" | "pro";
   label: string;
   highlight?: boolean;
+  interval?: "month" | "year";
 }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
   async function upgrade() {
-    track("upgrade_clicked", { plan });
+    track("upgrade_clicked", { plan, interval });
     setBusy(true);
     setNote(null);
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, interval }),
       });
       const data = await res.json();
       if (res.ok && data.url) {

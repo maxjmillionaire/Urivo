@@ -3,7 +3,8 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { getCreditBalance, getCreditLedger } from "@/lib/credits";
 import { AppShell } from "../_shell/app-shell";
 import { loadRailStore } from "../_shell/rail-data";
-import { UpgradeButton, ManageSubscriptionButton } from "./upgrade-buttons";
+import { ManageSubscriptionButton } from "./upgrade-buttons";
+import { PlanPicker } from "./plan-picker";
 import { CreditPacks } from "./credit-packs";
 import { PayoutSetup } from "./payouts";
 import { getConnectStatus, connectState } from "@/lib/billing/connect";
@@ -73,57 +74,18 @@ export default async function BillingPage() {
         </section>
       )}
 
-      {plan === "free" && (
+      {/* Shown to Founder too, not just Free — a Founder who never sees Pro on
+          their own billing page can only find it through the Stripe portal. */}
+      {plan !== "pro" && (
         <section className="mt-8">
-          <h2 className="text-lg font-semibold tracking-tight text-ivory">Upgrade</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-ivory">
+            {plan === "free" ? "Upgrade" : "Move up to Pro"}
+          </h2>
           <p className="mt-1 text-sm text-mist">
             From your idea to a live store in minutes.
             {isFoundingMember && " You're a founding member — your price is locked for life."}
           </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            {([PLANS.core, PLANS.pro] as const).map((p) => {
-              const popular = p.key === "core";
-              const price = priceForUser(p.key, priceType);
-              const struck = isFoundingMember ? p.price.regular : launch ? p.price.regular : null;
-              return (
-                <div
-                  key={p.key}
-                  className={`u-float relative flex flex-col rounded-2xl bg-panel/70 p-6 ${
-                    popular ? "border border-gold/30" : "border border-hair"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold text-ivory">{p.name}</h3>
-                    {popular && (
-                      <span className="u-gold rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider">
-                        Most popular
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-4 flex items-baseline gap-2">
-                    <span className="text-3xl font-semibold tracking-tight text-ivory">
-                      {formatPrice(price)}
-                    </span>
-                    {struck != null && struck !== price && (
-                      <span className="text-mist line-through">{formatPrice(struck)}</span>
-                    )}
-                    <span className="text-sm text-mist">/ mo</span>
-                  </div>
-                  <ul className="mt-5 flex-1 space-y-2.5">
-                    {p.highlights.map((h) => (
-                      <li key={h} className="flex items-start gap-2.5 text-sm text-mist">
-                        <span className="mt-0.5 text-gold-soft">✓</span>
-                        <span>{h}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-6">
-                    <UpgradeButton plan={p.key as "core" | "pro"} label={`Choose ${p.name}`} highlight={popular} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <PlanPicker priceType={priceType} isFoundingMember={isFoundingMember} launch={launch} currentPlan={plan} />
         </section>
       )}
 

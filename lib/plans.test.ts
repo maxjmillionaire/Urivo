@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   getPlan,
+  priceForInterval,
+  annualMonthsFree,
+  annualSavingEur,
   maxLiveStores,
   capacityLabel,
   monthlyPrice,
@@ -96,5 +99,48 @@ describe("live-store capacity", () => {
     for (const k of ["free", "core", "pro"]) {
       expect(capacityLabel(k).toLowerCase()).not.toMatch(/limited to|only|restrict|max\b/);
     }
+  });
+});
+
+/*
+ * Annual billing exists for cash and churn, but the number a customer checks is
+ * "two months free". If that stops being true the offer stops being credible,
+ * so it is asserted rather than assumed.
+ */
+describe("annual billing", () => {
+  it("prices a year at ten months — two months free, on every paid plan", () => {
+    for (const key of ["core", "pro"] as const) {
+      expect(annualMonthsFree(key)).toBe(2);
+      expect(getPlan(key).price.annual).toBe(getPlan(key).price.regular * 10);
+    }
+  });
+
+  it("states a saving the customer can verify in their head", () => {
+    expect(annualSavingEur("core")).toBe(49 * 12 - 490);
+    expect(annualSavingEur("pro")).toBe(199 * 12 - 1990);
+  });
+
+  it("never compounds the founding lock with the annual price", () => {
+    // Founding is a MONTHLY lifetime rate. Stacking it onto a year paid up
+    // front would hand over the tier for a fraction of its price.
+    const founding = priceForInterval("core", "year", "founding");
+    expect(founding).toBe(getPlan("core").price.annual);
+    expect(founding).toBeGreaterThan(getPlan("core").price.founding! * 10);
+  });
+
+  it("leaves monthly pricing exactly as it was", () => {
+    expect(priceForInterval("core", "month", null)).toBe(49);
+    expect(priceForInterval("pro", "month", null)).toBe(199);
+  });
+
+  it("keeps a year cheaper than twelve months, always", () => {
+    for (const key of ["core", "pro"] as const) {
+      expect(priceForInterval(key, "year")).toBeLessThan(getPlan(key).price.regular * 12);
+    }
+  });
+
+  it("reports no saving for a free plan rather than dividing by zero", () => {
+    expect(annualSavingEur("free")).toBe(0);
+    expect(annualMonthsFree("free")).toBe(0);
   });
 });

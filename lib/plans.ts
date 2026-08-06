@@ -55,6 +55,12 @@ export interface PlanConfig {
     regular: number;
     /** Lifetime price for founding members (first 50). Undefined = no discount. */
     founding?: number;
+    /**
+     * Annual price — the year paid up front. Set to ten months of the monthly
+     * price: two months free is the discount customers recognise instantly and
+     * can verify in their head, which matters more than squeezing the ratio.
+     */
+    annual: number;
   };
   /** Marketing bullets — kept here so the pricing deck and product never drift. */
   highlights: string[];
@@ -82,7 +88,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
       premiumSupport: false,
       earlyAccess: false,
     },
-    price: { currency: "EUR", launch: 0, regular: 0 },
+    price: { currency: "EUR", launch: 0, regular: 0, annual: 0 },
     highlights: ["25 welcome AI credits", "One live store, on a urivo.ai address", "A taste of the AI Store Assistant"],
   },
   core: {
@@ -102,7 +108,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
       premiumSupport: false,
       earlyAccess: false,
     },
-    price: { currency: "EUR", launch: 49, regular: 49, founding: 29 },
+    price: { currency: "EUR", launch: 49, regular: 49, founding: 29, annual: 490 },
     highlights: [
       "150 AI credits every month",
       "Run up to 3 live stores",
@@ -129,7 +135,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
       premiumSupport: true,
       earlyAccess: true,
     },
-    price: { currency: "EUR", launch: 199, regular: 199, founding: 149 },
+    price: { currency: "EUR", launch: 199, regular: 199, founding: 149, annual: 1990 },
     highlights: [
       "800 AI credits every month",
       "Unlimited live stores",
@@ -212,7 +218,11 @@ export function evolutionTier(key: string | null | undefined): EvolutionTier {
 
 /** Format a EUR price for display (whole euros, no cents). */
 export function formatPrice(euros: number): string {
-  return euros === 0 ? "€0" : `€${euros}`;
+  // Annual prices are four digits, and "€1990" reads as a typo where "€1,990"
+  // reads as a price. Grouped with a thin space rather than a comma or a dot,
+  // which are the decimal mark in half of Urivo's markets.
+  if (euros === 0) return "€0";
+  return `€${Math.round(euros).toLocaleString("en-US").replace(/,/g, "\u202f")}`;
 }
 
 /** Live-store capacity for a plan. null = unlimited (Pro). */
@@ -224,4 +234,36 @@ export function maxLiveStores(key: string | null | undefined): number | null {
 export function capacityLabel(key: string | null | undefined): string {
   const max = maxLiveStores(key);
   return max === null ? "Unlimited live stores" : `Run up to ${max} live store${max === 1 ? "" : "s"}`;
+}
+
+export type BillingInterval = "month" | "year";
+
+/**
+ * What a plan costs for the chosen interval. Annual is a flat published price
+ * rather than a discount applied to whatever the monthly happens to be — the
+ * founding rate is a MONTHLY lifetime lock and does not stack with paying a
+ * year up front, and quietly compounding the two would give away the tier.
+ */
+export function priceForInterval(
+  key: string | null | undefined,
+  interval: BillingInterval,
+  priceType: string | null | undefined = null,
+  now: Date = new Date(),
+): number {
+  const plan = getPlan(key);
+  return interval === "year" ? plan.price.annual : priceForUser(plan.key, priceType, now);
+}
+
+/** Months of the monthly price a year costs — "two months free", verifiable. */
+export function annualMonthsFree(key: string | null | undefined): number {
+  const plan = getPlan(key);
+  if (plan.price.regular <= 0 || plan.price.annual <= 0) return 0;
+  return Math.round(12 - plan.price.annual / plan.price.regular);
+}
+
+/** What the customer keeps by paying yearly, in euros. */
+export function annualSavingEur(key: string | null | undefined): number {
+  const plan = getPlan(key);
+  if (plan.price.regular <= 0 || plan.price.annual <= 0) return 0;
+  return plan.price.regular * 12 - plan.price.annual;
 }
