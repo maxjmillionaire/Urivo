@@ -1,16 +1,45 @@
 # Urivo — Launch Runbook
 
-Work top to bottom. After each block, hit `/api/health` to confirm wiring.
+Work top to bottom. After each block, run the **preflight** — not the plain
+health check:
+
+```
+curl "https://<your-domain>/api/health?deep=1&key=$CRON_SECRET"
+```
+
+`/api/health` on its own only reports which environment variables are *present*.
+Every failure that actually takes a launch down passes that check: test Stripe
+keys in production, a migration nobody pasted, a revoked key, `APP_URL` still on
+localhost. The deep mode probes the database, compares the deployed schema
+against the functions the code calls, and asks Stripe who it is. It returns
+`503` with a list of blockers until the deployment can genuinely take money.
 
 **Where the code actually stands.** The application is built and the database
-layer is verified end-to-end against a real Postgres — all 25 migrations, the
+layer is verified end-to-end against a real Postgres — all 36 migrations, the
 credit RPCs, RLS grants, and the one-shot `setup_all.sql`. Subscriptions, credit
-packs, the billing portal and the storefront checkout are **written and wired**;
-they have simply never been run against live Stripe keys. One capability is
-genuinely missing: **Stripe Connect merchant onboarding** (Block 4).
+packs, the billing portal, storefront checkout and **Stripe Connect merchant
+onboarding** are all written and wired; they have simply never been run against
+live Stripe keys. Custom domains have their database, provider seam and
+middleware in place, and need the API and setup screen once a real domain and a
+deployed origin exist.
 
-What remains is therefore infrastructure, one build task, and a real
+What remains is therefore infrastructure, live-key verification, and a real
 run-through — in that order.
+
+---
+
+## The dated plan
+
+| Date | What happens | Who |
+|---|---|---|
+| **11 Aug** | Funding lands. Buy the domain, deploy on Railway, point Cloudflare at it, swap in live Stripe keys, apply outstanding migrations. | Founder |
+| **11–12 Aug** | Block 1 and Block 2 end to end on the real domain. Nothing else starts until preflight is green. | Founder |
+| **12–15 Aug** | Test phase. A handful of real people use Urivo on comped plans; feedback arrives in `/admin/feedback` with the screen attached. Fix what they hit. | Both |
+| **15 Aug** | Public launch, marketing on. | Founder |
+
+The test phase is the part most likely to be skipped and the part most worth
+protecting. Three days of five people using the product finds things no amount
+of internal clicking will, because they do not know where not to press.
 
 ---
 
@@ -19,7 +48,7 @@ run-through — in that order.
 1. **Supabase project** — create one at supabase.com.
    - **On a brand-new, empty project:** SQL Editor → New query → paste
      **`supabase/setup_all.sql`** → Run. That single file contains every
-     migration (`0001` → `0026`) in order.
+     migration (`0001` → `0036`) in order.
    - **On a project that already has some migrations applied:** do NOT replay
      `setup_all.sql` — migration `0001` creates tables unconditionally and will
      error on the first one that already exists. Instead check what is actually
@@ -52,8 +81,14 @@ run-through — in that order.
    wildcard `*.urivo.ai` for storefronts) pointing at Railway, and set
    `ROOT_DOMAIN` / `APP_URL` to the real domain. Domain via a registrar
    (Cloudflare), not Railway.
-5. **Verify:** open `/api/health` → `launchReady: true` and every `required`
-   flag `true`. Fix any `false` before continuing.
+5. **Verify — with the preflight, not the plain health check:**
+   `/api/health?deep=1&key=$CRON_SECRET` must return `200` with
+   `"ok": true` and an empty `blockers` array. It will tell you, by name, which
+   migrations are missing, whether the Stripe key is live or test, whether the
+   key is actually valid, and whether `APP_URL` and `ROOT_DOMAIN` agree. Work
+   the blockers to zero before continuing; treat the warnings as a shopping
+   list. (Without `CRON_SECRET` set, deep mode does not exist and the endpoint
+   answers `404` — it fails closed.)
 
 ## Block 2 — Staging smoke-test (click every critical flow once, for real)
 
@@ -61,32 +96,38 @@ The DB layer is proven; these are the flows that only real keys + auth exercise.
 Run through them on the deployed staging URL and confirm each:
 
 - [ ] **Sign up** with email + name → confirm the email → land on dashboard,
-      greeting shows your name, **20 welcome credits** are granted (they are
-      granted on confirmation, not at signup).
+      greeting shows your name, **25 welcome credits** are granted (they are
+      granted on confirmation, not at signup). Count them: the pricing table
+      promises 25, and this number is the first promise Urivo makes.
 - [ ] **Google sign-in** → works, name/avatar populate, credits granted.
 - [ ] **Disposable email is refused** at signup (blocklist + domain check).
 - [ ] **Generate a store** → real brand + products + **photos** appear; credits
-      drop by 20; on a free account the store is a **draft**.
+      drop by 20, leaving 5.
 - [ ] **First-store notification** appears in the bell; **credits-low** fires
       once the balance drops below 20.
-- [ ] **Preview the draft** (View/Preview) → you see it with the "Preview"
-      banner; an incognito visitor gets 404 (not public).
-- [ ] **Publish** on a paid plan → store goes live; a "store is live"
-      notification appears (and does not re-fire on a re-toggle same day).
-- [ ] **Ask Urivo** (needs a paid plan) → streams a reply; footer shows
-      `1 credit · N left`; balance drops; at 0 the upgrade/top-up pop-up appears.
+- [ ] **Publish on the FREE account** → the store goes live on its urivo.ai
+      address and an incognito visitor can see it. Free runs one live store on
+      purpose; a free user who has never owned anything does not pay to keep it.
+- [ ] **Publish a second store on Free** → refused with the capacity message,
+      not a crash, and the first store stays live.
+- [ ] **Ask Urivo** → streams a reply; footer shows `2 credits · N left`;
+      balance drops; at 0 the upgrade/top-up pop-up appears.
 - [ ] **Ask Urivo edit** → propose → confirm → the real store changes.
-- [ ] **Market research / Ad Studio** → produce output; credits drop (3 / 3).
+- [ ] **Market research / Ad Studio** → produce output; credits drop (4 / 4).
 - [ ] **Out of credits** → generate modal shows the two-path moment.
 - [ ] **Settings** → change name / password; **Sign out** from the account menu.
-- [ ] **Admin** → `/admin/finance` loads for an `ADMIN_EMAILS` address and 404s
-      for anyone else. Cost-per-action and the founding tracker render.
+- [ ] **Admin** → `/admin/finance`, `/admin/testers` and `/admin/feedback` all
+      load for an `ADMIN_EMAILS` address and **404** for anyone else (sign out
+      and check — a 403 would confirm the route exists).
+- [ ] **Feedback** → press the Feedback control on a dashboard screen, send one,
+      and confirm it appears in `/admin/feedback` with the route attached. Then
+      confirm a failure is honest: it must never say "sent" when nothing saved.
 - [ ] **First-sale instrumentation** → publish a store and confirm
       `stores.published_at` is stamped; unpublish and republish and confirm it
       does **not** reset. The First sale panel is the number the business is
       steered by — verify it is recording before real merchants arrive.
 - [ ] **Legal** pages (Impressum / Datenschutz / AGB) load.
-- [ ] `/api/health` still green; check Sentry receives a test error.
+- [ ] Preflight still returns `"ok": true`; check Sentry receives a test error.
 
 ## Block 3 — Weekly business digest (scheduled)
 
@@ -168,11 +209,49 @@ against live keys, not building it.
       notification and the email.
 - [ ] **Refund** a test charge and confirm the order status updates.
 
-## Block 6 — Deferred by decision (do not build before launch)
+## Block 6 — The test phase (12–15 Aug)
 
-- **Custom domains** (spec 7) — Cloudflare Registrar + Cloudflare for SaaS path
-  is fully specified. Every store lives free on its `*.urivo.ai` subdomain
-  until then.
+Three days of real people using the product, on real plans, before marketing
+turns on. This is the cheapest bug-finding available: testers do not know where
+not to press.
+
+**Setup**
+
+- [ ] `ADMIN_EMAILS` set, so `/admin/testers` and `/admin/feedback` open.
+- [ ] Each tester **signs up normally first** — access is granted to a real
+      account, never created from the admin panel, so email confirmation, the
+      disposable-domain blocklist and the signup throttle still apply to them.
+      A tester who skipped those is not testing the funnel.
+- [ ] Grant each of them Founder or Pro for 14 days from `/admin/testers`. Every
+      grant expires by itself; it will refuse an account that already pays,
+      because overwriting a Stripe subscriber's plan would desynchronise the
+      product from Stripe.
+- [ ] Tell them where the Feedback control is. That is the whole briefing —
+      the screen, the store and the plan attach themselves.
+
+**Watch daily**
+
+- [ ] `/admin/feedback` — "Where people are getting stuck" ranks open reports by
+      screen. The top row is the next thing to fix.
+- [ ] `/admin/finance` — free-tier inference spend and the kill switch.
+- [ ] Sentry — errors nobody bothered to report.
+
+**The question the test phase actually answers:** did anyone reach a first real
+sale, and where did the others stop? The North Star is the share of merchants
+who make a first sale, so a test phase that produces five happy testers and zero
+sales has told you something important, not nothing.
+
+- [ ] Revoke the comps, or let them lapse, before the public launch.
+
+## Block 7 — Deferred by decision (do not build before launch)
+
+- **Custom domains** (spec 7) — the foundation is in: `store_domains` with a
+  platform-wide unique hostname (0031), the Cloudflare provider seam, hostname
+  validation, and middleware that routes an unrecognised Host to a 404 instead
+  of Urivo's marketing site. What is left needs a real domain and a deployed
+  origin: the API routes, the merchant setup screen, and canonical/Stripe return
+  URLs on custom hosts. Available on **Founder and Pro**. Until then every store
+  lives free on its `*.urivo.ai` subdomain.
 - **Urivo Copilot** (spec 8) — post-launch flagship; the grounded assistant and
   the propose→confirm→apply safety model it builds on already exist.
 - **Product merchandising** (spec 9) — variants, bundles, galleries, honest

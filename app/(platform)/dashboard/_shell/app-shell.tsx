@@ -5,6 +5,7 @@ import { AppSidebar, type NavKey } from "./app-sidebar";
 import { AppRail, type RailStore } from "./app-rail";
 import { MobileRail } from "./mobile-rail";
 import { NotificationBell } from "./notification-bell";
+import { FeedbackButton } from "./feedback-button";
 import { getNotifications, unreadCount } from "@/lib/notifications/service";
 import type { Account } from "./account-menu";
 
@@ -91,6 +92,8 @@ export async function AppShell({
       </div>
       <AppRail store={store} canAsk={canAskUrivo(account.plan)} credits={credits} plan={account.plan} />
       <MobileRail store={store} canAsk={canAskUrivo(account.plan)} credits={credits} plan={account.plan} />
+      {/* Every screen, because the screen someone gets stuck on is the one worth hearing about. */}
+      <FeedbackButton storeId={store?.id ?? null} />
     </div>
   );
 }

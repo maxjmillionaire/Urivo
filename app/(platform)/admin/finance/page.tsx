@@ -79,6 +79,14 @@ export default async function FinanceDashboardPage() {
             </p>
           </div>
           <div className="text-right text-xs text-white/40">
+            <Link href="/admin/feedback" className="text-amber-300/90 hover:text-amber-200">
+              → Feedback inbox
+            </Link>
+            <br />
+            <Link href="/admin/testers" className="text-amber-300/90 hover:text-amber-200">
+              → Testers
+            </Link>
+            <br />
             <Link href="/admin/referrals" className="text-amber-300/90 hover:text-amber-200">
               → Creator referrals
             </Link>
