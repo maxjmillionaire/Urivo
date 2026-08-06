@@ -46,6 +46,7 @@ const FORBIDDEN: [string, RegExp][] = [
  * regulated claim rendered as furniture.
  */
 const INVENTED_NAV = [
+  "New collection",
   "Reviews",
   "Journal",
   "New in",

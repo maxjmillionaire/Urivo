@@ -21,6 +21,7 @@ export interface StylePreset {
 // airy, elegant serif set large. Feels like a quiet gallery.
 const AUREUM = parseDesignSystem({
   personality: "Minimal, editorial, quietly precise",
+  heroEyebrow: "Kept, not worn out",
   story:
     "Aureum was built on a quiet idea: a watch should be noticed by the person wearing it first, and by everyone else second. We keep the collection small and design each reference to be kept.",
   palette: { background: "#F4F2EC", surface: "#EAE7DE", ink: "#16130E", accent: "#8A6D3B", accentInk: "#FFFFFF" },
@@ -44,6 +45,7 @@ const AUREUM = parseDesignSystem({
 // Condensed display type in caps, tight grid, image-overlay cards, loud footer.
 const VOLT = parseDesignSystem({
   personality: "Bold, expressive, fashion-forward",
+  heroEyebrow: "Drops, not seasons",
   highlights: [
     { title: "Heavyweight, not flimsy", detail: "280gsm jersey that keeps its shape instead of going see-through." },
     { title: "Cut for movement", detail: "Dropped shoulders, boxed hem, room to actually move in it." },
@@ -70,6 +72,7 @@ const VOLT = parseDesignSystem({
 // very rounded, elevated shadows, framed cards, generous and gentle.
 const LUME = parseDesignSystem({
   personality: "Warm, friendly, sun-softened",
+  heroEyebrow: "For reactive skin",
   story:
     "Lumè exists because most skincare talks to you as though something is wrong. We make a small number of gentle, well-considered things, and we let your skin take its time.",
   trust: [

@@ -82,6 +82,12 @@ export interface StoreDesignSystem {
   /** Customer-facing brand narrative for the story section (editorial, honest). */
   story?: string;
   /**
+   * The small line above the hero headline. Authored per brand, or absent —
+   * every store used to print "New collection", which asserts a newness the
+   * renderer cannot know and made every Urivo store recognisable as one.
+   */
+  heroEyebrow?: string;
+  /**
    * Risk-reduction promises, AUTHORED for this brand. The renderer never
    * supplies these: a guarantee the merchant did not make is a commercial term
    * they are bound to and — for shipping, returns or environmental claims in the
@@ -316,6 +322,7 @@ export function parseDesignSystem(raw: unknown, productCount = 999): StoreDesign
   const accentInk = color(pRaw.accentInk, readableInk(accent));
 
   const story = typeof r.story === "string" && r.story.trim() ? r.story.trim().slice(0, 400) : undefined;
+  const heroEyebrow = str(r.heroEyebrow, 32) || undefined;
   const trust = parseProof(r.trust, 4);
   const highlights = parseProof(r.highlights, 3);
 
@@ -361,6 +368,7 @@ export function parseDesignSystem(raw: unknown, productCount = 999): StoreDesign
     tagline: typeof r.tagline === "string" && r.tagline.trim() ? r.tagline.trim().slice(0, 160) : undefined,
     brief: parseBrief(r.brief),
     story,
+    heroEyebrow,
     trust: trust.length ? trust : undefined,
     highlights: highlights.length ? highlights : undefined,
     narrative: parseNarrative(r.narrative, productCount) ?? undefined,

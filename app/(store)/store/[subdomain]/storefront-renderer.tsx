@@ -405,7 +405,9 @@ function withStop(text: string): string {
 
 function Hero({ storeName, ds, heroImage, logo, storyHref }: { storeName: string; ds: StoreDesignSystem; heroImage?: string | null; logo?: StoreLogo | null; storyHref?: string | null }) {
   const tagline = withStop(ds.tagline || ds.personality);
-  const eyebrow = "New collection";
+  // Authored, or nothing. The renderer does not get to announce a new
+  // collection on behalf of a brand whose catalogue it cannot date.
+  const eyebrow = ds.heroEyebrow?.trim() || "";
 
   if (ds.layout.hero === "split") {
     return (
@@ -413,7 +415,7 @@ function Hero({ storeName, ds, heroImage, logo, storyHref }: { storeName: string
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "3rem", alignItems: "center" }}>
           <div style={{ display: "grid", gap: "3rem", gridTemplateColumns: "1.05fr 1fr" }} className="uv-hero-split">
             <div className="uv-rise">
-              <p className="uv-eyebrow">{eyebrow}</p>
+              {eyebrow && <p className="uv-eyebrow">{eyebrow}</p>}
               <h1 style={{ fontSize: "var(--h1)", marginTop: "1.2rem" }}>{storeName}</h1>
               <p style={{ marginTop: "1.4rem", maxWidth: "34ch", color: "var(--muted)", fontSize: "1.05rem" }}>{tagline}</p>
               <div style={{ marginTop: "2.2rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
@@ -452,7 +454,7 @@ function Hero({ storeName, ds, heroImage, logo, storyHref }: { storeName: string
         )}
         <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${rgba(ds.palette.background, 0.1)} 20%, ${rgba(ds.palette.background, 0.92)})` }} />
         <div className="uv-wrap uv-rise" style={{ position: "relative", paddingBottom: "clamp(3rem,6vw,6rem)", paddingTop: "6rem" }}>
-          <p className="uv-eyebrow">{eyebrow}</p>
+          {eyebrow && <p className="uv-eyebrow">{eyebrow}</p>}
           <h1 style={{ fontSize: "var(--h1)", marginTop: "1rem", maxWidth: "16ch" }}>{storeName}</h1>
           <p style={{ marginTop: "1.3rem", maxWidth: "40ch", color: "var(--muted)", fontSize: "1.1rem" }}>{tagline}</p>
           <a href="#uv-shop" className="uv-btn" style={{ marginTop: "2rem", display: "inline-block" }}>Shop now</a>
@@ -464,7 +466,7 @@ function Hero({ storeName, ds, heroImage, logo, storyHref }: { storeName: string
   if (ds.layout.hero === "statement") {
     return (
       <section className="uv-wrap uv-rise" style={{ paddingTop: "clamp(4rem,9vw,9rem)", paddingBottom: "var(--pad-y)", textAlign: "center" }}>
-        <p className="uv-eyebrow">{eyebrow}</p>
+        {eyebrow && <p className="uv-eyebrow">{eyebrow}</p>}
         <h1 style={{ fontSize: "var(--h1)", marginTop: "1.4rem", marginLeft: "auto", marginRight: "auto", maxWidth: "14ch" }}>{storeName}</h1>
         <p style={{ marginTop: "1.6rem", maxWidth: "48ch", marginLeft: "auto", marginRight: "auto", color: "var(--muted)", fontSize: "1.12rem" }}>{tagline}</p>
         <div style={{ marginTop: "2.4rem" }}>
@@ -477,7 +479,7 @@ function Hero({ storeName, ds, heroImage, logo, storyHref }: { storeName: string
   // editorial (default)
   return (
     <section className="uv-wrap uv-rise" style={{ paddingTop: "clamp(3rem,6vw,6rem)", paddingBottom: "var(--pad-y)" }}>
-      <p className="uv-eyebrow">{eyebrow}</p>
+      {eyebrow && <p className="uv-eyebrow">{eyebrow}</p>}
       <h1 style={{ fontSize: "var(--h1)", marginTop: "1.3rem", maxWidth: "18ch" }}>{storeName}</h1>
       <p style={{ marginTop: "1.5rem", maxWidth: "44ch", color: "var(--muted)", fontSize: "1.1rem", fontStyle: ds.fonts.headingKey === "playfair" ? "italic" : "normal" }}>{tagline}</p>
       <a href="#uv-shop" className="uv-btn" style={{ marginTop: "2.2rem", display: "inline-block" }}>Shop the collection</a>
