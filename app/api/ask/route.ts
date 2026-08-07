@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { AttachmentsSchema, acceptAttachments } from "@/lib/ai/attachments-schema";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getPlanForUser } from "@/lib/plan-access";
 import { getCreditBalance, spendCredits } from "@/lib/credits";
@@ -38,6 +39,8 @@ const BodySchema = z.object({
     )
     .min(1)
     .max(24),
+  /* Files attached to this turn only — never replayed into history. */
+  attachments: AttachmentsSchema,
 });
 
 function fail(status: number, error: string, message: string) {
@@ -106,6 +109,14 @@ export async function POST(request: NextRequest) {
     };
   }
 
+  /*
+   * Re-validated server-side against the byte limits, not just the shape. The
+   * browser already checked, but the browser is not the boundary — anything
+   * over the limit is dropped rather than failing the turn, so six good
+   * screenshots and one enormous one still gets an answer about the six.
+   */
+  const { attachments } = acceptAttachments(body.attachments);
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -115,7 +126,7 @@ export async function POST(request: NextRequest) {
       let usage: TokenUsage | null = null;
       let produced = false;
       try {
-        for await (const event of streamAssistant(apiKey, body.messages, context)) {
+        for await (const event of streamAssistant(apiKey, body.messages, context, attachments)) {
           if (event.type === "usage") {
             usage = event.usage;
             continue;

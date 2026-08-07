@@ -4,6 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
 import { AI_INPUT_BUDGET, clampText } from "./limits";
+import { buildUserContent, type Attachment } from "./attachments";
 import type { TokenUsage } from "@/lib/finance/cost-model";
 
 /*
@@ -90,6 +91,16 @@ Produce:
 
 export interface ResearchInput {
   prompt: string;
+  /**
+   * Competitor screenshots, packaging photos, landing pages, moodboards.
+   *
+   * Research is the surface where an upload changes the answer most: "find me a
+   * wedge in this market" is a guess from a sentence, while "here is what the
+   * three incumbents look like, find the wedge" is an analysis of the actual
+   * landscape. The model reads the positioning, the price framing and the
+   * design language off the images rather than inferring them from a noun.
+   */
+  attachments?: Attachment[];
 }
 
 export interface ResearchOutcome {
@@ -112,7 +123,14 @@ export async function runMarketResearch(input: ResearchInput): Promise<ResearchO
     messages: [
       {
         role: "user",
-        content: `Research this market and find the wedge and the winning products:\n\n${clampText(input.prompt.trim(), AI_INPUT_BUDGET.promptChars)}`,
+        content: buildUserContent(
+          `Research this market and find the wedge and the winning products:\n\n${clampText(input.prompt.trim(), AI_INPUT_BUDGET.promptChars)}${
+            input.attachments?.length
+              ? "\n\nThe attached images are the reference material — competitors, packaging, landing pages or inspiration. Read the positioning, price framing and design language off them, and say where the gap actually is."
+              : ""
+          }`,
+          input.attachments,
+        ) as Anthropic.MessageParam["content"],
       },
     ],
   });

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { acceptAttachments } from "@/lib/ai/attachments-schema";
 import { supabaseServer } from "@/lib/supabase/server";
 import { requireStoreOwner } from "@/lib/tenant";
 import { getCreditBalance, spendCredits } from "@/lib/credits";
@@ -24,7 +25,7 @@ function fail(status: number, error: string, message: string) {
   return NextResponse.json({ error, message }, { status });
 }
 
-export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const owner = await requireStoreOwner(id);
   if (!owner.ok) {
@@ -61,6 +62,15 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     ? parseDesignSystem(config.designSystem)
     : themeToDesignSystem(parseTheme(store.theme_config));
 
+  /*
+   * The body is optional: Ad Studio has always been a one-click action, and it
+   * stays one. Attachments only appear when the merchant actually chose some,
+   * so an empty POST keeps working exactly as before.
+   */
+  const { attachments } = acceptAttachments(
+    await request.json().then((b) => (b as { attachments?: unknown })?.attachments).catch(() => undefined),
+  );
+
   const requestId = newRequestId();
   try {
     const { plan, usage } = await generateAdPlan(apiKey, {
@@ -72,7 +82,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         description: p.description ?? "",
         priceEUR: Number(p.price_eur),
       })),
-    });
+    }, attachments);
     await spendCredits(owner.userId, CREDIT_COSTS.adStudio, "Ad Studio plan", "ads").catch((e) =>
       captureException(e, { requestId, userId: owner.userId, route: "ads:charge" }),
     );

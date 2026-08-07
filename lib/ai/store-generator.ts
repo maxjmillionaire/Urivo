@@ -3,6 +3,7 @@ import { modelFor } from "./models";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
+import { buildUserContent, type Attachment } from "./attachments";
 import {
   parseDesignSystem,
   FONT_KEYS,
@@ -232,6 +233,16 @@ FINAL GATE: when someone lands here, their first feeling must be "I want this pr
 
 export interface StoreGenerationInput {
   prompt: string;
+  /**
+   * An existing logo, moodboard, palette, packaging shot, type specimen.
+   *
+   * This is where "Brand Studio" actually lives: the generator is what invents
+   * the brand, so it is the only place an uploaded identity can change the
+   * outcome. A merchant who already has a logo should get a store built AROUND
+   * it — palette pulled from it, type chosen to sit with it — rather than a
+   * beautiful store they then have to fight to make match.
+   */
+  attachments?: Attachment[];
 }
 
 /**
@@ -256,7 +267,14 @@ export async function generateStore(input: StoreGenerationInput): Promise<Genera
     messages: [
       {
         role: "user",
-        content: `Launch a completely original premium ecommerce brand for this business. First decide the creative brief, then let the entire store emerge from it — commit fully to a design language that fits this specific niche and audience:\n\n${clampText(input.prompt.trim(), AI_INPUT_BUDGET.promptChars)}`,
+        content: buildUserContent(
+          `Launch a completely original premium ecommerce brand for this business. First decide the creative brief, then let the entire store emerge from it — commit fully to a design language that fits this specific niche and audience:\n\n${clampText(input.prompt.trim(), AI_INPUT_BUDGET.promptChars)}${
+            input.attachments?.length
+              ? "\n\nThe founder has attached existing brand material — a logo, packaging, a moodboard or a palette. Build the store AROUND it rather than replacing it: read the palette, the type character and the mood off what they gave you, and choose a design system that sits with it. Where the attached material and your own instinct disagree, follow the attached material — it is already printed on something."
+              : ""
+          }`,
+          input.attachments,
+        ) as Anthropic.MessageParam["content"],
       },
     ],
   });

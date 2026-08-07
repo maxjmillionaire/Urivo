@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { AttachmentsSchema, acceptAttachments } from "@/lib/ai/attachments-schema";
 import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCreditBalance, STORE_GENERATION_COST } from "@/lib/credits";
@@ -33,6 +34,13 @@ export const maxDuration = 300;
 
 const BodySchema = z.object({
   prompt: z.string().trim().min(8, "Tell us a little more about your idea.").max(500),
+  /*
+   * An existing logo, moodboard, palette or packaging shot. The generator is
+   * what invents the brand, so this is the only place an uploaded identity can
+   * change the outcome — a merchant who already has a logo gets a store built
+   * around it rather than one they have to fight to make match.
+   */
+  attachments: AttachmentsSchema,
   subdomain: z
     .string()
     .trim()
@@ -132,7 +140,10 @@ export async function POST(request: NextRequest) {
   // 5. Generate (AI)
   let generated;
   try {
-    generated = await generateStore({ prompt: body.prompt });
+    generated = await generateStore({
+      prompt: body.prompt,
+      attachments: acceptAttachments(body.attachments).attachments,
+    });
   } catch (err) {
     const code = err instanceof Error ? err.message : "AI_FAILED";
     if (code === "AI_NOT_CONFIGURED") {

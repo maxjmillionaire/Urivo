@@ -1,5 +1,7 @@
 "use client";
 
+import { AttachButton } from "./attach";
+import type { Attachment } from "@/lib/ai/attachments";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -83,6 +85,7 @@ export function AskUrivo({
   const outOfCredits = creditsLeft < MESSAGE_COST;
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [busy, setBusy] = useState(false);
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -141,7 +144,7 @@ export function AskUrivo({
    * Partial lines are buffered — a chunk boundary can land mid-JSON.
    */
   const runTurn = useCallback(
-    async (history: Msg[], assistantId: string, signal: AbortSignal) => {
+    async (history: Msg[], assistantId: string, signal: AbortSignal, files: Attachment[]) => {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -149,6 +152,9 @@ export function AskUrivo({
           messages: history
             .filter((m) => m.content.trim() && !m.error)
             .map((m) => ({ role: m.role, content: m.content })),
+          // Only this turn's files. History stays text, so a screenshot is
+          // never re-sent (and re-billed) on every message after it.
+          attachments: files.length ? files : undefined,
         }),
         signal,
       });
@@ -224,6 +230,13 @@ export function AskUrivo({
         return;
       }
       setError(null);
+      /*
+       * Detach before sending. The files belong to this message; leaving them
+       * on the composer would silently re-attach them to the next one, which
+       * is both a surprise and a second charge for the same upload.
+       */
+      const sending = attachments;
+      setAttachments([]);
       const userMsg: Msg = { id: nextId(), role: "user", content };
       const assistantMsg: Msg = { id: nextId(), role: "assistant", content: "", phase: "thinking" };
       const history = [...messages, userMsg];
@@ -234,7 +247,7 @@ export function AskUrivo({
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const { produced, charged } = await runTurn(history, assistantMsg.id, controller.signal);
+        const { produced, charged } = await runTurn(history, assistantMsg.id, controller.signal, sending);
         // Only a turn that actually produced an answer is charged server-side,
         // so the visible balance must follow the same rule.
         if (produced && charged) setCreditsLeft((c) => Math.max(0, c - MESSAGE_COST));
@@ -479,6 +492,15 @@ export function AskUrivo({
             placeholder={hasStore ? "Rewrite my hero, add a product, change the palette…" : "Describe the store you want to build…"}
             className="w-full resize-none bg-transparent px-3.5 pt-3 text-sm text-ivory placeholder:text-mist-dim focus:outline-none disabled:opacity-60"
           />
+          <div className="px-2.5 pb-1">
+            <AttachButton
+              attachments={attachments}
+              onChange={setAttachments}
+              disabled={busy}
+              compact
+              hint="Attach a screenshot, a logo, a PDF or a video — Urivo reads it with your message."
+            />
+          </div>
           <div className="flex items-center justify-between px-2.5 pb-2.5">
             <span className="pl-1 text-[10px] text-mist-dim">
               {busy

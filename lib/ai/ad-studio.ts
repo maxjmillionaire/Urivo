@@ -3,6 +3,7 @@ import { modelFor } from "./models";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import * as z from "zod/v4";
+import { buildUserContent, type Attachment } from "./attachments";
 import type { TokenUsage } from "@/lib/finance/cost-model";
 
 /*
@@ -82,7 +83,26 @@ export interface AdOutcome {
   usage: TokenUsage;
 }
 
-export async function generateAdPlan(apiKey: string, store: AdStore): Promise<AdOutcome> {
+/*
+ * Existing creatives, UGC videos, product photos, competitor ads.
+ *
+ * This is the surface where uploads change the work most. Without one, Ad
+ * Studio writes ads from a product list — competent, but blind to what the
+ * merchant has already tried. With one it can say why a specific creative is
+ * failing: the hook lands three seconds too late, the product is off-frame
+ * until the end, the on-screen text competes with the logo. That critique is
+ * not available from a text description of an ad.
+ *
+ * Video arrives here as ordered frames (extracted in the browser — the API has
+ * no video block), which is enough for hook, pacing and framing, and not
+ * enough for audio. The prompt says so, so the model does not invent a read of
+ * a voiceover it never heard.
+ */
+export async function generateAdPlan(
+  apiKey: string,
+  store: AdStore,
+  attachments?: Attachment[],
+): Promise<AdOutcome> {
   const client = new Anthropic({ apiKey });
   const products = store.products.length
     ? store.products.map((p) => `  - ${p.title} (€${p.priceEUR.toFixed(2)}): ${p.description}`).join("\n")
@@ -101,7 +121,17 @@ ${products}`;
       { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
       { type: "text", text: context },
     ],
-    messages: [{ role: "user", content: "Build the channel strategy and the ad creative for this store." }],
+    messages: [
+      {
+        role: "user",
+        content: buildUserContent(
+          attachments?.length
+            ? "Build the channel strategy and the ad creative for this store. The attached material is existing or reference creative — read it first and say specifically what works and what does not (hook timing, framing, on-screen text, the offer), then write ads that beat it. Judge only what you can see; do not comment on audio."
+            : "Build the channel strategy and the ad creative for this store.",
+          attachments,
+        ) as Anthropic.MessageParam["content"],
+      },
+    ],
   });
 
   if (response.stop_reason === "refusal") throw new Error("AI_REFUSED");

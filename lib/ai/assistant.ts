@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { modelFor } from "./models";
 import { AI_INPUT_BUDGET, boundHistory, clampText } from "./limits";
+import { buildUserContent, type Attachment } from "./attachments";
 import {
   FONT_KEYS,
   NAV_VARIANTS,
@@ -173,20 +174,38 @@ export async function* streamAssistant(
   apiKey: string,
   history: AssistantMessage[],
   context: AssistantContext,
+  /**
+   * Files attached to THIS turn — a screenshot to critique, a logo to react to,
+   * a supplier PDF to read.
+   *
+   * They are placed on the final user message only, never replayed into
+   * history. Re-sending a 3 MB screenshot on every subsequent turn would
+   * multiply the cost of a conversation by its length and, worse, leave the
+   * model looking at an image the founder has long since moved on from.
+   */
+  attachments?: Attachment[],
 ): AsyncGenerator<AssistantEvent, void, unknown> {
   const client = new Anthropic({ apiKey });
 
   // Bound the input: turn count, total characters, and per message. With
   // max_tokens bounding the other end, the worst-case cost of a turn is fixed
   // regardless of how long a founder lets a conversation run (spec 6.2).
-  const turns = boundHistory(
+  const bounded = boundHistory(
     history,
     AI_INPUT_BUDGET.askMaxTurns,
     AI_INPUT_BUDGET.askHistoryChars,
-  ).map((m) => ({
-    role: m.role,
-    content: clampText(m.content, AI_INPUT_BUDGET.askPerMessageChars),
-  }));
+  );
+  const lastIndex = bounded.length - 1;
+  const turns: Anthropic.MessageParam[] = bounded.map((m, i) => {
+    const text = clampText(m.content, AI_INPUT_BUDGET.askPerMessageChars);
+    const isCurrentTurn = i === lastIndex && m.role === "user";
+    return {
+      role: m.role,
+      content: (isCurrentTurn
+        ? buildUserContent(text, attachments)
+        : text) as Anthropic.MessageParam["content"],
+    };
+  });
 
   const stream = client.messages.stream({
     model: ASSISTANT_MODEL,

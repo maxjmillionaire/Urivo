@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { AttachmentsSchema, acceptAttachments } from "@/lib/ai/attachments-schema";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getCreditBalance, spendCredits } from "@/lib/credits";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
@@ -21,6 +22,8 @@ export const maxDuration = 120;
 
 const BodySchema = z.object({
   prompt: z.string().trim().min(4, "Tell me a bit more about the niche or idea.").max(500),
+  /* Competitor screenshots, packaging, landing pages, moodboards. */
+  attachments: AttachmentsSchema,
 });
 
 function fail(status: number, error: string, message: string) {
@@ -57,7 +60,10 @@ export async function POST(request: NextRequest) {
 
   const requestId = newRequestId();
   try {
-    const { report, usage } = await runMarketResearch({ prompt: body.prompt });
+    const { report, usage } = await runMarketResearch({
+      prompt: body.prompt,
+      attachments: acceptAttachments(body.attachments).attachments,
+    });
     await spendCredits(user.id, CREDIT_COSTS.marketResearch, "Market research", "research").catch((e) =>
       captureException(e, { requestId, userId: user.id, route: "research:charge" }),
     );

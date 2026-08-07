@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AttachButton } from "../_shell/attach";
+import type { Attachment } from "@/lib/ai/attachments";
 import { useRouter } from "next/navigation";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { RevealStagger } from "../../_motion/reveal-stagger";
@@ -40,6 +42,7 @@ export function ResearchLab() {
   const [phase, setPhase] = useState(0);
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   useEffect(() => {
     if (!busy) return;
@@ -59,7 +62,10 @@ export function ResearchLab() {
         const res = await fetch("/api/research", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: content }),
+          body: JSON.stringify({
+            prompt: content,
+            attachments: attachments.length ? attachments : undefined,
+          }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.message || "Research is unavailable right now.");
@@ -93,6 +99,15 @@ export function ResearchLab() {
             placeholder="A niche or idea — e.g. 'minimalist skincare for sensitive skin, made in Switzerland'"
             className="w-full resize-none bg-transparent px-4 pt-3.5 text-sm text-ivory placeholder:text-mist-dim focus:outline-none disabled:opacity-60"
           />
+          <div className="px-3 pb-1">
+            <AttachButton
+              attachments={attachments}
+              onChange={setAttachments}
+              disabled={busy}
+              compact
+              hint="Attach competitor screenshots, packaging or landing pages — the research is read off them, not guessed."
+            />
+          </div>
           <div className="flex items-center justify-between px-3 pb-3">
             <span className="text-[10px] text-mist-dim">⌘↵ to research · {CREDIT_COSTS.marketResearch} credits</span>
             <button

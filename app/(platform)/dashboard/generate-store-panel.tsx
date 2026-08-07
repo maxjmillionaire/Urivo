@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AttachButton } from "./_shell/attach";
+import type { Attachment } from "@/lib/ai/attachments";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GenerationStudio, type StudioResult } from "./generation-studio";
 import { GenerationCinema } from "./generation-cinema";
@@ -71,6 +73,7 @@ export function GenerateStorePanel({
   const [prompt, setPrompt] = useState("");
   const [subdomain, setSubdomain] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   // Store-name skill: live availability + brandable, available-only suggestions.
   const [availability, setAvailability] = useState<AvailabilityState>({ status: "idle" });
@@ -192,7 +195,11 @@ export function GenerateStorePanel({
       const res = await fetch("/api/generate-store", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: p, subdomain: subdomain.trim().toLowerCase() }),
+        body: JSON.stringify({
+          prompt: p,
+          subdomain: subdomain.trim().toLowerCase(),
+          attachments: attachments.length ? attachments : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Generation failed. Please try again.");
@@ -301,6 +308,14 @@ export function GenerateStorePanel({
                   placeholder="A minimalist skincare line for sensitive skin, made in Switzerland."
                   className="w-full resize-none rounded-xl border border-hair bg-night px-4 py-3 text-sm text-ivory placeholder:text-mist-dim transition-colors focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/20"
                 />
+                <div className="mt-3">
+                  <AttachButton
+                    attachments={attachments}
+                    onChange={setAttachments}
+                    compact
+                    hint="Already have a logo, packaging or a moodboard? Attach it and the store is built around it."
+                  />
+                </div>
               </div>
               <div>
                 <div className="mb-2 flex items-center justify-between">

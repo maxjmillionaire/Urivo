@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { AttachButton } from "../_shell/attach";
+import type { Attachment } from "@/lib/ai/attachments";
 import Link from "next/link";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { RevealStagger } from "../../_motion/reveal-stagger";
@@ -31,6 +33,7 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
   const [busy, setBusy] = useState(false);
   const [plan, setPlan] = useState<AdPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
 
   const run = useCallback(async () => {
@@ -38,7 +41,11 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
     setError(null);
     setBusy(true);
     try {
-      const res = await fetch(`/api/stores/${store.id}/ads`, { method: "POST" });
+      const res = await fetch(`/api/stores/${store.id}/ads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attachments: attachments.length ? attachments : undefined }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || "Ad Studio is unavailable right now.");
       setPlan(data.plan);
@@ -75,7 +82,8 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
 
   return (
     <div className="mt-7">
-      <div className="u-float flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-hair bg-panel/70 p-5">
+      <div className="u-float rounded-2xl border border-hair bg-panel/70 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-ivory">{store.name}</p>
           <p className="text-xs text-mist-dim">
@@ -89,6 +97,15 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
         >
           {busy ? "Writing ads…" : plan ? "Regenerate" : "Generate ads"}
         </button>
+        </div>
+        <div className="mt-4 border-t border-hair pt-4">
+          <AttachButton
+            attachments={attachments}
+            onChange={setAttachments}
+            disabled={busy}
+            hint="Attach existing creatives, UGC videos, product photos or a competitor's ad — Urivo critiques what you have before writing what beats it."
+          />
+        </div>
       </div>
 
       {error && (
