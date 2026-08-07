@@ -34,6 +34,7 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
   const [plan, setPlan] = useState<AdPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [adjusted, setAdjusted] = useState<string[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
 
   const run = useCallback(async () => {
@@ -49,6 +50,7 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || "Ad Studio is unavailable right now.");
       setPlan(data.plan);
+      setAdjusted(data.adjusted ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ad Studio hit a snag. Please try again.");
     } finally {
@@ -112,6 +114,17 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
         <p role="alert" className="mt-4 rounded-xl border border-alert/20 bg-alert/5 px-4 py-3 text-sm text-alert">
           {error}
         </p>
+      )}
+
+      {adjusted.length > 0 && (
+        <div className="mt-4 rounded-xl border border-gold/25 bg-gold/5 px-4 py-3 text-xs text-cloud">
+          <p className="font-medium text-ivory">Some copy was shortened to fit its platform.</p>
+          <ul className="mt-1 space-y-0.5 text-mist">
+            {[...new Set(adjusted)].map((a) => (
+              <li key={a}>· {a}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {busy && (

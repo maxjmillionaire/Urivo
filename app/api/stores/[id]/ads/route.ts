@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { acceptAttachments } from "@/lib/ai/attachments-schema";
+import { loadAdPerformance } from "@/lib/ai/ad-context";
 import { supabaseServer } from "@/lib/supabase/server";
 import { requireStoreOwner } from "@/lib/tenant";
 import { getCreditBalance, spendCredits } from "@/lib/credits";
@@ -71,9 +72,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     await request.json().then((b) => (b as { attachments?: unknown })?.attachments).catch(() => undefined),
   );
 
+  // The store's real traffic and sales. Ad Studio wrote ads from a catalogue
+  // until now; these are the numbers that change the advice.
+  const performance = await loadAdPerformance(id);
+
   const requestId = newRequestId();
   try {
-    const { plan, usage } = await generateAdPlan(apiKey, {
+    const { plan, usage, adjusted } = await generateAdPlan(apiKey, {
       name: store.store_name,
       tagline: ds.tagline ?? "",
       personality: ds.personality,
@@ -82,7 +87,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         description: p.description ?? "",
         priceEUR: Number(p.price_eur),
       })),
-    }, attachments);
+    }, attachments, performance);
     await spendCredits(owner.userId, CREDIT_COSTS.adStudio, "Ad Studio plan", "ads").catch((e) =>
       captureException(e, { requestId, userId: owner.userId, route: "ads:charge" }),
     );
@@ -94,7 +99,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       model: AD_MODEL,
       requestId,
     });
-    return NextResponse.json({ success: true, plan });
+    // `adjusted` is empty on a clean run; when copy had to be cut to fit a
+    // platform, the merchant is told rather than handed a silently shortened ad.
+    return NextResponse.json({ success: true, plan, adjusted });
   } catch (err) {
     const code = err instanceof Error ? err.message : "AI_FAILED";
     if (code === "AI_REFUSED") return fail(422, "AI_REFUSED", "I couldn't build ads for that one — try adjusting the store first.");
