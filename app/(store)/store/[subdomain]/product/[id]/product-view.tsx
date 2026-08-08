@@ -158,17 +158,19 @@ export function ProductView({
                 )}
               </div>
 
-              <div style={{ marginTop: "1.9rem", display: "grid", gap: "1rem", borderTop: `1px solid ${p.line}`, paddingTop: "1.6rem" }}>
-                {SERVICE.map(([d, h, s]) => (
-                  <div key={h} style={{ display: "flex", gap: ".85rem", alignItems: "center" }}>
-                    <span style={{ color: p.accent, flexShrink: 0, display: "inline-flex" }}><Ic d={d} /></span>
-                    <span style={{ fontSize: ".88rem" }}>
-                      <span style={{ fontWeight: 600 }}>{h}</span>
-                      <span style={{ color: p.muted }}> — {s}</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
+              {(ds.trust ?? []).length > 0 && (
+                <div style={{ marginTop: "1.9rem", display: "grid", gap: "1rem", borderTop: `1px solid ${p.line}`, paddingTop: "1.6rem" }}>
+                  {(ds.trust ?? []).map((it) => (
+                    <div key={it.title} style={{ display: "flex", gap: ".85rem", alignItems: "center" }}>
+                      <span style={{ color: p.accent, flexShrink: 0, display: "inline-flex" }}><Ic d={TRUST_MARK} /></span>
+                      <span style={{ fontSize: ".88rem" }}>
+                        <span style={{ fontWeight: 600 }}>{it.title}</span>
+                        <span style={{ color: p.muted }}> — {it.detail}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </main>
@@ -228,10 +230,20 @@ function Ic({ d }: { d: string }) {
     </svg>
   );
 }
-const SERVICE: [string, string, string][] = [
-  ["M12 3l7 3v6c0 4.4-3 7.4-7 9-4-1.6-7-4.6-7-9V6z M9 12l2 2 4-4", "Secure checkout", "Encrypted, end to end"],
-  ["M3 7h11v8H3z M14 10h4l3 3v2h-7 M6.5 17a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M18 17a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z", "Tracked delivery", "Fast, insured shipping"],
-  ["M3 12a9 9 0 1 0 9-9 M3 4v5h5", "30-day returns", "No questions asked"],
-];
+/*
+ * One neutral mark for every authored promise.
+ *
+ * This replaced a fixed list — "Tracked delivery, fast insured shipping" and
+ * "30-day returns, no questions asked" — printed on the product page of every
+ * store Urivo generated. Those are binding commercial terms, and a returns
+ * window is a legally meaningful one; no merchant had agreed to either, and
+ * plenty could not have honoured them. The homepage's Trust section had already
+ * been corrected to render only what the brand authored; the product page, the
+ * screen where the promise actually converts, kept the hardcoded version.
+ *
+ * The rule is the same on both surfaces now: the renderer does not make
+ * promises on a merchant's behalf. No authored trust, no section.
+ */
+const TRUST_MARK = "M12 3l7 3v6c0 4.4-3 7.4-7 9-4-1.6-7-4.6-7-9V6z M9 12l2 2 4-4";
 
 const PDP_CSS = `#uv-store .uv-btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;padding:.95rem 1.9rem;border-radius:var(--btn-radius);border:none;cursor:pointer;font-family:var(--font-b);font-size:.76rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent);transition:filter .2s ease,transform .18s ease;}#uv-store .uv-btn:hover{filter:brightness(1.05);}#uv-store .uv-btn:active{transform:translateY(1px) scale(.99);}#uv-store .uv-h{font-family:var(--font-h);line-height:1.1;}#uv-store a{color:inherit;text-decoration:none;}#uv-store .uv-relcard{display:block;transition:transform .25s ease;}#uv-store .uv-relcard:hover{transform:translateY(-3px);}@media (max-width:820px){#uv-store .uv-pdp{grid-template-columns:1fr !important;}#uv-store .uv-buy{position:static !important;}}`;

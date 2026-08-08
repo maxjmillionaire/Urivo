@@ -63,7 +63,11 @@ const VOLT = parseDesignSystem({
     footer: "bold",
     imageTreatment: "duotone",
     motion: "lively",
-    announcement: "Free shipping worldwide · New drop friday",
+    // Was "Free shipping worldwide · New drop friday". This file is destined to
+    // be few-shot input for the generator, and a shipping promise in an exemplar
+    // is a shipping promise the model will write into real merchants' stores —
+    // the one thing the header above says these presets must never contain.
+    announcement: "New drop friday",
     sectionOrder: ["announcement", "hero", "marquee", "collection", "highlights", "footer"],
   },
 });

@@ -438,8 +438,12 @@ export default async function FinanceDashboardPage() {
 
         {snap.mrrEur === 0 && (
           <p className="rounded-lg border border-amber-400/30 bg-amber-400/5 px-4 py-3 text-sm text-amber-200/90">
-            Revenue is a proxy from active subscriptions and reads €0 until Stripe is wired (Phase 2).
-            Cost, tokens, images and credits below are <strong>real</strong>, straight from the ledger.
+            MRR is a <strong>proxy</strong>: active subscriptions counted at list price, so it reads
+            {" "}{eur(0)} until someone is on a paid plan, and it does not know that a founding{" "}
+            {planName("core")} pays {eur(PLANS.core.price.founding ?? PLANS.core.price.regular)}{" "}
+            rather than {eur(PLANS.core.price.regular)}. Money that actually arrived is under{" "}
+            <strong>Revenue this month</strong> below, recorded from Stripe events. Cost, tokens,
+            images and credits are real, straight from the ledger.
           </p>
         )}
 
