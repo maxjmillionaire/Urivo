@@ -1,46 +1,49 @@
 # Handoff — start here
 
-One engineering task remains before external setup. Everything else that could
-be verified without a domain, a deployment or a Higgsfield key has been.
+Entitlement and payment authorization were the open question. They have now been
+answered against a real database, and the answer was worse than expected: paid
+tiers were reachable three different ways. All three are closed and proven
+closed. What remains is external setup — see `LAUNCH.md` Block 0.
 
 ---
 
-## The one remaining blocker
+## What the last session found
 
-**Entitlement and payment authorization is unverified.** Not broken — unverified.
-Nobody has yet proven that a Free user cannot reach paid functionality by
-calling the API directly.
+The previous attempt failed because it authenticated with `Authorization: Bearer
+<access_token>` while the app uses Supabase session cookies, so every
+"authenticated" assertion measured an anonymous request. The way past that was
+not better cookies: it was to test the layer the cookie only leads to. A local
+PostgreSQL with all 46 migrations applied, queried as the `authenticated` role
+with a user id in `request.jwt.claim.sub`, is exactly the position a logged-in
+visitor holds against PostgREST with the public anon key.
 
-### Why the last attempt did not settle it
+That position could do all of this:
 
-`/tmp/.../scratchpad/sec.mjs` created six users with real database state, read
-the route tree from disk, and attacked every protected endpoint. Every call
-made "as user X" came back `401 Please sign in` — because it authenticated with
-an `Authorization: Bearer <access_token>` header, and **the app uses Supabase
-session cookies, not bearer tokens.**
+| Attack | Result before |
+|---|---|
+| `profiles.update({ plan: 'pro' })` | Pro, free, forever |
+| `profiles.update({ subscription_status: 'active' })` | Entitlement activated |
+| `profiles.update({ comped_until: '2099-01-01' })` | Permanent comp |
+| `stores.update({ is_active: true })` | Every store live on Free |
+| `stores.insert(...)` | Free stores, born live (`is_active` defaults true) |
 
-So the run proved only what was already known: anonymous requests are refused.
-Every authenticated assertion in it measured something other than its name.
+RLS was not the problem — every policy was correctly written. RLS decides which
+**rows**; it says nothing about which **columns**, and owning the row was
+enough. Migration **0045** revokes the blanket UPDATE and grants back only
+`full_name` / `marketing_opt_in` on profiles and `store_name` / `theme_config`
+on stores.
 
-Two smaller artifacts in the same run, for the record: `405` responses came from
-calling `GET` on routes that only export `POST` (a safe refusal, but not proof of
-authorization), and the credit assertions read `undefined` because the profile
-PATCH and the `spend_credits` signature were both guessed rather than read.
+A fourth way in needed no console: completing Stripe Checkout with a card that
+fails authentication still fires `checkout.session.completed` with the
+subscription left `incomplete`. The webhook activated on arrival and every gate
+read `profiles.plan` alone. `entitledPlan()` (lib/plans.ts) now resolves access
+from payment state, and the webhook waits for Stripe to confirm the
+subscription is live.
 
-### The next step, concretely
-
-1. Log in through the browser as each test user and export the cookies — the
-   same way `/tmp/demo-cookies.json` was produced. Playwright context, real
-   `/login` submit, `context.cookies()`.
-2. Re-run the existing attacks with those cookies. The script is complete apart
-   from this: six users with real `plan` / `subscription_status` /
-   `stripe_subscription_id`, the route list, and verified cleanup are all there.
-3. Read `spend_credits`' real signature from the migration before calling it.
-4. Then the untested surfaces: Stripe price-id substitution, forged success URL,
-   webhook replay with a repeated `event_id`, creator-code discount manipulation,
-   cross-tenant reads and writes with another user's resource ids.
-5. For every rejection, assert the **database did not change**. A 403 followed by
-   a mutation is still a breach.
+And `publish_store` had never worked: `select count(*) … for update` is invalid
+in PostgreSQL, so every publish of a not-already-live store raised and the API
+answered "please try again". It hid because generated stores are born live, so
+the capacity cap was the one path nobody exercised. **0046** fixes it.
 
 ---
 
@@ -48,47 +51,69 @@ PATCH and the `spend_credits` signature were both guessed rather than read.
 
 | Area | Evidence |
 |---|---|
-| Attribution | 29 integration tests against the real database (`npm run test:db`), spec 10 |
-| Anonymous denial | 7 protected routes return 401; webhook refuses missing and invalid signatures |
-| RLS | Every table has it enabled; 0 exceptions |
-| Admin guards | 5/5 admin API routes and 4/4 admin pages carry `requireAdmin` |
-| Rate limits | 0 unprotected public POST routes |
-| Cart → checkout | Add to cart, persisted state, counter, drawer, subtotal, checkout call — proven to the payment boundary |
-| Pricing | Single source in `lib/plans.ts`; `lib/pricing-drift.test.ts` scans app/ and lib/ |
-| Mobile | 6 flows at 390px: no horizontal overflow, no sub-11px text, no JS errors |
-| Notifications | No dead email types |
+| Privilege escalation | `scripts/adversarial-db.sh` — 25 attacks denied, 0 failures; reopening the grants makes it report 6 |
+| Tenant isolation | Read, write and delete of another merchant's stores, products, orders, credits, referrals — all refused |
+| Entitlement | `lib/entitlement.test.ts`; resolved against real rows for paid / incomplete / cancelled / comped / expired-comp |
+| Live-store capacity | Free 1, Founder 3, Pro unlimited; 5 concurrent publishes against a cap of 3 leave exactly 3 |
+| `published_at` | Survives unpublish → republish (first-sale instrumentation) |
+| Credits | Two concurrent 20-credit spends against a 25 balance: one succeeds, balance 5, never negative; zero and negative amounts refused |
+| Creator commission | Wired to `invoice.paid`; two concurrent writes produce one commission; `referrals.customer_id` is UNIQUE so first-touch cannot be reassigned |
+| Storefront checkout | Client-supplied prices ignored, another store's product refused, quantity clamped to stock (`lib/commerce/checkout.test.ts`) |
+| Admin | 9/9 admin endpoints and 4/4 admin pages gate on `isAdminEmail` and answer 404 |
+| Anonymous | Reads published storefronts only; zero rows writable anywhere |
+| Storefront claims | No surface authors a shipping, returns, delivery, environmental or manufacturing promise (`lib/storefront/honest-claims.test.ts`, whole directory) |
+| Cart | `lib/client-directive.test.ts` — every component with a handler or hook declares `"use client"` |
+| Attribution | 29 integration tests, spec 10 — unchanged, not re-audited |
 
 **Do not reopen the attribution architecture.** The sessionStorage design and the
 email-matching proposal were both replaced and are not the current state.
 
 ---
 
+## The one guard that has to survive
+
+`entitlement_columns_locked()` (0045) reports whether the dangerous grants are
+gone, and `/api/health?deep=1` refuses to call a deployment ready without it. A
+missing GRANT has no symptoms — every screen renders, every function answers,
+and the only sign is that the tiers are free. If that check ever goes amber,
+nothing else about the deployment matters.
+
+---
+
 ## Method that produced these results
 
-- Read the repository before calling anything. Routes were guessed three times
-  in one session and were wrong three times (`/pricing`, `/legal/terms`,
-  `[slug]`); each produced a fabricated finding.
+- Read the repository before calling anything. Routes and columns were guessed
+  and wrong repeatedly in earlier sessions; each guess produced a fabricated
+  finding. `products.price_eur` is not `price_cents`.
+- Test the layer the credential leads to, not the credential. A cookie you
+  cannot mint is not a reason to skip authorization testing.
+- Prove a guard is not vacuous by reintroducing the bug. Every test added here
+  was watched to fail before it was trusted.
 - Assert the RPC's status, not only the row afterwards. A 42804 hid for a full
-  release because the row looked plausible and nobody read the 400.
-- Give every test case its own identity. Reusing one email turned six
-  malformed-input cases into six returning-customer cases.
-- When a test fails, decide whether the test or the code is wrong before
-  reporting. In this session most failures were the test.
-- Strip comments before judging source. Two tests failed on their own prose.
+  release because the row looked plausible.
+- When a test fails, decide whether the test or the code is wrong first. One
+  test here asserted the product page owned its click handler; it does not, it
+  composes the component that does.
+- Strip comments before judging source. Prose about a retired claim is not the
+  claim.
 
 ---
 
 ## Blocked on purchases, not on effort
 
-See `LAUNCH.md` Block 0. Domain (custom domains, canonical URLs, Stripe return
-URLs, owner-preview exclusion) · Railway (deployment, the two cron schedules in
-`railway.json`) · Higgsfield (visual ad creative, real image cost replacing the
-estimate via `rebase_image_costs`).
+See `LAUNCH.md` Block 0. Domain · Railway (deployment + the two cron schedules
+in `railway.json`) · Higgsfield (visual ad creative, real image cost via
+`rebase_image_costs`).
+
+Two things genuinely cannot be checked here and must be done once the project
+exists: **run `scripts/adversarial-db.sh` against the real Supabase project**
+(it takes a `PGURL`), and confirm `/api/health?deep=1` returns `entitlement.columns` green.
 
 ---
 
 ## State
 
-349 unit tests · 29 database integration tests · typecheck clean · production
-build compiles · migrations through 0044 applied · database left clean after
-every run.
+372 unit tests · 29 database integration tests (unchanged, need a Supabase
+project to run) · 25 adversarial database checks · typecheck clean · production
+build compiles · migrations through **0046** · `setup_all.sql` regenerated and
+verified to provision a blank database in one paste.

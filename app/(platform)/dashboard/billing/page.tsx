@@ -8,7 +8,7 @@ import { PlanPicker } from "./plan-picker";
 import { CreditPacks } from "./credit-packs";
 import { PayoutSetup } from "./payouts";
 import { getConnectStatus, connectState } from "@/lib/billing/connect";
-import { PLANS, planName, formatPrice, isLaunchWindow, priceForUser } from "@/lib/plans";
+import { PLANS, planName, formatPrice, isLaunchWindow, priceForUser, entitledPlanKey } from "@/lib/plans";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { RevealStagger } from "../../_motion/reveal-stagger";
 
@@ -22,15 +22,33 @@ export default async function BillingPage() {
   if (!user) redirect("/login");
 
   const [{ data: profile }, balance, ledger, rail, connect] = await Promise.all([
-    supabase.from("profiles").select("plan, price_type, subscription_status, email").eq("id", user.id).single(),
+    supabase
+      .from("profiles")
+      .select("plan, price_type, subscription_status, comped_until, stripe_subscription_id, email")
+      .eq("id", user.id)
+      .single(),
     getCreditBalance(user.id),
     getCreditLedger(user.id),
     loadRailStore(user.id),
     getConnectStatus(user.id),
   ]);
 
-  const plan = profile?.plan ?? "free";
+  /*
+   * The tier the account may actually USE, not the one its plan column names.
+   * Billing has to agree with the rest of the product: if an incomplete
+   * checkout or a lapsed comp left `plan` on a paid tier, every other screen
+   * now says Free, and this one saying Founder would leave the visitor with no
+   * way to subscribe — the upgrade section is hidden from anyone already on the
+   * tier it offers.
+   */
+  const plan = entitledPlanKey(profile);
   const priceType = profile?.price_type ?? "standard";
+  /*
+   * Stripe's portal needs a Stripe subscription. Comped testers hold a paid
+   * tier without one, so "Manage subscription" is keyed to the subscription
+   * itself rather than to the tier — otherwise the button opens an error.
+   */
+  const hasSubscription = Boolean(profile?.stripe_subscription_id);
   const isFoundingMember = priceType === "founding";
   const launch = isLaunchWindow();
   const planLabel = planName(plan);
@@ -89,7 +107,7 @@ export default async function BillingPage() {
         </section>
       )}
 
-      {plan !== "free" && (
+      {hasSubscription && (
         <section className="mt-8">
           <h2 className="text-lg font-semibold tracking-tight text-ivory">Manage subscription</h2>
           <div className="u-float mt-4 flex flex-col gap-4 rounded-2xl border border-hair bg-panel/70 p-6 sm:flex-row sm:items-center sm:justify-between">
