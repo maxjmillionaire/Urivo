@@ -1,3 +1,17 @@
+"use client";
+
+/*
+ * Client component, and it must stay one.
+ *
+ * This file mounts StoreCartProvider, CartButton and BuyBox. Without the
+ * directive Next renders them on the server: the markup appears, the button is
+ * visible, the cart badge reads "0 items" — and the onClick is never bound. A
+ * shopper clicks Add to cart and nothing happens, with no error anywhere.
+ *
+ * The product page is the ONLY route with an add-to-cart control (the
+ * storefront home renders none), so this silently made every generated store
+ * unable to take a single order.
+ */
 import Link from "next/link";
 import { fontStack, type StoreDesignSystem } from "@/lib/storefront/design-system";
 import { toCents, formatMoney } from "@/lib/commerce/types";
