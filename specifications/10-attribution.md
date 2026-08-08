@@ -371,21 +371,22 @@ a specification; the gaps below are real and named so nobody mistakes the two.
 
 | § | Rule | Today |
 |---|---|---|
-| 2 | Server-issued `urivo_cs` cookie | **Not built.** The session id is client-generated in `sessionStorage` and dies with the tab |
-| 3 | 7-day window | **Not built.** The effective window is one browser tab |
+| 2 | Server-issued `urivo_cs` cookie | Built — HttpOnly, SameSite=Lax, verified on the wire |
+| 3 | 7-day window | Built (0039) — verified at 3 days credited, 10 days expired |
 | 4 | First touch | Built |
 | 4 | Click events kept as events | Partial — `store_visits` holds them; retention is unbounded |
-| 5 | `?uc=` validated against **this** store | **Not built.** A foreign creative id currently attributes |
-| 6 | Repeat purchases excluded | **Not built.** A repeat purchase in-session attributes to the ad |
-| 8 | First write wins | **Not built.** `attribute_order` overwrites on re-run |
-| 10 | Revenue net of refunds | Partial — full refunds drop out via status; partial refunds do not reduce revenue |
-| 11 | 90-day click retention | **Not built.** Nothing is deleted |
-| 13 | Bots and unfurlers excluded | **Not built.** Meta's preview fetch counts as a click |
-| 14 | Coverage shown with every metric | **Not built.** Ad numbers are shown alone |
+| 5 | `?uc=` validated against **this** store | Built (0039, 0042) |
+| 6 | Repeat purchases excluded | Built (0039) — labelled `returning` |
+| 8 | First write wins | Built (0039, 0043) — `unknown` stays re-attemptable |
+| 10 | Revenue net of refunds | Built (0039) — partial refunds netted |
+| 11 | 90-day click retention | Built (0044) — selective, idempotent; **cron not scheduled yet** |
+| 13 | Bots and unfurlers excluded | Built — beacon + UA filter |
+| 14 | Coverage shown with every metric | Built (0040, 0043) — five buckets, reconciled |
+| — | Rules verified against a real database | Built — `npm run test:db`, 11 cases |
 
-The most consequential gaps are §2/§3 (attribution ends when the tab closes,
-under-reporting every considered purchase) and §13 (every new ad gets a phantom
-click the moment its link is pasted into Meta).
+Remaining gaps: the retention cron is not scheduled on the host, so §11 runs
+only when called; owner-preview exclusion (§13) is not built; and Phase 3/6 of
+the production audit — adversarial input testing — has not been run.
 
 ---
 
