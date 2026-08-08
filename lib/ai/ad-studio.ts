@@ -6,6 +6,7 @@ import * as z from "zod/v4";
 import { buildUserContent, type Attachment } from "./attachments";
 import { AD_PLATFORMS, enforceLimits, findViolations, renderPlatformLimits, PLATFORM_LIMITS, type AdPlatform } from "./ad-platforms";
 import { renderAdPerformance, type AdPerformance } from "./ad-context";
+import { renderAdHistory, type CreativePerformance } from "./ad-performance";
 import type { TokenUsage } from "@/lib/finance/cost-model";
 
 /*
@@ -75,6 +76,7 @@ Standards:
   · Pinterest: aspirational, keyword-aware, calm.
 - Banned words: "Revolutionary", "Unlock", "Dive into", "Game-changing", "Elevate", "Unleash", "In today's digital world". No fake urgency, no ALL CAPS shouting.
 - Honest: propose budget as sensible starting ranges (e.g. "€20–40/day to test"), not guarantees.
+- If PAST ADS are listed below, they are measured results from this store. Beat them: repeat what the winners had in common, and never re-propose an angle that has already been tested and failed.
 - USE THE PERFORMANCE NUMBERS BELOW. They are this store's real traffic and sales, not an example. A store with no visitors needs reach, not conversion tweaks; a store with visitors and no sales does not need more spend. Say which situation this is, and let the plan follow from it. Never invent a figure that is not given.
 
 Produce:
@@ -111,6 +113,14 @@ export async function generateAdPlan(
   attachments?: Attachment[],
   /** This store's real traffic and sales. Omitted only when unreadable. */
   performance?: AdPerformance,
+  /**
+   * How previously generated ads actually did — measured, not modelled.
+   *
+   * This is what makes the second run better than the first instead of
+   * another fresh guess. An angle that sold is a pattern to repeat; one that
+   * took 400 clicks and produced nothing is a question already answered.
+   */
+  history?: CreativePerformance[],
 ): Promise<AdOutcome> {
   const client = new Anthropic({ apiKey });
   const products = store.products.length
@@ -133,6 +143,10 @@ ${products}`;
       { type: "text", text: renderPlatformLimits() },
       { type: "text", text: context },
       ...(performance ? [{ type: "text" as const, text: renderAdPerformance(performance) }] : []),
+      ...(() => {
+        const past = history ? renderAdHistory(history) : null;
+        return past ? [{ type: "text" as const, text: past }] : [];
+      })(),
     ],
     messages: [
       {

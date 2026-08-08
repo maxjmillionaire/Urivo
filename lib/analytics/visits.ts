@@ -42,6 +42,11 @@ export interface RecordVisitInput {
   path?: string | null;
   referrerHost?: string | null;
   device?: Device;
+  /** The Urivo-generated ad that sent this visit (?uc=… on the link). */
+  creativeId?: string | null;
+  /** A merchant's own campaign tagging, kept separate from Urivo's own ads. */
+  utmCampaign?: string | null;
+  utmSource?: string | null;
 }
 
 /**
@@ -61,13 +66,28 @@ export async function recordVisit(input: RecordVisitInput): Promise<void> {
       .maybeSingle();
     if (!store || !store.is_active) return;
 
-    await admin.from("store_visits").insert({
+    /*
+     * The attribution columns arrive with migration 0038. Naming them in an
+     * insert on a database that has not applied it rejects the whole row and
+     * the store silently stops recording traffic — so the write falls back to
+     * the columns that have existed since 0001. Losing attribution is a
+     * missing insight; losing the visit is a broken metric.
+     */
+    const base = {
       store_id: store.id,
       session_hash: session,
       path: input.path ? input.path.slice(0, PATH_MAX) : null,
       referrer_host: input.referrerHost ?? null,
       device: input.device ?? "unknown",
-    });
+    };
+    const attributed = {
+      ...base,
+      creative_id: input.creativeId ?? null,
+      utm_campaign: input.utmCampaign?.slice(0, 120) ?? null,
+      utm_source: input.utmSource?.slice(0, 120) ?? null,
+    };
+    const { error } = await admin.from("store_visits").insert(attributed);
+    if (error) await admin.from("store_visits").insert(base);
   } catch {
     /* analytics is never allowed to affect the storefront */
   }

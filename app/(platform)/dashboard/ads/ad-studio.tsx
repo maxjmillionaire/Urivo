@@ -1,7 +1,18 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AttachButton } from "../_shell/attach";
+
+interface CreativePerf {
+  creativeId: string;
+  platform: string;
+  headline: string;
+  angle: string;
+  clicks: number;
+  orders: number;
+  revenueEUR: number;
+  conversionPct: number | null;
+}
 import type { Attachment } from "@/lib/ai/attachments";
 import Link from "next/link";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
@@ -35,6 +46,7 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
   const [error, setError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [adjusted, setAdjusted] = useState<string[]>([]);
+  const [perf, setPerf] = useState<CreativePerf[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
 
   const run = useCallback(async () => {
@@ -51,12 +63,29 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
       if (!res.ok) throw new Error(data?.message || "Ad Studio is unavailable right now.");
       setPlan(data.plan);
       setAdjusted(data.adjusted ?? []);
+      void loadPerf();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ad Studio hit a snag. Please try again.");
     } finally {
       setBusy(false);
     }
   }, [store, busy]);
+
+  const loadPerf = useCallback(async () => {
+    if (!store) return;
+    try {
+      const res = await fetch(`/api/stores/${store.id}/ads`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setPerf((data.creatives ?? []) as CreativePerf[]);
+    } catch {
+      /* the panel simply stays empty */
+    }
+  }, [store]);
+
+  useEffect(() => {
+    void loadPerf();
+  }, [loadPerf]);
 
   async function copy(text: string, key: string) {
     try {
@@ -135,6 +164,59 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
         </div>
       )}
 
+      {/*
+        * Measured, not modelled. Urivo owns the storefront that receives
+        * the click and the order that closes the sale, so this join is
+        * exact — no pixel to be blocked, no third party.
+        */}
+      <div className="u-float mt-6 rounded-2xl border border-hair bg-panel/50 p-5">
+        <p className="text-sm font-medium text-ivory">What your ads actually did</p>
+        {perf.length === 0 ? (
+          <p className="mt-1.5 text-xs leading-relaxed text-mist">
+            Paste a tracked link into your ad account and this fills in by itself — clicks, orders and revenue per
+            ad, measured against your real storefront. No pixel, no ad-account connection: Urivo already owns both
+            ends of the journey. The next plan you generate reads these results and beats them.
+          </p>
+        ) : (
+          <>
+            <p className="mt-1.5 text-xs text-mist">
+              Every click and sale joined server-side. The next generation learns from this.
+            </p>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[34rem] text-left text-xs">
+                <thead className="text-[10px] uppercase tracking-wider text-mist-dim">
+                  <tr>
+                    {["Ad", "Platform", "Clicks", "Orders", "Revenue", "Conv."].map((h, i) => (
+                      <th key={h} className={`border-b border-hair pb-2 pr-3 font-medium ${i > 1 ? "text-right" : ""}`}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {perf.map((c) => (
+                    <tr key={c.creativeId} className="border-b border-hair/40">
+                      <td className="max-w-[16rem] truncate py-2 pr-3 text-ivory/90" title={c.headline}>
+                        {c.headline}
+                      </td>
+                      <td className="py-2 pr-3 text-mist">{c.platform}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums text-mist">{c.clicks}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums text-mist">{c.orders}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums text-ivory/90">
+                        €{c.revenueEUR.toFixed(2)}
+                      </td>
+                      <td className="py-2 text-right tabular-nums text-mist">
+                        {c.conversionPct === null ? "—" : `${c.conversionPct}%`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+
       {plan && (
         <RevealStagger className="mt-6">
           {/* Strategy */}
@@ -195,20 +277,23 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
                     </button>
                   </div>
                   <p className="mt-2 text-[10px] text-mist-dim">Angle — {ad.angle}</p>
+                  {"trackingUrl" in ad && typeof ad.trackingUrl === "string" && (
+                    <button
+                      onClick={() => copy(ad.trackingUrl as string, `${key}-link`)}
+                      title={ad.trackingUrl as string}
+                      className="u-press mt-3 inline-flex items-center gap-1.5 self-start rounded-lg border border-hair px-2.5 py-1.5 text-[10px] font-semibold text-gold-soft transition-colors hover:border-gold/40 hover:text-gold"
+                    >
+                      <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+                        <path d="M13.5 6.5 8 12a2 2 0 0 0 2.8 2.8l5.7-5.6a3.5 3.5 0 0 0-5-5L5 10.2a5 5 0 0 0 7 7l4.5-4.4" />
+                      </svg>
+                      {copied === `${key}-link` ? "Link copied ✓" : "Copy tracked link"}
+                    </button>
+                  )}
                 </div>
               );
             })}
           </div>
 
-          {/* Honest analytics note */}
-          <div className="u-float mt-6 rounded-2xl border border-hair bg-panel/50 p-5">
-            <p className="text-sm font-medium text-ivory">Live performance analytics</p>
-            <p className="mt-1.5 text-xs leading-relaxed text-mist">
-              Real spend, CTR, CPA and ROAS come from connecting a Google or Meta Ads account — a one-click integration
-              on the roadmap. Until then, Ad Studio delivers the strategy and creative; run them on your ad account and
-              paste results back here when the connection lands.
-            </p>
-          </div>
         </RevealStagger>
       )}
     </div>

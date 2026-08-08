@@ -233,6 +233,21 @@ export function CartButton({ className }: { className?: string }) {
   );
 }
 
+/**
+ * The visit beacon's anonymous session id, if this browser has one.
+ *
+ * Read, never written: the beacon owns it. This is what joins a sale back to
+ * the ad that produced the click — no cookie, no new tracking, and it dies
+ * with the tab.
+ */
+function readSessionId(): string | undefined {
+  try {
+    return sessionStorage.getItem("urivo_sid") ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function CartDrawer({ subdomain }: { subdomain: string }) {
   const { lines, count, subtotal, currency, setQty, remove, open, setOpen, canSell } = useCart();
   const [checkingOut, setCheckingOut] = useState(false);
@@ -259,7 +274,13 @@ function CartDrawer({ subdomain }: { subdomain: string }) {
       const res = await fetch(`/api/store/${subdomain}/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })) }),
+        body: JSON.stringify({
+          items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+          // The same anonymous session id the visit beacon uses. It is what
+          // lets the sale be joined back to the ad that produced the click —
+          // read here rather than stored, so nothing new is tracked.
+          sid: readSessionId(),
+        }),
       });
       const data = await res.json();
       if (res.ok && data.url) {

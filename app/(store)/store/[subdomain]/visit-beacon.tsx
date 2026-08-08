@@ -38,7 +38,21 @@ export function VisitBeacon({ subdomain }: { subdomain: string }) {
     const sid = sessionId();
     if (!sid) return;
 
-    const payload = JSON.stringify({ subdomain, sid, path: window.location.pathname });
+    /*
+     * ?uc= is the ad that sent this visitor — Urivo's own tracking link. It is
+     * read once, on the first pageview of the session, which is what makes the
+     * attribution FIRST touch: the ad that introduced the brand gets the sale,
+     * not whatever retargeting ad happened to run last.
+     */
+    const params = new URLSearchParams(window.location.search);
+    const payload = JSON.stringify({
+      subdomain,
+      sid,
+      path: window.location.pathname,
+      uc: params.get("uc") ?? undefined,
+      campaign: params.get("utm_campaign") ?? undefined,
+      source: params.get("utm_source") ?? undefined,
+    });
     try {
       sessionStorage.setItem(flag, "1");
       if (navigator.sendBeacon) {

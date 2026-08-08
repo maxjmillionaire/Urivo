@@ -62,6 +62,25 @@ export async function recordPaidOrder(
 
   if (orderErr || !order) throw orderErr ?? new Error("ORDER_INSERT_FAILED");
 
+  /*
+   * Attribute the sale to the ad that earned it.
+   *
+   * The session id rode along in the Stripe metadata because the webhook has
+   * no browser context. The RPC finds the FIRST visit in that session which
+   * carried a creative — first touch, so the ad that introduced the brand gets
+   * the sale rather than whatever retargeting ad ran last.
+   *
+   * Best-effort and last: an order that exists without attribution is a
+   * missing insight, an order that failed to record is lost money.
+   */
+  const sid = typeof s.metadata?.sid === "string" ? s.metadata.sid : null;
+  if (sid) {
+    await admin.rpc("attribute_order", { p_order_id: order.id, p_session_hash: sid }).then(
+      () => undefined,
+      () => undefined,
+    );
+  }
+
   if (params.lines.length > 0) {
     const { error: itemsErr } = await admin.from("order_items").insert(
       params.lines.map((l) => ({

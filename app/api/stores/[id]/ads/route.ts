@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { acceptAttachments } from "@/lib/ai/attachments-schema";
 import { loadAdPerformance } from "@/lib/ai/ad-context";
+import { saveCreatives, loadAdPerformanceHistory } from "@/lib/ai/ad-performance";
 import { supabaseServer } from "@/lib/supabase/server";
 import { requireStoreOwner } from "@/lib/tenant";
 import { getCreditBalance, spendCredits } from "@/lib/credits";
@@ -24,6 +25,25 @@ export const maxDuration = 120;
 
 function fail(status: number, error: string, message: string) {
   return NextResponse.json({ error, message }, { status });
+}
+
+/**
+ * Measured performance for this store's generated ads.
+ *
+ * Exact, not sampled: Urivo owns the storefront that received the click and
+ * the order that closed the sale, so the join is two rows in one database.
+ * No pixel to be blocked, no third party, no consent banner for a tracker
+ * that does not exist.
+ */
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const owner = await requireStoreOwner(id);
+  if (!owner.ok) {
+    return owner.reason === "UNAUTHORIZED"
+      ? fail(401, "UNAUTHORIZED", "Please sign in.")
+      : fail(404, "NOT_FOUND", "Store not found.");
+  }
+  return NextResponse.json({ creatives: await loadAdPerformanceHistory(id) });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -53,7 +73,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const supabase = await supabaseServer();
   const [{ data: store }, { data: products }] = await Promise.all([
-    supabase.from("stores").select("store_name, theme_config").eq("id", id).single(),
+    supabase.from("stores").select("store_name, subdomain, theme_config").eq("id", id).single(),
     supabase.from("products").select("title, description, price_eur").eq("store_id", id).order("position", { ascending: true }),
   ]);
   if (!store) return fail(404, "NOT_FOUND", "Store not found.");
@@ -74,7 +94,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // The store's real traffic and sales. Ad Studio wrote ads from a catalogue
   // until now; these are the numbers that change the advice.
-  const performance = await loadAdPerformance(id);
+  const [performance, history] = await Promise.all([
+    loadAdPerformance(id),
+    // What previous ads for this store actually did. Empty on the first run.
+    loadAdPerformanceHistory(id),
+  ]);
 
   const requestId = newRequestId();
   try {
@@ -87,7 +111,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         description: p.description ?? "",
         priceEUR: Number(p.price_eur),
       })),
-    }, attachments, performance);
+    }, attachments, performance, history);
     await spendCredits(owner.userId, CREDIT_COSTS.adStudio, "Ad Studio plan", "ads").catch((e) =>
       captureException(e, { requestId, userId: owner.userId, route: "ads:charge" }),
     );
@@ -101,7 +125,28 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
     // `adjusted` is empty on a clean run; when copy had to be cut to fit a
     // platform, the merchant is told rather than handed a silently shortened ad.
-    return NextResponse.json({ success: true, plan, adjusted });
+    /*
+     * Persist the ads so their traffic and revenue can be attributed back to
+     * them, and hand each one its tracking link. This is what turns a plan
+     * into something measurable — without it the next run is another guess.
+     *
+     * Best-effort: a merchant who cannot be given links still gets their ads.
+     */
+    const stored = await saveCreatives(
+      id,
+      store.subdomain,
+      plan.creatives,
+      process.env.APP_URL ?? "http://localhost:3000",
+    );
+
+    // `adjusted` is empty on a clean run; when copy had to be cut to fit a
+    // platform, the merchant is told rather than handed a silently shortened ad.
+    return NextResponse.json({
+      success: true,
+      plan: stored ? { ...plan, creatives: stored } : plan,
+      adjusted,
+      tracked: Boolean(stored),
+    });
   } catch (err) {
     const code = err instanceof Error ? err.message : "AI_FAILED";
     if (code === "AI_REFUSED") return fail(422, "AI_REFUSED", "I couldn't build ads for that one — try adjusting the store first.");

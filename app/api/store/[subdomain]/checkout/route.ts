@@ -26,6 +26,13 @@ const BodySchema = z.object({
     .array(z.object({ productId: z.string().uuid(), quantity: z.number().int().min(1).max(20) }))
     .min(1)
     .max(50),
+  /*
+   * The visitor's anonymous session id — the same cookieless value the visit
+   * beacon already sends. Carried through checkout so the sale can be joined
+   * back to the ad that produced the click. No new tracking, no PII: it is a
+   * random string in sessionStorage that dies with the tab.
+   */
+  sid: z.string().trim().min(6).max(64).optional(),
 });
 
 function fail(status: number, error: string, message: string) {
@@ -101,6 +108,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           store_id: store.id,
           subdomain,
           cart: JSON.stringify(cart.lines.map((l) => [l.productId, l.quantity])).slice(0, 480),
+          // Rides on the Stripe session so the webhook — which has no browser
+          // context — can attribute the order once payment actually clears.
+          ...(body.sid ? { sid: body.sid } : {}),
         },
         success_url: `${origin}/order/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}?checkout=cancelled`,

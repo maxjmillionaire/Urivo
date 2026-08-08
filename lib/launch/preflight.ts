@@ -50,6 +50,8 @@ export interface PreflightReport {
  * front of a user instead of in this report.
  */
 export const REQUIRED_RPCS = [
+  "ad_performance",
+  "attribute_order",
   "attribute_store_outcome",
   "comped_accounts",
   "creator_payout_summary",

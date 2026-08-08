@@ -16,9 +16,17 @@ export const dynamic = "force-dynamic";
  */
 
 const SUBDOMAIN_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,61})[a-z0-9]$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(request: NextRequest) {
-  let body: { subdomain?: unknown; sid?: unknown; path?: unknown };
+  let body: {
+    subdomain?: unknown;
+    sid?: unknown;
+    path?: unknown;
+    uc?: unknown;
+    campaign?: unknown;
+    source?: unknown;
+  };
   try {
     body = await request.json();
   } catch {
@@ -28,6 +36,11 @@ export async function POST(request: NextRequest) {
   const subdomain = typeof body.subdomain === "string" ? body.subdomain.toLowerCase().slice(0, 63) : "";
   const sid = typeof body.sid === "string" ? body.sid : "";
   const path = typeof body.path === "string" ? body.path : null;
+  // ?uc= on the storefront link — the ad that sent this visitor. Validated as
+  // a uuid rather than trusted: it becomes a foreign key.
+  const uc = typeof body.uc === "string" && UUID.test(body.uc) ? body.uc : null;
+  const campaign = typeof body.campaign === "string" ? body.campaign.slice(0, 120) : null;
+  const source = typeof body.source === "string" ? body.source.slice(0, 120) : null;
 
   if (!SUBDOMAIN_PATTERN.test(subdomain) || sid.length < 6) {
     return NextResponse.json({ ok: false }, { status: 400 });
@@ -44,6 +57,9 @@ export async function POST(request: NextRequest) {
     path,
     referrerHost: hostFromReferrer(request.headers.get("referer")),
     device: deviceFromUserAgent(request.headers.get("user-agent")),
+    creativeId: uc,
+    utmCampaign: campaign,
+    utmSource: source,
   });
 
   return NextResponse.json({ ok: true });
