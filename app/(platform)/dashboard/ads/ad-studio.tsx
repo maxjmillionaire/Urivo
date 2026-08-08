@@ -71,6 +71,8 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
   const [perf, setPerf] = useState<CreativePerf[]>([]);
   const [tracking, setTracking] = useState<TrackingGap | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<"google" | "meta" | null>(null);
+  const [exportNote, setExportNote] = useState<string | null>(null);
 
   const run = useCallback(async () => {
     if (!store || busy) return;
@@ -110,6 +112,44 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
   useEffect(() => {
     void loadPerf();
   }, [loadPerf]);
+
+  /*
+   * Download the ad platform's own import file. The response is either a CSV
+   * or a 200 explaining why there is nothing to export — a set with no Google
+   * ads in it is a fact about the plan, not a failure to report as an error.
+   */
+  async function exportAds(format: "google" | "meta") {
+    if (!store || exporting) return;
+    setExporting(format);
+    setExportNote(null);
+    try {
+      const res = await fetch(`/api/stores/${store.id}/ads/export?format=${format}`);
+      const type = res.headers.get("Content-Type") ?? "";
+      if (!res.ok || !type.includes("csv")) {
+        const data = await res.json().catch(() => null);
+        setExportNote(data?.note ?? data?.message ?? "That export could not be built. Please try again.");
+        return;
+      }
+      const blob = await res.blob();
+      const name = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? `${format}-ads.csv`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+      const ads = res.headers.get("X-Urivo-Ads") ?? "";
+      setExportNote(
+        format === "google"
+          ? "Downloaded. Import it in Google Ads Editor — it arrives paused, with your tracked link already set as the final URL."
+          : `Downloaded ${ads} ${ads === "1" ? "ad" : "ads"}. Import it in Meta Ads Manager — everything arrives paused, each ad with its own tracked link.`,
+      );
+    } catch {
+      setExportNote("That export could not be built. Please try again.");
+    } finally {
+      setExporting(null);
+    }
+  }
 
   async function copy(text: string, key: string) {
     try {
@@ -227,6 +267,38 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
               Every ad you have generated, with the link that measures it. Grab a link here any time — you never need
               to regenerate an ad to get it back.
             </p>
+
+            {/*
+              * The last stretch of copy-paste, removed. Twenty fields per ad
+              * become one file, and because the tracked link is written in as
+              * the destination, a merchant who exports never types a URL — the
+              * one step that silently breaks measurement stops existing.
+              */}
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-hair pt-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-mist-dim">
+                Import into
+              </span>
+              {(
+                [
+                  ["google", "Google Ads Editor"],
+                  ["meta", "Meta Ads Manager"],
+                ] as const
+              ).map(([format, label]) => (
+                <button
+                  key={format}
+                  onClick={() => exportAds(format)}
+                  disabled={exporting !== null}
+                  className="u-press inline-flex items-center gap-1.5 rounded-lg border border-hair px-2.5 py-1.5 text-[11px] font-semibold text-cloud transition-colors hover:border-gold/40 hover:text-ivory disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 3v9m0 0 3.2-3.2M10 12 6.8 8.8M4 14v1.5A1.5 1.5 0 0 0 5.5 17h9a1.5 1.5 0 0 0 1.5-1.5V14" />
+                  </svg>
+                  {exporting === format ? "Building…" : label}
+                </button>
+              ))}
+              <span className="text-[10px] text-mist-dim">Free · arrives paused</span>
+            </div>
+            {exportNote && <p className="mt-2 text-[11px] leading-relaxed text-mist">{exportNote}</p>}
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[40rem] text-left text-xs">
                 <thead className="text-[10px] uppercase tracking-wider text-mist-dim">
