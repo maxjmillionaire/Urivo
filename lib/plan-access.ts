@@ -1,23 +1,32 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getPlan, type PlanConfig } from "@/lib/plans";
+import { entitledPlan, type PlanConfig } from "@/lib/plans";
 
 /*
  * Server-side plan resolution. Feature gating is enforced HERE against the real
  * profile row — never trusted from the client (spec 6.1). Read the plan once and
  * ask the PlanConfig what the tier is allowed to do.
+ *
+ * The plan column alone is not the answer: it says which tier a subscription is
+ * FOR, not that it was paid for. `entitledPlan` applies the payment rule (see
+ * lib/plans.ts), so an incomplete checkout, a cancelled subscription or a lapsed
+ * comp all resolve to Free here — at the one place every gate already calls.
  */
 
-/** Resolve a user's plan config from their profile. Defaults to Free on any miss. */
+/** Resolve a user's ENTITLED plan config. Defaults to Free on any miss. */
 export async function getPlanForUser(
   userId: string,
   client?: SupabaseClient,
 ): Promise<PlanConfig> {
   const db = client ?? supabaseAdmin();
-  const { data } = await db.from("profiles").select("plan").eq("id", userId).single();
+  const { data } = await db
+    .from("profiles")
+    .select("plan, subscription_status, comped_until")
+    .eq("id", userId)
+    .single();
   void maybeExpireComps();
-  return getPlan(data?.plan ?? "free");
+  return entitledPlan(data);
 }
 
 /*

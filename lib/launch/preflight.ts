@@ -64,6 +64,7 @@ export const REQUIRED_RPCS = [
   "credit_balance",
   "credit_expiry_summary",
   "dashboard_store_stats",
+  "entitlement_columns_locked",
   "expire_comped_access",
   "feedback_inbox",
   "finance_cost_per_action",
@@ -197,6 +198,56 @@ async function checkSchema(): Promise<Check> {
       ok: false,
       severity: "blocker",
       detail: `Schema check failed: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+}
+
+/*
+ * Entitlement columns. RLS decides which ROWS a signed-in user may write, never
+ * which COLUMNS — so a correct `auth.uid() = id` policy still let anyone set
+ * their own `plan` from the browser with the public anon key, and set
+ * `stores.is_active` past the live-store cap. Migration 0045 revokes those
+ * grants.
+ *
+ * Checked at runtime rather than trusted, because a missing GRANT has no
+ * symptoms: every screen renders, every function answers, and the only sign is
+ * that the tiers are free. A database provisioned before 0045 must not be able
+ * to report itself ready.
+ */
+async function checkEntitlementColumns(): Promise<Check> {
+  try {
+    const { data, error } = await supabaseAdmin().rpc("entitlement_columns_locked");
+    if (error) {
+      return {
+        name: "entitlement.columns",
+        ok: false,
+        severity: "blocker",
+        detail: `Could not verify column privileges: ${error.message}. If the function is missing, migration 0045 has not been applied — until it is, any signed-in user can grant themselves a paid plan.`,
+      };
+    }
+    if (data !== true) {
+      return {
+        name: "entitlement.columns",
+        ok: false,
+        severity: "blocker",
+        detail:
+          "plan / subscription / publish columns are still writable by signed-in users. " +
+          "Apply supabase/migrations/0045_column_privileges.sql — without it, a user can set " +
+          "their own plan to Pro and publish past their store capacity using the public anon key.",
+      };
+    }
+    return {
+      name: "entitlement.columns",
+      ok: true,
+      severity: "info",
+      detail: "Plan, subscription and publish columns are service-role-only.",
+    };
+  } catch (e) {
+    return {
+      name: "entitlement.columns",
+      ok: false,
+      severity: "blocker",
+      detail: `Column-privilege check failed: ${e instanceof Error ? e.message : String(e)}`,
     };
   }
 }
@@ -393,15 +444,17 @@ function checkOptional(): Check[] {
 }
 
 export async function runPreflight(): Promise<PreflightReport> {
-  const [database, schema, stripeReachable] = await Promise.all([
+  const [database, schema, entitlementColumns, stripeReachable] = await Promise.all([
     checkDatabase(),
     checkSchema(),
+    checkEntitlementColumns(),
     checkStripeReachable(),
   ]);
 
   const checks: Check[] = [
     database,
     schema,
+    entitlementColumns,
     checkStripeMode(),
     stripeReachable,
     ...checkUrls(),

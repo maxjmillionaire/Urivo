@@ -1,5 +1,5 @@
 import { supabaseServer } from "@/lib/supabase/server";
-import { canAskUrivo } from "@/lib/plans";
+import { canAskUrivo, entitledPlanKey } from "@/lib/plans";
 import { getCreditBalance } from "@/lib/credits";
 import { AppSidebar, type NavKey } from "./app-sidebar";
 import { AppRail, type RailStore } from "./app-rail";
@@ -52,7 +52,11 @@ export async function AppShell({
 
   if (user) {
     const [{ data: profile }, balance, notifList, unreadN] = await Promise.all([
-      supabase.from("profiles").select("full_name, email, plan").eq("id", user.id).single(),
+      supabase
+        .from("profiles")
+        .select("full_name, email, plan, subscription_status, comped_until")
+        .eq("id", user.id)
+        .single(),
       getCreditBalance(user.id).catch(() => 0),
       getNotifications(user.id).catch(() => []),
       unreadCount(user.id).catch(() => 0),
@@ -60,7 +64,7 @@ export async function AppShell({
     account = {
       name: profile?.full_name ?? metaName ?? null,
       email: profile?.email ?? email ?? user.email ?? null,
-      plan: profile?.plan ?? "free",
+      plan: entitledPlanKey(profile),
       avatarUrl: avatarUrl ?? metaAvatar ?? null,
     };
     credits = balance;

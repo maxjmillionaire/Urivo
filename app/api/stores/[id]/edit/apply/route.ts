@@ -175,7 +175,35 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           "Publishing your store is available on Founder and Pro. Upgrade to take it live.",
         );
       }
-      storeUpdate.is_active = plan.setLive;
+      /*
+       * Ask Urivo publishes through publish_store, exactly as the store
+       * settings route does. Writing is_active directly here would have taken a
+       * store live without consulting the merchant's live-store capacity —
+       * asking the assistant to "make it live" was a way past a cap that the
+       * button next to it enforces.
+       */
+      if (plan.setLive === true) {
+        const { data: pub, error: pubErr } = await admin.rpc("publish_store", {
+          p_store_id: id,
+          p_max_live: userPlan.maxLiveStores,
+        });
+        const outcome = (Array.isArray(pub) ? pub[0] : pub) as
+          | { published: boolean; live_count: number; reason: string }
+          | null
+          | undefined;
+        if (pubErr || !outcome) throw pubErr ?? new Error("PUBLISH_FAILED");
+        if (!outcome.published) {
+          return fail(
+            409,
+            outcome.reason === "AT_CAPACITY" ? "AT_CAPACITY" : "PUBLISH_FAILED",
+            outcome.reason === "AT_CAPACITY"
+              ? `You're running ${outcome.live_count} live store${outcome.live_count === 1 ? "" : "s"}, which is everything this plan carries. Pause one to take another live.`
+              : "Could not take your store live. Please try again.",
+          );
+        }
+      } else {
+        storeUpdate.is_active = false;
+      }
     }
     if (Object.keys(storeUpdate).length > 0) {
       const { error } = await admin.from("stores").update(storeUpdate).eq("id", id);

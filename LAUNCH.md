@@ -83,7 +83,7 @@ is listed under item 1 rather than guessed at now.
 1. **Supabase project** — create one at supabase.com.
    - **On a brand-new, empty project:** SQL Editor → New query → paste
      **`supabase/setup_all.sql`** → Run. That single file contains every
-     migration (`0001` → `0036`) in order.
+     migration (`0001` → `0046`) in order.
    - **On a project that already has some migrations applied:** do NOT replay
      `setup_all.sql` — migration `0001` creates tables unconditionally and will
      error on the first one that already exists. Instead check what is actually

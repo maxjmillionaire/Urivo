@@ -20,6 +20,7 @@ import {
 import { applyAccountUpdate } from "@/lib/billing/connect";
 import { notifyPayoutsReady, notifyPayoutsRestricted } from "@/lib/notifications/events";
 import { recordRevenue } from "@/lib/finance/revenue";
+import { recordFirstPayment } from "@/lib/referral/service";
 import { captureException } from "@/lib/monitoring";
 import { newRequestId, logger } from "@/lib/logger";
 
@@ -281,6 +282,21 @@ async function handlePlatformCheckout(event: Stripe.Event, session: Stripe.Check
     const subId = idOf(session.subscription);
     if (!subId || !userId) return;
     const sub = await stripe().subscriptions.retrieve(subId);
+    /*
+     * Completing the Checkout form is not paying. A card that fails
+     * authentication still produces this event, with a real subscription left
+     * in `incomplete` — so activating on arrival hands the tier to anyone who
+     * reaches the payment step with a card that declines. Wait for Stripe to
+     * say the subscription is live; `customer.subscription.updated` and
+     * `invoice.paid` both arrive the moment it is, and both activate it.
+     */
+    if (sub.status !== "active" && sub.status !== "trialing") {
+      logger.info("Subscription checkout completed without payment", {
+        subscription: sub.id,
+        status: sub.status,
+      });
+      return;
+    }
     await linkSubscription(userId, sub);
     /*
      * Deliberately NOT recorded as revenue here. Every subscription checkout
@@ -356,6 +372,35 @@ async function handleInvoicePaid(event: Stripe.Event, invoice: Stripe.Invoice) {
     invoice.id ?? subId,
     subscriptionPeriodEnd(sub),
   );
+
+  /*
+   * Creator commission. `invoice.paid` is the only event that means money
+   * actually arrived, which is why the referral is settled here and not at
+   * checkout: a session that is abandoned, declines, or never authenticates
+   * must never earn a creator anything.
+   *
+   * Safe to call on every paid invoice — recordFirstPayment is keyed on the
+   * referral's own first_payment_status and no-ops once it has recorded, so a
+   * Stripe retry cannot double-credit and a renewal cannot pay a second
+   * commission. A customer with no referral row is simply NOT_REFERRED.
+   *
+   * Left to throw on a database error rather than swallowed: every step above
+   * is idempotent, so Stripe's retry re-runs them harmlessly and tries the
+   * commission again. A silently dropped commission becomes a creator dispute
+   * nobody can reconstruct.
+   */
+  if ((invoice.amount_paid ?? 0) > 0) {
+    const currency = (invoice.currency ?? "eur").toLowerCase();
+    const paid = invoice.amount_paid / 100;
+    await recordFirstPayment({
+      customerId: userId,
+      // Accounting is EUR (lib/pricing). Checkout is EUR-only today, so the
+      // presentment amount is the same figure; when localized currencies ship
+      // this is the seam that already stores both.
+      amountEur: paid,
+      ...(currency === "eur" ? {} : { presentment: { currency, amount: paid } }),
+    });
+  }
 
   // A light receipt for genuine renewals only (the welcome covers the first).
   if (invoice.billing_reason === "subscription_cycle") {

@@ -1,7 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCreditBalance, getCreditExpiry, STORE_GENERATION_COST, type CreditExpiry } from "@/lib/credits";
-import { planName, canPublish as planCanPublish, volumeMessage } from "@/lib/plans";
+import { planName, canPublish as planCanPublish, volumeMessage, entitledPlanKey } from "@/lib/plans";
 import { storeStatsFor, sumStats, type StoreStats } from "@/lib/analytics/visits";
 
 /*
@@ -182,7 +182,11 @@ export async function buildDashboardOverview(
   const now = new Date();
 
   const [{ data: profile }, credits, creditsExpiry, { data: storeRows }] = await Promise.all([
-    admin.from("profiles").select("plan, stripe_charges_enabled").eq("id", userId).single(),
+    admin
+      .from("profiles")
+      .select("plan, subscription_status, comped_until, stripe_charges_enabled")
+      .eq("id", userId)
+      .single(),
     getCreditBalance(userId).catch(() => 0),
     getCreditExpiry(userId).catch(() => null),
     admin
@@ -194,7 +198,9 @@ export async function buildDashboardOverview(
 
   const stores = storeRows ?? [];
   const storeIds = stores.map((s) => s.id);
-  const plan = profile?.plan ?? "free";
+  // The tier the merchant may actually USE — an unpaid or lapsed subscription
+  // reads as Free here, so the dashboard never promises access the API refuses.
+  const plan = entitledPlanKey(profile);
   const planLabel = planName(plan);
   const hasPlan = plan === "core" || plan === "pro";
   const canPublish = planCanPublish(plan);

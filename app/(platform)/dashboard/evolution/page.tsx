@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { getPlan } from "@/lib/plans";
+import { entitledPlan } from "@/lib/plans";
 import { AppShell } from "../_shell/app-shell";
 import { loadRailStore } from "../_shell/rail-data";
 import { EvolutionLab } from "./evolution-lab";
@@ -18,11 +18,15 @@ export default async function EvolutionPage() {
   if (!user) redirect("/login");
 
   const [{ data: profile }, rail] = await Promise.all([
-    supabase.from("profiles").select("email, plan").eq("id", user.id).single(),
+    supabase
+      .from("profiles")
+      .select("email, plan, subscription_status, comped_until")
+      .eq("id", user.id)
+      .single(),
     loadRailStore(user.id),
   ]);
 
-  const plan = getPlan(profile?.plan);
+  const plan = entitledPlan(profile);
   const evolution = plan.features.evolution;
 
   return (

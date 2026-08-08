@@ -97,9 +97,18 @@ export default async function BillingPage() {
               <p className="text-sm text-ivory">
                 Update your payment method, change plan, or cancel anytime.
               </p>
+              {/*
+                * past_due is the one subscription state a merchant needs to act on
+                * and the only one they cannot see anywhere else: Stripe is retrying
+                * a card that failed, access continues meanwhile, and it ends for
+                * real if the retries run out. The branch this replaced compared
+                * against "canceled" — a value this column never holds (it stores
+                * "cancelled") inside a block that only renders for a paid plan, so
+                * it could not be reached from either direction.
+                */}
               <p className="mt-1 text-xs text-mist">
-                {profile?.subscription_status === "canceled"
-                  ? "Your subscription is set to end — you keep access until the period closes."
+                {profile?.subscription_status === "past_due"
+                  ? "Your last payment didn't go through. Update your card to keep your stores live — we'll keep retrying in the meantime."
                   : "You're in control. Cancelling stays effective until the end of your paid period."}
               </p>
             </div>
