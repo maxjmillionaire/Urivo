@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { acceptAttachments } from "@/lib/ai/attachments-schema";
 import { loadAdPerformance } from "@/lib/ai/ad-context";
-import { saveCreatives, loadAdPerformanceHistory } from "@/lib/ai/ad-performance";
+import {
+  saveCreatives,
+  loadAdPerformanceHistory,
+  loadAdLibrary,
+  detectTrackingGap,
+} from "@/lib/ai/ad-performance";
 import { supabaseServer } from "@/lib/supabase/server";
 import { requireStoreOwner } from "@/lib/tenant";
 import { getCreditBalance, spendCredits } from "@/lib/credits";
@@ -28,12 +33,18 @@ function fail(status: number, error: string, message: string) {
 }
 
 /**
- * Measured performance for this store's generated ads.
+ * Every ad this store has generated: its copy, its tracking link, and what it
+ * measurably did.
  *
  * Exact, not sampled: Urivo owns the storefront that received the click and
  * the order that closed the sale, so the join is two rows in one database.
  * No pixel to be blocked, no third party, no consent banner for a tracker
  * that does not exist.
+ *
+ * The tracking links belong here rather than only in the generation response.
+ * Ads are written in one sitting and launched in another; a merchant who comes
+ * back a day later must be able to reach the link that makes the measurement
+ * work, without paying credits to regenerate ads they already have.
  */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -43,7 +54,22 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       ? fail(401, "UNAUTHORIZED", "Please sign in.")
       : fail(404, "NOT_FOUND", "Store not found.");
   }
-  return NextResponse.json({ creatives: await loadAdPerformanceHistory(id) });
+
+  const supabase = await supabaseServer();
+  const { data: store } = await supabase.from("stores").select("subdomain").eq("id", id).single();
+  if (!store) return fail(404, "NOT_FOUND", "Store not found.");
+
+  const [creatives, performance] = await Promise.all([
+    loadAdLibrary(id, store.subdomain, process.env.APP_URL ?? "http://localhost:3000"),
+    loadAdPerformance(id),
+  ]);
+
+  return NextResponse.json({
+    creatives,
+    // Whether the one manual step in the chain — pasting the tracked link into
+    // the ad platform — actually happened. Silent otherwise.
+    tracking: detectTrackingGap(creatives, performance.visitors7d),
+  });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { renderAdHistory, trackingUrl, type CreativePerformance } from "./ad-performance";
+import { renderAdHistory, trackingUrl, detectTrackingGap, type CreativePerformance } from "./ad-performance";
 
 /*
  * Ad attribution — the loop that turns a generator into a marketing system.
@@ -132,6 +132,104 @@ describe("the chain from click to sale is complete", () => {
     const sql = read("supabase/migrations/0038_ad_attribution.sql");
     const visits = sql.slice(sql.indexOf("alter table public.store_visits"));
     expect(visits).toMatch(/on delete set null/);
+  });
+});
+
+describe("the tracked link is reachable after the plan that produced it is gone", () => {
+  const ROOT = join(__dirname, "..", "..");
+  const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
+
+  it("the ads endpoint hands back a link for every saved ad, not just fresh ones", () => {
+    /*
+     * Ads get written in one sitting and launched in another. When the links
+     * lived only in the generation response, a merchant returning the next day
+     * had no tracked URL at all — so they pasted their plain store address and
+     * the entire measurement chain silently did nothing.
+     */
+    const route = read("app/api/stores/[id]/ads/route.ts");
+    const get = route.slice(route.indexOf("export async function GET"), route.indexOf("export async function POST"));
+    expect(get).toMatch(/loadAdLibrary/);
+    expect(get).toMatch(/detectTrackingGap/);
+  });
+
+  it("the results table can actually copy the link, so it survives a reload", () => {
+    const ui = read("app/(platform)/dashboard/ads/ad-studio.tsx");
+    const start = ui.indexOf("Your ads — links and results");
+    const end = ui.indexOf("{plan && (");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    // Rendering the URL somewhere is not enough — the button has to copy it.
+    expect(ui.slice(start, end)).toMatch(/copy\(c\.trackingUrl/);
+  });
+
+  it("copying the whole ad includes the destination URL", () => {
+    // The lazy path and the correct path have to be the same path.
+    const ui = read("app/(platform)/dashboard/ads/ad-studio.tsx");
+    expect(ui).toMatch(/Website URL: \$\{ad\.trackingUrl\}/);
+  });
+
+  it("says plainly that the plain store address will not do", () => {
+    const ui = read("app/(platform)/dashboard/ads/ad-studio.tsx");
+    expect(ui).toMatch(/not your plain store address/i);
+  });
+});
+
+describe("a silently broken tracking setup gets named", () => {
+  const HOUR = 60 * 60 * 1000;
+  const NOW = Date.parse("2026-08-08T12:00:00Z");
+  const ad = (clicks: number, ageHours: number) => ({
+    clicks,
+    createdAt: new Date(NOW - ageHours * HOUR).toISOString(),
+  });
+
+  it("stays quiet when no ad has been generated", () => {
+    expect(detectTrackingGap([], 500, NOW)).toBeNull();
+  });
+
+  it("stays quiet while the ads are too fresh to have been clicked", () => {
+    // Zero clicks an hour after generating means nothing at all.
+    expect(detectTrackingGap([ad(0, 1)], 500, NOW)).toBeNull();
+  });
+
+  it("stays quiet when there is simply no traffic to explain", () => {
+    // No visitors and no clicks is a reach problem, not a tracking problem.
+    // Telling this merchant to fix their links would send them after the wrong bug.
+    expect(detectTrackingGap([ad(0, 48)], 3, NOW)).toBeNull();
+  });
+
+  it("speaks up when visitors arrive but nothing is tagged", () => {
+    const gap = detectTrackingGap([ad(0, 48)], 340, NOW)!;
+    expect(gap.tone).toBe("warn");
+    expect(gap.detail).toMatch(/340 visitors/);
+    expect(gap.detail).toMatch(/plain store address/i);
+  });
+
+  it("points at something that is actually on the page", () => {
+    /*
+     * This warning is usually read without a freshly generated plan on screen,
+     * so it must send the merchant to the results table — which is always
+     * there — rather than to an ad card that may not be.
+     */
+    const gap = detectTrackingGap([ad(0, 48)], 340, NOW)!;
+    expect(gap.detail).toMatch(/table below/i);
+    expect(gap.detail).not.toMatch(/the ad below/i);
+  });
+
+  it("does not accuse a merchant whose traffic is simply organic", () => {
+    // Urivo cannot see whether a campaign is running, so it must not assert one is.
+    const gap = detectTrackingGap([ad(0, 48)], 340, NOW)!;
+    expect(gap.detail).toMatch(/if you have ads running/i);
+    expect(gap.detail).toMatch(/nothing to fix/i);
+  });
+
+  it("confirms the setup once a tracked click lands", () => {
+    const gap = detectTrackingGap([ad(12, 48)], 340, NOW)!;
+    expect(gap.tone).toBe("ok");
+    expect(gap.detail).toMatch(/12 tracked clicks/);
+  });
+
+  it("counts one click as a click, not '1 clicks'", () => {
+    expect(detectTrackingGap([ad(1, 48)], 340, NOW)!.detail).toMatch(/1 tracked click\b/);
   });
 });
 

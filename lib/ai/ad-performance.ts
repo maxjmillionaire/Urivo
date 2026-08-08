@@ -120,6 +120,23 @@ export interface CreativePerformance {
   createdAt: string;
 }
 
+/**
+ * A past ad with everything needed to actually launch it — copy AND link.
+ *
+ * The performance rows alone were a dead end. A merchant who generated ads on
+ * Monday and sat down to put them into Meta on Wednesday had no tracking link
+ * anywhere: the links only ever existed in the response to the generation
+ * request, so a page reload lost them for good. The only URL still in reach
+ * was the plain storefront address — which measures nothing. The interface was
+ * quietly teaching the one mistake that breaks the whole loop.
+ */
+export interface AdLibraryEntry extends CreativePerformance {
+  format: string;
+  primaryText: string;
+  cta: string;
+  trackingUrl: string;
+}
+
 export async function loadAdPerformanceHistory(storeId: string): Promise<CreativePerformance[]> {
   try {
     const { data, error } = await supabaseAdmin().rpc("ad_performance", { p_store_id: storeId });
@@ -144,6 +161,113 @@ export async function loadAdPerformanceHistory(storeId: string): Promise<Creativ
   } catch {
     return [];
   }
+}
+
+/**
+ * Every saved ad, with its copy and its tracking link, ready to launch.
+ *
+ * Two reads rather than one: `ad_performance` for the measured numbers and the
+ * creative rows for the copy. Merging in memory keeps this working on the
+ * schema already deployed — a merchant should not need another migration to
+ * get back a link the product already generated for them.
+ */
+export async function loadAdLibrary(
+  storeId: string,
+  subdomain: string,
+  appUrl: string,
+): Promise<AdLibraryEntry[]> {
+  const performance = await loadAdPerformanceHistory(storeId);
+  if (performance.length === 0) return [];
+
+  let copy = new Map<string, { format: string; primaryText: string; cta: string }>();
+  try {
+    const { data } = await supabaseAdmin()
+      .from("ad_creatives")
+      .select("id, format, primary_text, cta")
+      .eq("store_id", storeId);
+    copy = new Map(
+      ((data ?? []) as Record<string, unknown>[]).map((r) => [
+        String(r.id),
+        {
+          format: String(r.format ?? ""),
+          primaryText: String(r.primary_text ?? ""),
+          cta: String(r.cta ?? ""),
+        },
+      ]),
+    );
+  } catch {
+    /* Copy is a nicety; the link is the part that matters. Carry on without it. */
+  }
+
+  return performance.map((p) => ({
+    ...p,
+    format: copy.get(p.creativeId)?.format ?? "",
+    primaryText: copy.get(p.creativeId)?.primaryText ?? "",
+    cta: copy.get(p.creativeId)?.cta ?? "",
+    trackingUrl: trackingUrl(appUrl, subdomain, p.creativeId),
+  }));
+}
+
+/**
+ * Whether the merchant's ads are actually being measured.
+ *
+ * The tracking link is the one manual step in the chain, and getting it wrong
+ * fails silently: the ads run, the traffic arrives, and every ad sits at zero
+ * clicks forever. The merchant reads that as "my ads failed" and turns them
+ * off, when what failed was the measurement. Nothing else in the product can
+ * tell them apart — so this does, out of numbers already on hand.
+ *
+ * It states a fact and a condition rather than an accusation, because Urivo
+ * cannot know whether the ads are live. A store with organic traffic and no
+ * campaign running is not doing anything wrong, and must not be told it is.
+ */
+export interface TrackingGap {
+  tone: "warn" | "ok";
+  title: string;
+  detail: string;
+}
+
+/** Old enough that a launched ad would have been clicked by now. */
+const SETTLE_MS = 6 * 60 * 60 * 1000;
+/** Below this, "no tracked clicks" means no traffic, not broken tracking. */
+const MIN_VISITORS = 20;
+
+export function detectTrackingGap(
+  library: Pick<CreativePerformance, "clicks" | "createdAt">[],
+  visitors7d: number,
+  now: number = Date.now(),
+): TrackingGap | null {
+  if (library.length === 0) return null;
+
+  const settled = library.filter((c) => now - Date.parse(c.createdAt) > SETTLE_MS);
+  if (settled.length === 0) return null; // Too soon to read anything into a zero.
+
+  const clicks = library.reduce((sum, c) => sum + c.clicks, 0);
+
+  if (clicks > 0) {
+    return {
+      tone: "ok",
+      title: "Your ads are being measured.",
+      detail: `${clicks} tracked ${clicks === 1 ? "click" : "clicks"} joined to a specific ad so far. Every sale that follows one is credited exactly, and the next plan you generate reads these results.`,
+    };
+  }
+
+  // No tracked clicks, but people are arriving. Something untagged is sending
+  // them — and if a campaign is running, it is pointing at the wrong URL.
+  if (visitors7d >= MIN_VISITORS) {
+    return {
+      tone: "warn",
+      title: "Traffic is arriving, but none of it is tagged.",
+      /*
+       * Points at the results table, not at a generated ad card: this warning
+       * is most often read on a page with no fresh plan on it, and an
+       * instruction that refers to something not on screen is worse than none.
+       */
+      detail: `${visitors7d} visitors in the last 7 days and not one came through a tracked link. If you have ads running, they are pointing at your plain store address, so nothing can be measured — copy a link from the table below into your campaign and results will start appearing here. If your visitors come from somewhere else, this is nothing to fix.`,
+    };
+  }
+
+  return null;
 }
 
 /**
