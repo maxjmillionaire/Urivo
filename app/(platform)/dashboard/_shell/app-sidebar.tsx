@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import logo from "@/assets/brand/urivo-logo.png";
@@ -43,6 +43,26 @@ export function AppSidebar({
 }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
+
+  /*
+   * Lock body scroll while the drawer is open; close on Escape.
+   *
+   * Identical to the companion rail and the cart drawer — this was the one
+   * overlay in the product without either, so on a phone the page scrolled
+   * underneath the open navigation and Escape did nothing. Same pattern, same
+   * cleanup, so the three drawers behave the same way.
+   */
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   const row = (key: NavKey | "support", label: string, href: string, Icon: typeof IconHome, hint?: string) => {
     const on = key === active;

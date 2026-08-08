@@ -69,7 +69,6 @@ export function GenerationStudio({
   }, [done]);
 
   const activePhase = done ? PHASES.length : phase;
-  const pct = Math.min(100, Math.round((activePhase / PHASES.length) * 100));
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-night text-ivory">
@@ -119,15 +118,32 @@ export function GenerationStudio({
             </div>
           ) : (
             <>
-              {/* progress bar */}
-              <div className="mt-8 flex items-center gap-3">
-                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
-                  <div
-                    className="h-full rounded-full transition-[width] duration-700 ease-out"
-                    style={{ width: `${pct}%`, backgroundImage: "var(--grad-gold)" }}
+              {/*
+                * An indeterminate bar, because generation has no measurable
+                * progress to report.
+                *
+                * This used to be a percentage: phases advanced on a 1500ms timer
+                * and the number was (phase / 6) * 100, printed next to the bar.
+                * It reached 83% in seven and a half seconds and then sat there
+                * for the rest of a generation that takes far longer — and a
+                * progress number frozen at 83% is how software tells someone it
+                * has crashed. The phases below are honest (they name what the
+                * system is doing, and the last one holds until the real result
+                * lands); a number derived from a timer was not.
+                *
+                * Same sweeping bar as the app's own loading screen, so waiting
+                * looks the same everywhere in the product.
+                */}
+              <div className="mt-8" role="status" aria-label="Generating your store">
+                <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                  <span
+                    className="block h-full w-1/3 rounded-full"
+                    style={{
+                      backgroundImage: "var(--grad-gold)",
+                      animation: "urivo-loadbar 1.4s var(--ease-urivo) infinite",
+                    }}
                   />
                 </div>
-                <span className="w-9 text-right font-mono text-[11px] text-mist tabular-nums">{pct}%</span>
               </div>
 
               {/* phases */}

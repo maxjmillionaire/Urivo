@@ -17,7 +17,12 @@ export function LegalShell({
         style={{ background: "radial-gradient(70% 40% at 50% 0%, rgba(36,50,76,0.4), rgba(11,18,32,0) 55%)" }}
       />
       <div className="relative mx-auto w-full max-w-2xl px-6 py-16">
-        <Link href="/" className="inline-flex items-center gap-2.5 text-sm font-medium text-mist transition-colors hover:text-ivory">
+        {/* -my-2 py-2: the only way back from a legal page, sized for a thumb
+            without moving the header. */}
+        <Link
+          href="/"
+          className="-my-2 inline-flex items-center gap-2.5 py-2 text-sm font-medium text-mist transition-colors hover:text-ivory"
+        >
           <Image src={logo} alt="Urivo" width={22} height={22} className="rounded-md" /> Urivo
         </Link>
         <h1 className="mt-8 text-4xl font-semibold tracking-tight text-ivory">{title}</h1>
