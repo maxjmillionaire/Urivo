@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { rateLimit } from "@/lib/ratelimit";
 import { recordVisit, deviceFromUserAgent, hostFromReferrer } from "@/lib/analytics/visits";
+import { isBot, botReason } from "@/lib/analytics/bots";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,26 @@ export async function POST(request: NextRequest) {
   }
 
   const subdomain = typeof body.subdomain === "string" ? body.subdomain.toLowerCase().slice(0, 63) : "";
-  const sid = typeof body.sid === "string" ? body.sid : "";
+
+  /*
+   * The session comes from the HttpOnly cookie the middleware issued, never
+   * from the request body (spec 10 §2, §16.7). A client-supplied id could be
+   * forged to attach someone else's visit to a session, or replayed to inflate
+   * an ad's clicks. The body value is still accepted as a fallback for a
+   * storefront served before the cookie existed, but the cookie always wins.
+   */
+  const cookieSid = request.cookies.get("urivo_cs")?.value ?? "";
+  const sid = UUID.test(cookieSid) ? cookieSid : typeof body.sid === "string" ? body.sid : "";
+
+  /*
+   * Bots never enter the numbers, on either side of any ratio (§13). Meta
+   * fetches every URL pasted into an ad account to build its preview, before a
+   * single human sees the ad — so without this, each new ad would open with a
+   * phantom click. Recorded rather than dropped, so "where did my visitor go"
+   * has an answer.
+   */
+  const ua = request.headers.get("user-agent");
+  const bot = isBot(ua);
   const path = typeof body.path === "string" ? body.path : null;
   // ?uc= on the storefront link — the ad that sent this visitor. Validated as
   // a uuid rather than trusted: it becomes a foreign key.
@@ -56,10 +76,12 @@ export async function POST(request: NextRequest) {
     sessionHash: sid,
     path,
     referrerHost: hostFromReferrer(request.headers.get("referer")),
-    device: deviceFromUserAgent(request.headers.get("user-agent")),
+    device: deviceFromUserAgent(ua),
     creativeId: uc,
     utmCampaign: campaign,
     utmSource: source,
+    isBot: bot,
+    botReason: bot ? botReason(ua) : null,
   });
 
   return NextResponse.json({ ok: true });

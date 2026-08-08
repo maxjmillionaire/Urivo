@@ -47,6 +47,10 @@ export interface RecordVisitInput {
   /** A merchant's own campaign tagging, kept separate from Urivo's own ads. */
   utmCampaign?: string | null;
   utmSource?: string | null;
+  /** Automated client. Excluded from both sides of every ratio (spec 10 §13). */
+  isBot?: boolean;
+  /** Which signature matched, so a dropped visit can be explained. */
+  botReason?: string | null;
 }
 
 /**
@@ -80,14 +84,54 @@ export async function recordVisit(input: RecordVisitInput): Promise<void> {
       referrer_host: input.referrerHost ?? null,
       device: input.device ?? "unknown",
     };
+    /*
+     * Resolve the ad before naming it, rather than letting the foreign key
+     * decide. Two reasons, and the second is the one that bit:
+     *
+     *   A tracked link copied from somewhere else must never take credit here
+     *   (spec 10 §5) — ownership is checked, not assumed.
+     *
+     *   An unresolvable id would fail the whole insert, and the fallback below
+     *   cannot tell "this column does not exist yet" from "this ad does not
+     *   exist", so it discarded the UTM context too. A visit whose ad we
+     *   cannot place is still a visit with a knowable source.
+     */
+    let creativeId: string | null = null;
+    if (input.creativeId) {
+      const { data: creative } = await admin
+        .from("ad_creatives")
+        .select("id")
+        .eq("id", input.creativeId)
+        .eq("store_id", store.id)
+        .maybeSingle();
+      creativeId = creative?.id ?? null;
+    }
+
     const attributed = {
       ...base,
-      creative_id: input.creativeId ?? null,
+      creative_id: creativeId,
       utm_campaign: input.utmCampaign?.slice(0, 120) ?? null,
       utm_source: input.utmSource?.slice(0, 120) ?? null,
+      // 0039. Bot visits are stored, not dropped: excluded from every metric,
+      // but still answerable when a merchant asks where a visitor went.
+      is_bot: input.isBot ?? false,
+      bot_reason: input.botReason ?? null,
     };
     const { error } = await admin.from("store_visits").insert(attributed);
-    if (error) await admin.from("store_visits").insert(base);
+    if (!error) return;
+
+    /*
+     * Step back one migration at a time rather than all the way to `base`. A
+     * database with 0038 but not 0039 keeps its attribution instead of losing
+     * it alongside the bot flag — and a bot visit is skipped entirely there,
+     * because recording it without the flag would count a crawler as a human.
+     */
+    const { creative_id, utm_campaign, utm_source } = attributed;
+    if (input.isBot) return;
+    const { error: legacy } = await admin
+      .from("store_visits")
+      .insert({ ...base, creative_id, utm_campaign, utm_source });
+    if (legacy) await admin.from("store_visits").insert(base);
   } catch {
     /* analytics is never allowed to affect the storefront */
   }

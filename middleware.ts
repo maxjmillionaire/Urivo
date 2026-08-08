@@ -9,6 +9,58 @@ import { createServerClient } from "@supabase/ssr";
 const SUBDOMAIN_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,61})[a-z0-9]$/;
 
 /*
+ * THE COMMERCE SESSION (specifications/10-attribution.md §2).
+ *
+ * A shop has to know that the person who filled a cart is the person who
+ * checks out. That is the whole purpose of this cookie, and it is the reason
+ * generated storefronts carry no consent banner: it is the textbook "strictly
+ * necessary" case under §25(2) TTDSG.
+ *
+ * Attribution rides on it and must never be used to justify it. If the
+ * commerce need for the session disappears, the cookie goes with it and
+ * attribution loses its window — rather than the cookie acquiring a new
+ * purpose it was not granted. Without that discipline this becomes a marketing
+ * identifier wearing a shopping-cart excuse in about two years.
+ *
+ * Issued here rather than in the page, because middleware is the only place in
+ * the App Router that can set a cookie on every storefront request. Server-
+ * issued and HttpOnly on purpose: no page script can read it, forge it, or
+ * hand it to anyone else, which is what lets the attribution path treat it as
+ * authoritative — nothing else in the chain is client-supplied (§16.7).
+ */
+const COMMERCE_SESSION = "urivo_cs";
+/** 7 days — the attribution window, and nothing longer is needed (§3). */
+const COMMERCE_SESSION_MAX_AGE = 7 * 24 * 60 * 60;
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Ensure the response carries a commerce session, re-stamping the expiry.
+ *
+ * Sliding rather than fixed: a shopper who keeps returning inside the window
+ * should not have their cart and their attribution expire underneath them
+ * mid-journey. A malformed value is replaced rather than trusted — it can only
+ * have come from tampering, since nothing legitimate writes this cookie.
+ *
+ * On a real deployment each storefront is its own host, so a shopper visiting
+ * two Urivo stores has two unrelated sessions. Locally, path-based routing
+ * puts every store on one origin and they share one; harmless, because every
+ * attribution query is scoped by store_id regardless.
+ */
+function withCommerceSession(request: NextRequest, response: NextResponse): NextResponse {
+  const current = request.cookies.get(COMMERCE_SESSION)?.value;
+  response.cookies.set(COMMERCE_SESSION, SESSION_ID.test(current ?? "") ? current! : crypto.randomUUID(), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    // Lax still sends the cookie on a top-level navigation, which is exactly
+    // what an ad click is — and never on a cross-site subrequest.
+    sameSite: "lax",
+    path: "/",
+    maxAge: COMMERCE_SESSION_MAX_AGE,
+  });
+  return response;
+}
+
+/*
  * Admin allow-list check. Mirrors lib/admin.ts, which is the canonical
  * definition — it is restated here because middleware runs in the edge runtime
  * and must not pull in `server-only` modules. Keep the two in step.
@@ -71,11 +123,12 @@ export async function middleware(request: NextRequest) {
       // storefront sub-pages (product, order/success) and the checkout API work
       // on a real subdomain — not just the home page.
       if (p.startsWith("/api") || p.startsWith("/_next") || p.startsWith("/store/")) {
+        // The checkout and tracking APIs read the session; they never mint one.
         return NextResponse.next();
       }
       const url = request.nextUrl.clone();
       url.pathname = `/store/${subdomain}${p === "/" ? "" : p}`;
-      return NextResponse.rewrite(url);
+      return withCommerceSession(request, NextResponse.rewrite(url));
     }
     // Malformed subdomain: fall through to the main site untouched.
   } else if (isCustomDomainCandidate(host, rootDomain)) {
@@ -97,8 +150,18 @@ export async function middleware(request: NextRequest) {
     if (!p.startsWith("/api") && !p.startsWith("/_next") && !p.startsWith("/store/")) {
       const url = request.nextUrl.clone();
       url.pathname = `/store/${host}${p === "/" ? "" : p}`;
-      return NextResponse.rewrite(url);
+      return withCommerceSession(request, NextResponse.rewrite(url));
     }
+  }
+
+  /*
+   * Path-based storefronts: /store/<sub> reached directly. This is how local
+   * development and previews work, where subdomains do not resolve — and the
+   * attribution chain has to behave identically there or it cannot be tested
+   * before it reaches a merchant.
+   */
+  if (request.nextUrl.pathname.startsWith("/store/")) {
+    return withCommerceSession(request, NextResponse.next());
   }
 
   // --- Auth session + protected routes ------------------------------

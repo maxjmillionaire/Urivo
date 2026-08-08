@@ -27,13 +27,19 @@ const BodySchema = z.object({
     .min(1)
     .max(50),
   /*
-   * The visitor's anonymous session id — the same cookieless value the visit
-   * beacon already sends. Carried through checkout so the sale can be joined
-   * back to the ad that produced the click. No new tracking, no PII: it is a
-   * random string in sessionStorage that dies with the tab.
+   * Legacy field, accepted but no longer trusted.
+   *
+   * The session now comes from the HttpOnly commerce-session cookie the
+   * middleware issues (spec 10 §2). A client-supplied id could be forged to
+   * attach a stranger's checkout to someone else's click, so it is only used
+   * when no cookie is present — a storefront page served before the cookie
+   * existed. Remove once no such page can still be open (7 days after deploy).
    */
   sid: z.string().trim().min(6).max(64).optional(),
 });
+
+/** Shape of the middleware-issued commerce session (spec 10 §2). */
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function fail(status: number, error: string, message: string) {
   return NextResponse.json({ error, message }, { status });
@@ -65,6 +71,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch {
     return fail(400, "INVALID_INPUT", "Your cart looks invalid. Please refresh and try again.");
   }
+
+  /*
+   * The commerce session that carries this sale back to the click that caused
+   * it. Server-issued and HttpOnly, so it is the one identifier in the chain
+   * that cannot have been written by the page (spec 10 §2).
+   */
+  const cookieSession = request.cookies.get("urivo_cs")?.value;
+  const sessionId = SESSION_ID.test(cookieSession ?? "") ? cookieSession : body.sid;
 
   const admin = supabaseAdmin();
   const store = await loadStoreForCheckout(admin, subdomain);
@@ -108,9 +122,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           store_id: store.id,
           subdomain,
           cart: JSON.stringify(cart.lines.map((l) => [l.productId, l.quantity])).slice(0, 480),
-          // Rides on the Stripe session so the webhook — which has no browser
-          // context — can attribute the order once payment actually clears.
-          ...(body.sid ? { sid: body.sid } : {}),
+          /*
+           * Rides on the Stripe session so the webhook — which has no browser
+           * context — can attribute the order once payment actually clears.
+           * The cookie wins over anything the client sent: it is HttpOnly and
+           * server-issued, so unlike a request body it cannot be forged to
+           * claim someone else's click (spec 10 §16.7).
+           */
+          ...(sessionId ? { sid: sessionId } : {}),
         },
         success_url: `${origin}/order/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}?checkout=cancelled`,

@@ -101,10 +101,32 @@ describe("the chain from click to sale is complete", () => {
     expect(read("app/api/track/route.ts")).toMatch(/creativeId: uc/);
   });
 
-  it("checkout carries the session forward", () => {
-    // Without this the sale can never be joined back to the click.
-    expect(read("app/(store)/store/[subdomain]/cart/store-cart.tsx")).toMatch(/sid: readSessionId\(\)/);
-    expect(read("app/api/store/[subdomain]/checkout/route.ts")).toMatch(/sid: body\.sid/);
+  it("checkout takes the session from the cookie, never from the page", () => {
+    /*
+     * Spec 10 §2/§16.7. The session is HttpOnly and server-issued precisely so
+     * that it cannot be forged: a client-supplied id could be set to a stranger's
+     * value to attach their checkout to someone else's click, or replayed to
+     * inflate an ad. The request body is a fallback for pages served before the
+     * cookie existed, and the cookie must win.
+     */
+    const checkout = read("app/api/store/[subdomain]/checkout/route.ts");
+    expect(checkout).toMatch(/request\.cookies\.get\("urivo_cs"\)/);
+    expect(checkout).toMatch(/SESSION_ID\.test\(cookieSession \?\? ""\) \? cookieSession : body\.sid/);
+    expect(checkout).toMatch(/sid: sessionId/);
+  });
+
+  it("the session outlives the browser tab", () => {
+    /*
+     * The failure this replaces: the id lived in sessionStorage, so attribution
+     * ended when the tab closed. Every considered purchase — click today, buy
+     * tomorrow — was reported as zero next to the ad that caused it, and a
+     * merchant switching off a working ad never saw an error.
+     */
+    const mw = read("middleware.ts");
+    expect(mw).toMatch(/httpOnly: true/);
+    expect(mw).toMatch(/sameSite: "lax"/); // still sent on the ad click itself
+    expect(mw).toMatch(/COMMERCE_SESSION_MAX_AGE = 7 \* 24 \* 60 \* 60/);
+    expect(mw).toMatch(/withCommerceSession\(request, NextResponse\.rewrite\(url\)\)/);
   });
 
   it("the webhook attributes the order after payment clears", () => {
@@ -234,13 +256,27 @@ describe("a silently broken tracking setup gets named", () => {
 });
 
 describe("recording a visit survives a database that is one migration behind", () => {
-  it("falls back to the columns that have always existed", () => {
+  it("steps back one migration at a time instead of straight to the floor", () => {
     const visits = readFileSync(join(__dirname, "..", "analytics", "visits.ts"), "utf8");
     /*
      * Naming a column that does not exist rejects the whole insert, and the
      * store silently stops recording traffic. Losing attribution is an insight;
      * losing the visit is a broken metric on the merchant's dashboard.
+     *
+     * Two steps, not one: a database with 0038 but not 0039 keeps its
+     * attribution rather than losing it alongside the bot flag.
      */
-    expect(visits).toMatch(/if \(error\) await admin\.from\("store_visits"\)\.insert\(base\)/);
+    expect(visits).toMatch(/insert\(\{ \.\.\.base, creative_id, utm_campaign, utm_source \}\)/);
+    expect(visits).toMatch(/if \(legacy\) await admin\.from\("store_visits"\)\.insert\(base\)/);
+  });
+
+  it("never records a bot on a database that cannot flag it as one", () => {
+    /*
+     * Without the is_bot column there is nowhere to put the flag, and inserting
+     * the row anyway would file a crawler as a human — the exact number spec 10
+     * §13 exists to keep clean. Skipping the row is the honest degradation.
+     */
+    const visits = readFileSync(join(__dirname, "..", "analytics", "visits.ts"), "utf8");
+    expect(visits).toMatch(/if \(input\.isBot\) return;/);
   });
 });
