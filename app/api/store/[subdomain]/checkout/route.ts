@@ -35,7 +35,20 @@ const BodySchema = z.object({
    * when no cookie is present — a storefront page served before the cookie
    * existed. Remove once no such page can still be open (7 days after deploy).
    */
-  sid: z.string().trim().min(6).max(64).optional(),
+  sid: z
+    .string()
+    .trim()
+    .min(6)
+    .max(64)
+    /*
+     * Charset-restricted, not just length-checked. A control character here
+     * reaches PostgREST, which refuses a null byte outright (22P05) — the RPC
+     * 400s instead of deciding, and the order is left un-assessed for no
+     * reason. Rejecting it at the boundary keeps a malformed fallback value
+     * from costing a real attribution.
+     */
+    .regex(/^[A-Za-z0-9._~-]+$/, "session id must be url-safe")
+    .optional(),
 });
 
 /** Shape of the middleware-issued commerce session (spec 10 §2). */

@@ -291,4 +291,227 @@ suite("attribution rules, against the real database", () => {
     )[0];
     expect(second.deleted).toBe(0);
   });
+
+  // ── Phase 6: adversarial ────────────────────────────────────────────
+  describe("hostile and malformed input fails safely", () => {
+    it("refuses a forged session that never visited anything", async () => {
+      /*
+       * The attack: guess or replay a session id at checkout to attach someone
+       * else's click — or any click — to your own order. The cookie is HttpOnly
+       * and server-issued precisely so this cannot be done from a page, but the
+       * database must refuse it regardless of how the value arrived.
+       */
+      const creative = await fx.creative(store, "forged");
+      const victim = fx.session("victim");
+      await fx.visit(store, victim, creative, HOUR);
+
+      const order = await fx.order(store, { email: "forged@example.invalid" });
+      const forged = `urivo-itest-forged-${crypto.randomUUID()}`;
+      fx.sessions.push(forged);
+
+      expect(await api.rpc("attribute_order", { p_order_id: order, p_session_hash: forged })).toBeNull();
+      expect((await fx.basisOf(order)).creative_id).toBeNull();
+    });
+
+    it.each([
+      ["empty", ""],
+      ["whitespace", "     "],
+      ["too short", "abc"],
+      ["sql injection", "'; drop table orders; --"],
+      ["4kb of junk", "x".repeat(4096)],
+      ["unicode", "🙂".repeat(50)],
+      ["newlines", "aaaaaa\n\r\nbbbb"],
+    ])("survives a %s session id without raising", async (label, value) => {
+      /*
+       * Every one of these must return an answer rather than an exception. A
+       * raise here would be swallowed by the webhook's best-effort call and
+       * leave the order silently un-assessed — the exact failure mode the whole
+       * subsystem was rebuilt to eliminate.
+       */
+      /*
+       * A distinct buyer per case. Reusing one email made every case after the
+       * first a returning customer, so the suite was testing §6 six times over
+       * and never testing malformed input at all — an assertion that measures
+       * something other than its name is worse than a missing one.
+       */
+      const order = await fx.order(store, { email: `junk-${label.replace(/\W/g, "")}@example.invalid` });
+      const result = await api.rpc("attribute_order", {
+        p_order_id: order,
+        p_session_hash: value,
+      });
+      expect(result).toBeNull();
+      // And it must still be a DECIDED state, not left unknown.
+      expect(["none", "expired"]).toContain((await fx.basisOf(order)).attribution_basis);
+    });
+
+    it("rejects a null byte at the transport layer, before it can reach the function", async () => {
+      /*
+       * PostgREST refuses \u0000 in JSON with 22P05 — Postgres text cannot hold
+       * it. That is the right layer to stop it, but it means the RPC 400s rather
+       * than deciding, so the order must stay 'unknown' and the failure must be
+       * logged. Both hold: the call site inspects the error and the row keeps
+       * the un-assessed default rather than a confident 'none'.
+       */
+      const order = await fx.order(store, { email: "nullbyte@example.invalid" });
+      await expect(
+        api.rpc("attribute_order", { p_order_id: order, p_session_hash: "aaaaaa\u0000" }),
+      ).rejects.toThrow(/22P05|400/);
+      expect((await fx.basisOf(order)).attribution_basis).toBe("unknown");
+    });
+
+    it("attributes nothing for an order that does not exist", async () => {
+      // A webhook for a deleted or foreign order must not raise.
+      const result = await api.rpc("attribute_order", {
+        p_order_id: crypto.randomUUID(),
+        p_session_hash: fx.session("ghost"),
+      });
+      expect(result).toBeNull();
+    });
+
+    it("ignores a visit tagged with a creative that does not exist", async () => {
+      /*
+       * A hand-typed or truncated ?uc= reaches the storefront constantly. The
+       * write path resolves the creative before naming it, so the row carries
+       * null — and the read path must not invent a match from it either.
+       */
+      const session = fx.session("ghost-creative");
+      const r = await api.rest("store_visits", {
+        method: "POST",
+        body: JSON.stringify({
+          store_id: store,
+          session_hash: session,
+          path: "/",
+          creative_id: null,
+          is_bot: false,
+          utm_source: "meta",
+        }),
+      });
+      expect(r.ok).toBe(true);
+
+      const order = await fx.order(store, { email: "ghost@example.invalid" });
+      expect(await api.rpc("attribute_order", { p_order_id: order, p_session_hash: session })).toBeNull();
+      // Direct, not "our window expired" — the visit never named a real ad.
+      expect((await fx.basisOf(order)).attribution_basis).toBe("none");
+    });
+
+    it("keeps the traffic source when the ad id is unusable", async () => {
+      // Spec §5: an unresolvable ?uc= must not destroy the UTM context with it.
+      const session = fx.session("utm-kept");
+      await api.rest("store_visits", {
+        method: "POST",
+        body: JSON.stringify({
+          store_id: store,
+          session_hash: session,
+          path: "/",
+          creative_id: null,
+          is_bot: false,
+          utm_source: "newsletter",
+          utm_campaign: "spring",
+        }),
+      });
+      const row = (
+        await api.rest<{ utm_source: string; utm_campaign: string }[]>(
+          `store_visits?select=utm_source,utm_campaign&session_hash=eq.${session}`,
+        )
+      ).body[0];
+      expect(row.utm_source).toBe("newsletter");
+      expect(row.utm_campaign).toBe("spring");
+    });
+
+    it("counts one session as one click however many pageviews it makes", async () => {
+      // Counting reloads would make every ad look several times better than it is.
+      const creative = await fx.creative(store, "reloads");
+      const session = fx.session("reloads");
+      for (let i = 0; i < 5; i++) await fx.visit(store, session, creative, HOUR - i * 1000);
+
+      const row = (
+        await api.rpc<{ creative_id: string; clicks: number }[]>("ad_performance", { p_store_id: store })
+      ).find((r) => r.creative_id === creative)!;
+      expect(row.clicks).toBe(1);
+    });
+
+    it("attributes two purchases in one session to the same introducing ad", async () => {
+      // Two decisions, one introduction. Stated explicitly so it is never read
+      // as double counting (§9).
+      const creative = await fx.creative(store, "two-orders");
+      const session = fx.session("two-orders");
+      await fx.visit(store, session, creative, HOUR);
+
+      const a = await fx.order(store, { email: "buyer-a@example.invalid", cents: 1000 });
+      const b = await fx.order(store, { email: "buyer-b@example.invalid", cents: 2000 });
+      await api.rpc("attribute_order", { p_order_id: a, p_session_hash: session });
+      await api.rpc("attribute_order", { p_order_id: b, p_session_hash: session });
+
+      const row = (
+        await api.rpc<{ creative_id: string; orders: number; revenue_cents: number }[]>("ad_performance", {
+          p_store_id: store,
+        })
+      ).find((r) => r.creative_id === creative)!;
+      expect(row.orders).toBe(2);
+      expect(row.revenue_cents).toBe(3000);
+    });
+
+    it("never lets concurrent attribution attempts disagree", async () => {
+      /*
+       * Two webhook deliveries racing on the same order. Whichever lands first
+       * decides; the other must return that same answer rather than a second
+       * opinion, or the merchant's number changes under them.
+       */
+      const first = await fx.creative(store, "race-a");
+      const second = await fx.creative(store, "race-b");
+      const s1 = fx.session("race-a");
+      const s2 = fx.session("race-b");
+      await fx.visit(store, s1, first, HOUR);
+      await fx.visit(store, s2, second, HOUR);
+      const order = await fx.order(store, { email: "race@example.invalid" });
+
+      const [x, y] = await Promise.all([
+        api.rpc<string | null>("attribute_order", { p_order_id: order, p_session_hash: s1 }),
+        api.rpc<string | null>("attribute_order", { p_order_id: order, p_session_hash: s2 }),
+      ]);
+
+      const settled = (await fx.basisOf(order)).creative_id;
+      expect([first, second]).toContain(settled);
+      // Both callers must agree with the row, whichever won.
+      for (const answer of [x, y]) if (answer !== null) expect(answer).toBe(settled);
+    });
+
+    it("does not let a refund push attributed revenue below zero", async () => {
+      const creative = await fx.creative(store, "overrefund");
+      const session = fx.session("overrefund");
+      await fx.visit(store, session, creative, HOUR);
+      const order = await fx.order(store, { email: "over@example.invalid", cents: 5000 });
+      await api.rpc("attribute_order", { p_order_id: order, p_session_hash: session });
+      await api.rest(`orders?id=eq.${order}`, {
+        method: "PATCH",
+        body: JSON.stringify({ amount_refunded: 5000 }),
+      });
+
+      const row = (
+        await api.rpc<{ creative_id: string; revenue_cents: number }[]>("ad_performance", {
+          p_store_id: store,
+        })
+      ).find((r) => r.creative_id === creative)!;
+      expect(row.revenue_cents).toBe(0);
+      expect(row.revenue_cents).toBeGreaterThanOrEqual(0);
+    });
+
+    it("reconciles after every hostile case above", async () => {
+      /*
+       * Runs last, so the invariant is checked against the debris of the whole
+       * adversarial suite rather than a clean table. Spec §16.4.
+       */
+      const cov = (
+        await api.rpc<Record<string, number>[]>("attribution_coverage", { p_store_id: store, p_days: 90 })
+      )[0];
+      expect(
+        cov.attributed_cents +
+          cov.returning_cents +
+          cov.expired_cents +
+          cov.unattributed_cents +
+          cov.unknown_cents,
+      ).toBe(cov.total_cents);
+    });
+  });
+
 });
