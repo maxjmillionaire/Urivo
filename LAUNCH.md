@@ -43,6 +43,41 @@ of internal clicking will, because they do not know where not to press.
 
 ---
 
+## Block 0 — Waiting on money (nothing here is an engineering problem)
+
+Three purchases gate everything below, and none of them can be worked around
+in code. Everything that is buildable without them is already built, tested
+and pushed; the items here are blocked on access, not on effort.
+
+| # | Purchase | Unblocks | State of the code |
+|---|---|---|---|
+| 1 | **Domain** | Custom-domain routes · canonical URLs · Stripe return URLs · owner-preview exclusion (spec 10 §13) | Routing and middleware are written and pass locally; none of it can be verified against a real host until the domain exists |
+| 2 | **Railway** | Deployment · the two cron schedules in `railway.json` — daily `/api/cron/expire-clicks` (retention, spec 10 §11) and weekly digest | Both endpoints are built and callable; retention that is never scheduled is not retention |
+| 3 | **Higgsfield API key** | Visual ad creative — the image or video that *is* the ad · real image cost replacing the estimate everywhere | Ad Studio writes, measures, learns and exports; only the visual is missing. `rebase_image_costs` (0037) is waiting to replace every estimated figure with the real one |
+
+### Why the visual is last and not first
+
+Ad Studio is already a marketing system rather than a copywriter: it writes
+platform-correct ads, gives each one a tracked link, measures clicks, orders
+and revenue exactly, feeds those results into the next generation, and exports
+files Google and Meta import directly. What it cannot do is produce the picture.
+
+That is deliberately the last thing built, because Urivo's own rule applies to
+Urivo: **no AI action ships without its real cost known.** Estimating the price
+of image generation and then optimising against the estimate is exactly the
+habit this company decided not to have. The moment the key exists, the estimate
+is replaced everywhere by measurement.
+
+### One open item that is not about money
+
+Owner-preview exclusion (spec 10 §13): a merchant loading their own published
+storefront currently counts as a visitor and depresses their conversion rate.
+The clean fix depends on whether the platform's auth cookie is visible on a
+storefront subdomain, which cannot be answered without the real domain — so it
+is listed under item 1 rather than guessed at now.
+
+---
+
 ## Block 1 — Infrastructure & secrets (needed for ANY launch)
 
 1. **Supabase project** — create one at supabase.com.
