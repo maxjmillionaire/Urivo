@@ -1,7 +1,7 @@
 import { supabaseServer } from "@/lib/supabase/server";
 import { canAskUrivo, entitledPlanKey } from "@/lib/plans";
 import { getCreditBalance } from "@/lib/credits";
-import { AppSidebar, type NavKey } from "./app-sidebar";
+import { AppSidebar } from "./app-sidebar";
 import { AppRail, type RailStore } from "./app-rail";
 import { MobileRail } from "./mobile-rail";
 import { NotificationBell } from "./notification-bell";
@@ -14,19 +14,28 @@ import type { Account } from "./account-menu";
  * scrolling core in between. Every app screen lives inside this shell so the
  * whole product reads as one connected surface.
  *
- * The shell resolves the signed-in account itself (name, plan, avatar) so the
- * profile menu is consistent on every page without each route threading it in.
+ * Rendered ONCE, by dashboard/layout.tsx — and that is the point.
+ *
+ * Each page used to render its own AppShell. Next keeps a layout mounted across
+ * navigations between its children but re-renders a page completely, so with the
+ * shell inside the page, every move between dashboard screens tore the whole
+ * frame down: the sidebar was removed from the DOM and replaced, and
+ * dashboard/loading.tsx (the full shell skeleton) filled the gap. Measured with
+ * 250ms of database latency, a click from Home to Billing showed 21 shimmer bars
+ * and zero navigation labels — the entire application blinked out and back.
+ *
+ * Now the shell is the layout: the sidebar, the rail and the account menu are
+ * the same DOM nodes from one screen to the next, and only the content region
+ * suspends. The active nav row is read from the URL inside AppSidebar, so no
+ * page has to declare where it sits in the navigation.
+ *
+ * The shell also resolves the signed-in account itself (name, plan, avatar) so
+ * the profile menu is consistent everywhere without each route threading it in.
  */
 export async function AppShell({
-  active,
-  email,
-  avatarUrl,
   store,
   children,
 }: {
-  active: NavKey;
-  email?: string | null;
-  avatarUrl?: string | null;
   store: RailStore | null;
   children: React.ReactNode;
 }) {
@@ -41,9 +50,9 @@ export async function AppShell({
 
   let account: Account = {
     name: metaName ?? null,
-    email: email ?? user?.email ?? null,
+    email: user?.email ?? null,
     plan: "free",
-    avatarUrl: avatarUrl ?? metaAvatar ?? null,
+    avatarUrl: metaAvatar ?? null,
   };
 
   let credits = 0;
@@ -63,9 +72,9 @@ export async function AppShell({
     ]);
     account = {
       name: profile?.full_name ?? metaName ?? null,
-      email: profile?.email ?? email ?? user.email ?? null,
+      email: profile?.email ?? user.email ?? null,
       plan: entitledPlanKey(profile),
-      avatarUrl: avatarUrl ?? metaAvatar ?? null,
+      avatarUrl: metaAvatar ?? null,
     };
     credits = balance;
     notifs = notifList;
@@ -83,7 +92,7 @@ export async function AppShell({
             "radial-gradient(90% 60% at 22% 0%, rgba(36,50,76,0.45), rgba(11,18,32,0) 60%), radial-gradient(70% 50% at 100% 100%, rgba(232,205,128,0.05), rgba(11,18,32,0) 55%)",
         }}
       />
-      <AppSidebar active={active} account={account} />
+      <AppSidebar account={account} />
       <div className="relative lg:pl-[240px] lg:pr-[340px]">
         <div className="pointer-events-none absolute right-5 top-4 z-30 sm:right-8 lg:top-3">
           <div className="pointer-events-auto">

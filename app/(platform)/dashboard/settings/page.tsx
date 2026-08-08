@@ -1,7 +1,5 @@
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { AppShell } from "../_shell/app-shell";
-import { loadRailStore } from "../_shell/rail-data";
 import { ProfileForm, EmailForm, NotificationsForm, PasswordForm, DeleteAccount } from "./settings-form";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +11,8 @@ export default async function SettingsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, rail] = await Promise.all([
+  const [{ data: profile }] = await Promise.all([
     supabase.from("profiles").select("email, full_name, marketing_opt_in").eq("id", user.id).single(),
-    loadRailStore(user.id),
   ]);
 
   const isEmailUser = user.app_metadata?.provider === "email";
@@ -23,7 +20,7 @@ export default async function SettingsPage() {
   const marketingOptIn = (profile as { marketing_opt_in?: boolean } | null)?.marketing_opt_in ?? true;
 
   return (
-    <AppShell active="settings" email={profile?.email ?? user.email ?? null} store={rail}>
+    <>
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">Account</p>
         <h1 className="mt-2 text-[28px] font-semibold tracking-tight text-ivory">Settings</h1>
@@ -65,6 +62,6 @@ export default async function SettingsPage() {
           <DeleteAccount />
         </div>
       </section>
-    </AppShell>
+    </>
   );
 }

@@ -1,8 +1,6 @@
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getCreditBalance, getCreditLedger } from "@/lib/credits";
-import { AppShell } from "../_shell/app-shell";
-import { loadRailStore } from "../_shell/rail-data";
 import { ManageSubscriptionButton } from "./upgrade-buttons";
 import { PlanPicker } from "./plan-picker";
 import { CreditPacks } from "./credit-packs";
@@ -21,7 +19,7 @@ export default async function BillingPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, balance, ledger, rail, connect] = await Promise.all([
+  const [{ data: profile }, balance, ledger, connect] = await Promise.all([
     supabase
       .from("profiles")
       .select("plan, price_type, subscription_status, comped_until, stripe_subscription_id, email")
@@ -29,7 +27,6 @@ export default async function BillingPage() {
       .single(),
     getCreditBalance(user.id),
     getCreditLedger(user.id),
-    loadRailStore(user.id),
     getConnectStatus(user.id),
   ]);
 
@@ -62,7 +59,7 @@ export default async function BillingPage() {
           : "Standard pricing";
 
   return (
-    <AppShell active="billing" email={profile?.email ?? user.email ?? null} store={rail}>
+    <>
       <RevealStagger>
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">Billing</p>
@@ -186,6 +183,6 @@ export default async function BillingPage() {
         )}
       </section>
       </RevealStagger>
-    </AppShell>
+    </>
   );
 }

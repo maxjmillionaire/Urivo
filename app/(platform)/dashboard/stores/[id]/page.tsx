@@ -7,8 +7,6 @@ import { parseLogo } from "@/lib/storefront/design-system";
 import { auditStoreSeo } from "@/lib/seo";
 import { SeoCard } from "./seo-card";
 import { env } from "@/lib/env";
-import { AppShell } from "../../_shell/app-shell";
-import { loadRailStore } from "../../_shell/rail-data";
 import { StoreManager } from "./store-manager";
 
 export const dynamic = "force-dynamic";
@@ -42,14 +40,13 @@ export default async function StoreDetailPage({
 
   if (!store || store.user_id !== user.id) notFound();
 
-  const [{ data: products }, { data: profile }, rail, plan] = await Promise.all([
+  const [{ data: products }, { data: profile }, plan] = await Promise.all([
     supabase
       .from("products")
       .select("id, title, description, price_eur, inventory_count, image_url")
       .eq("store_id", id)
       .order("position", { ascending: true }),
     supabase.from("profiles").select("email").eq("id", user.id).single(),
-    loadRailStore(user.id),
     getPlanForUser(user.id),
   ]);
 
@@ -57,7 +54,7 @@ export default async function StoreDetailPage({
   const theme = parseTheme(store.theme_config);
 
   return (
-    <AppShell active="stores" email={profile?.email ?? user.email ?? null} store={rail}>
+    <>
       <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">Storefront</p>
@@ -117,6 +114,6 @@ export default async function StoreDetailPage({
           })),
         })}
       />
-    </AppShell>
+    </>
   );
 }

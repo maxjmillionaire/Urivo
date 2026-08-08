@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
 import logo from "@/assets/brand/urivo-logo.png";
 import {
@@ -34,15 +35,36 @@ const NAV: { key: NavKey; label: string; href: string; Icon: typeof IconHome; hi
   { key: "billing", label: "Billing", href: "/dashboard/billing", Icon: IconCard },
 ];
 
-export function AppSidebar({
-  active,
-  account,
-}: {
-  active: NavKey;
-  account: Account;
-}) {
+/*
+ * Which nav row is current, read from the URL.
+ *
+ * It used to be a prop, which meant every page had to declare where it lived in
+ * the navigation — and, more importantly, that the shell had to be rendered by
+ * the page. Reading it here is what lets the shell move up into the layout and
+ * simply stay put while pages come and go.
+ */
+function navKeyFor(pathname: string): NavKey | null {
+  if (pathname === "/dashboard") return "home";
+  if (pathname.startsWith("/dashboard/stores")) return "stores";
+  if (pathname.startsWith("/dashboard/research")) return "research";
+  if (pathname.startsWith("/dashboard/ads")) return "ads";
+  if (pathname.startsWith("/dashboard/evolution")) return "evolution";
+  if (pathname.startsWith("/dashboard/billing")) return "billing";
+  if (pathname.startsWith("/dashboard/settings")) return "settings";
+  return null;
+}
+
+export function AppSidebar({ account }: { account: Account }) {
+  const pathname = usePathname();
+  const active = navKeyFor(pathname ?? "");
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
+
+  // A navigation closes the mobile drawer — otherwise the menu stays open on
+  // top of the page it just took you to.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   /*
    * Lock body scroll while the drawer is open; close on Escape.

@@ -2,8 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { entitledPlan } from "@/lib/plans";
-import { AppShell } from "../_shell/app-shell";
-import { loadRailStore } from "../_shell/rail-data";
 import { EvolutionLab } from "./evolution-lab";
 
 export const dynamic = "force-dynamic";
@@ -17,20 +15,19 @@ export default async function EvolutionPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, rail] = await Promise.all([
+  const [{ data: profile }] = await Promise.all([
     supabase
       .from("profiles")
       .select("email, plan, subscription_status, comped_until")
       .eq("id", user.id)
       .single(),
-    loadRailStore(user.id),
   ]);
 
   const plan = entitledPlan(profile);
   const evolution = plan.features.evolution;
 
   return (
-    <AppShell active="evolution" email={profile?.email ?? user.email ?? null} store={rail}>
+    <>
       <header>
         <div className="flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-gold" />
@@ -79,6 +76,6 @@ export default async function EvolutionPage() {
       ) : (
         <EvolutionLab tier={evolution} />
       )}
-    </AppShell>
+    </>
   );
 }
