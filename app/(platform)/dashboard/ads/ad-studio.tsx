@@ -21,6 +21,18 @@ interface TrackingGap {
   title: string;
   detail: string;
 }
+
+interface Bucket { orders: number; revenueEUR: number }
+interface Coverage {
+  attributed: Bucket;
+  returning: Bucket;
+  expired: Bucket;
+  unattributed: Bucket;
+  total: Bucket;
+  coveragePct: number | null;
+  days: number;
+  available: boolean;
+}
 import type { Attachment } from "@/lib/ai/attachments";
 import Link from "next/link";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
@@ -71,6 +83,8 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
   const [perf, setPerf] = useState<CreativePerf[]>([]);
   const [tracking, setTracking] = useState<TrackingGap | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [coverage, setCoverage] = useState<Coverage | null>(null);
+  const [coverageNote, setCoverageNote] = useState<string | null>(null);
   const [exporting, setExporting] = useState<"google" | "meta" | null>(null);
   const [exportNote, setExportNote] = useState<string | null>(null);
 
@@ -104,6 +118,8 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
       const data = await res.json();
       setPerf((data.creatives ?? []) as CreativePerf[]);
       setTracking((data.tracking ?? null) as TrackingGap | null);
+      setCoverage((data.coverage ?? null) as Coverage | null);
+      setCoverageNote((data.coverageNote ?? null) as string | null);
     } catch {
       /* the panel simply stays empty */
     }
@@ -267,6 +283,81 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
               Every ad you have generated, with the link that measures it. Grab a link here any time — you never need
               to regenerate an ad to get it back.
             </p>
+
+            {/*
+              * Spec 10 §14. The figures below are never shown alone. A merchant
+              * reading "€258 from your ads" concludes their ads produced €258;
+              * reading it beside the €340 we could not credit, they reason
+              * correctly — and the split tells them WHICH problem they have,
+              * which is a different fix in each case. No ad platform reports
+              * its own blind spots. That is exactly the point.
+              */}
+            {coverage?.available && coverage.total.orders > 0 && (
+              <div className="mt-4 rounded-xl border border-hair bg-night/40 p-4">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mist">
+                    Attribution coverage · last {coverage.days} days
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums text-ivory">
+                    {coverage.coveragePct === null ? "—" : `${coverage.coveragePct}%`}
+                  </p>
+                </div>
+
+                {/* Proportional, so the gap is seen before it is read. */}
+                <div className="mt-2.5 flex h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                  {(
+                    [
+                      ["attributed", coverage.attributed.revenueEUR, "bg-gold"],
+                      ["returning", coverage.returning.revenueEUR, "bg-live/70"],
+                      ["expired", coverage.expired.revenueEUR, "bg-mist/50"],
+                      ["unattributed", coverage.unattributed.revenueEUR, "bg-white/15"],
+                    ] as const
+                  ).map(([key, value, tone]) =>
+                    value > 0 && coverage.total.revenueEUR > 0 ? (
+                      <div
+                        key={key}
+                        className={tone}
+                        style={{ width: `${(value / coverage.total.revenueEUR) * 100}%` }}
+                      />
+                    ) : null,
+                  )}
+                </div>
+
+                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                  {(
+                    [
+                      ["Attributed to an ad", coverage.attributed, "text-gold-soft"],
+                      ["Returning customers", coverage.returning, "text-live"],
+                      ["Outside the window", coverage.expired, "text-mist"],
+                      ["No tracked link", coverage.unattributed, "text-mist"],
+                    ] as const
+                  ).map(([label, b, tone]) => (
+                    <div key={label}>
+                      <dt className="text-[10px] uppercase tracking-wider text-mist-dim">{label}</dt>
+                      <dd className={`mt-0.5 text-xs font-semibold tabular-nums ${tone}`}>
+                        €{b.revenueEUR.toFixed(2)}
+                        <span className="ml-1 font-normal text-mist-dim">
+                          · {b.orders} {b.orders === 1 ? "order" : "orders"}
+                        </span>
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+
+                {coverageNote && (
+                  <p className="mt-3 border-t border-hair pt-2.5 text-[11px] leading-relaxed text-mist">
+                    {coverageNote}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {coverage && !coverage.available && (
+              <p className="mt-3 rounded-xl border border-hair bg-night/40 px-3 py-2 text-[11px] leading-relaxed text-mist">
+                Coverage could not be read, so the figures below are shown without it. Treat them as a floor rather
+                than a total — they cannot tell you what share of your sales came from ads.
+              </p>
+            )}
 
             {/*
               * The last stretch of copy-paste, removed. Twenty fields per ad

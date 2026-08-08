@@ -6,6 +6,8 @@ import {
   loadAdPerformanceHistory,
   loadAdLibrary,
   detectTrackingGap,
+  loadAttributionCoverage,
+  explainCoverage,
 } from "@/lib/ai/ad-performance";
 import { supabaseServer } from "@/lib/supabase/server";
 import { requireStoreOwner } from "@/lib/tenant";
@@ -59,9 +61,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const { data: store } = await supabase.from("stores").select("subdomain").eq("id", id).single();
   if (!store) return fail(404, "NOT_FOUND", "Store not found.");
 
-  const [creatives, performance] = await Promise.all([
+  const [creatives, performance, coverage] = await Promise.all([
     loadAdLibrary(id, store.subdomain, process.env.APP_URL ?? "http://localhost:3000"),
     loadAdPerformance(id),
+    loadAttributionCoverage(id, 30),
   ]);
 
   return NextResponse.json({
@@ -69,6 +72,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     // Whether the one manual step in the chain — pasting the tracked link into
     // the ad platform — actually happened. Silent otherwise.
     tracking: detectTrackingGap(creatives, performance.visitors7d),
+    /*
+     * Never send ad figures without the share of revenue they account for
+     * (spec 10 §14). A merchant reading "€258" concludes their ads produced
+     * €258; reading it beside €340 they could not be credited, they reason
+     * correctly about what they actually know.
+     */
+    coverage,
+    coverageNote: explainCoverage(coverage),
   });
 }
 

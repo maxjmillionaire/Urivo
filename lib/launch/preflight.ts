@@ -52,6 +52,10 @@ export interface PreflightReport {
 export const REQUIRED_RPCS = [
   "ad_performance",
   "attribute_order",
+  // Spec 10 §14. Without it the ad figures render without a coverage share,
+  // which is the one state the model forbids: a number more confident than
+  // the evidence behind it.
+  "attribution_coverage",
   "attribute_store_outcome",
   "comped_accounts",
   "creator_payout_summary",

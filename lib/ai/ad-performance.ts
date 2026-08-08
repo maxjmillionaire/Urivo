@@ -209,6 +209,108 @@ export async function loadAdLibrary(
 }
 
 /**
+ * How much of this store's revenue the ad numbers actually account for.
+ *
+ * Spec 10 §14. No ad figure is ever shown alone, because a merchant told
+ * "€258 from your ads" concludes their ads produced €258. Told "€258
+ * attributed, €340 not attributable, 43% coverage" they reason correctly —
+ * and the split says WHICH problem they have: mostly returning customers is
+ * a retention business, mostly untracked is a broken link, mostly expired is
+ * a slow consideration cycle worth knowing about.
+ */
+export interface AttributionCoverage {
+  attributed: { orders: number; revenueEUR: number };
+  /** Known customers. Retention revenue, deliberately not an ad result (§6). */
+  returning: { orders: number; revenueEUR: number };
+  /** A tracked click exists, but outside the 7-day window (§3). */
+  expired: { orders: number; revenueEUR: number };
+  /** Direct, organic, cross-device, or an ad launched without a tracked link. */
+  unattributed: { orders: number; revenueEUR: number };
+  total: { orders: number; revenueEUR: number };
+  /** Attributed share of revenue. Null when there is no revenue to divide. */
+  coveragePct: number | null;
+  days: number;
+  /** False when the figure could not be read — distinct from "everything zero". */
+  available: boolean;
+}
+
+const bucket = (orders: unknown, cents: unknown) => ({
+  orders: Number(orders ?? 0),
+  revenueEUR: Number(cents ?? 0) / 100,
+});
+
+export async function loadAttributionCoverage(
+  storeId: string,
+  days = 30,
+): Promise<AttributionCoverage> {
+  const empty = (available: boolean): AttributionCoverage => ({
+    attributed: { orders: 0, revenueEUR: 0 },
+    returning: { orders: 0, revenueEUR: 0 },
+    expired: { orders: 0, revenueEUR: 0 },
+    unattributed: { orders: 0, revenueEUR: 0 },
+    total: { orders: 0, revenueEUR: 0 },
+    coveragePct: null,
+    days,
+    available,
+  });
+
+  try {
+    const { data, error } = await supabaseAdmin().rpc("attribution_coverage", {
+      p_store_id: storeId,
+      p_days: days,
+    });
+    const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined;
+    // A missing RPC means the migration is not applied. Reporting zeros would
+    // claim perfect knowledge of nothing; unavailable is the honest answer.
+    if (error || !row) return empty(false);
+
+    const attributed = bucket(row.attributed_orders, row.attributed_cents);
+    const total = bucket(row.total_orders, row.total_cents);
+
+    return {
+      attributed,
+      returning: bucket(row.returning_orders, row.returning_cents),
+      expired: bucket(row.expired_orders, row.expired_cents),
+      unattributed: bucket(row.unattributed_orders, row.unattributed_cents),
+      total,
+      coveragePct:
+        total.revenueEUR > 0
+          ? Math.round((attributed.revenueEUR / total.revenueEUR) * 1000) / 10
+          : null,
+      days,
+      available: true,
+    };
+  } catch {
+    return empty(false);
+  }
+}
+
+/**
+ * The one sentence that turns the split into a decision.
+ *
+ * A coverage figure alone still leaves the merchant to work out what it means.
+ * Naming the largest gap tells them which problem they actually have, and the
+ * three have nothing to do with each other.
+ */
+export function explainCoverage(c: AttributionCoverage): string | null {
+  if (!c.available || c.total.orders === 0) return null;
+
+  const gaps: [number, string][] = [
+    [c.returning.revenueEUR, `most of it is returning customers — that is retention revenue, not an ad result, and it is reported separately on purpose`],
+    [c.unattributed.revenueEUR, `most of it arrived without a tracked link — either from somewhere other than your ads, or from an ad pointing at your plain store address`],
+    [c.expired.revenueEUR, `most of it came from a tracked ad, but the purchase happened more than 7 days after the click, which is past the window Urivo will credit`],
+  ];
+  gaps.sort((a, b) => b[0] - a[0]);
+
+  if (c.attributed.revenueEUR === c.total.revenueEUR) {
+    return "Every sale in this period is joined to a specific ad.";
+  }
+  if (gaps[0][0] <= 0) return null;
+
+  return `€${(c.total.revenueEUR - c.attributed.revenueEUR).toFixed(2)} could not be credited to an ad — ${gaps[0][1]}.`;
+}
+
+/**
  * Whether the merchant's ads are actually being measured.
  *
  * The tracking link is the one manual step in the chain, and getting it wrong
