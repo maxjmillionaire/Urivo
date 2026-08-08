@@ -280,8 +280,76 @@ function parseBrief(raw: unknown): StoreBrief | undefined {
   };
   return brief.positioning || brief.photographyDirection ? brief : undefined;
 }
+/*
+ * Claims a merchant must make for themselves, refused no matter who wrote them.
+ *
+ * The generator prompt already forbids these in some detail. A prompt is a
+ * request, though, and these particular sentences are regulated commercial
+ * terms in the EU that bind the MERCHANT, not Urivo: a shipping threshold, a
+ * returns window, a delivery time, an environmental claim, a warranty, or
+ * invented social proof. The model is asked not to write them; this is what
+ * happens when it does anyway — on a bad sample, after a model change, or
+ * because a merchant asked Ask Urivo for "something about free delivery".
+ *
+ * Everything in the product funnels through parseDesignSystem — generation,
+ * assistant edits, and every storefront render — so a store generated before
+ * this existed is cleaned on its next render too.
+ *
+ * Deliberately narrow. It catches specific promises ("free shipping", "30-day
+ * returns", "carbon neutral", "lifetime warranty", "rated 4.8 by 2,000
+ * customers") and leaves ordinary brand language alone, because a trust section
+ * that drops honest copy is its own kind of failure.
+ */
+const UNSUPPORTED_CLAIM = new RegExp(
+  [
+    // "free shipping", and equally "free WORLDWIDE shipping" / "free next-day
+    // delivery" — the qualifier between the two words is exactly how the first
+    // version of this guard was slipped past by its own test.
+    String.raw`\bfree\b(?:\s+[\w-]+){0,2}\s+(?:shipping|delivery|postage|returns?)\b`,
+    String.raw`\bships?\s+free\b`,
+    String.raw`\bno[-\s]cost\s+(?:shipping|delivery|returns?)\b`,
+    /*
+     * A returns or warranty window the merchant never agreed to — with one
+     * deliberate exception.
+     *
+     * Fourteen days is the EU statutory right of withdrawal: a merchant selling
+     * to consumers owes it by law, so a store stating it is repeating the law
+     * rather than inventing a promise. Thirty, sixty or ninety days are
+     * voluntary commitments that bind whoever publishes them, and Urivo has no
+     * idea whether this merchant wants to offer one.
+     *
+     * Spelled-out numbers are here because Urivo's own reference preset said
+     * "Thirty days to decide" — a thirty-day window reads exactly as binding in
+     * words as it does in digits.
+     */
+    String.raw`\b(?!14\b)(?!fourteen\b)(?:\d+|seven|ten|twelve|twenty|thirty|sixty|ninety)[-\s]?(?:day|week|month|year)s?[-\s]?(?:returns?|warranty|guarantee|delivery|shipping|dispatch|to (?:decide|return|change your mind))\b`,
+    String.raw`\bmoney[-\s]back\b`,
+    String.raw`\bsatisfaction guarantee\b`,
+    String.raw`\blifetime\s+(?:warranty|guarantee)\b`,
+    String.raw`\bno questions asked\b`,
+    String.raw`\bnext[-\s]day\b`,
+    String.raw`\bdelivered in \d+`,
+    String.raw`\bcarbon[-\s]?(?:neutral|negative|offset|aware)\b`,
+    String.raw`\bclimate[-\s]positive\b`,
+    String.raw`\bplastic[-\s]free\b`,
+    String.raw`\b(?:fda|ce|iso|gots|oeko|fair\s?trade)[-\s]?(?:approved|certified|certification)\b`,
+    // Invented social proof: "4.8/5", "2,000 reviews", "rated 4.8".
+    String.raw`\b\d[\d.,]*\s*(?:\/\s*5|stars?|reviews?|happy customers)\b`,
+    String.raw`\bcustomers?\s+(?:rated|say)\b`,
+    String.raw`\brated\s+\d`,
+  ].join("|"),
+  "i",
+);
+
+/** True when a proof point promises something Urivo cannot know to be true. */
+export function isUnsupportedClaim(title: string, detail: string): boolean {
+  return UNSUPPORTED_CLAIM.test(`${title} ${detail}`);
+}
+
 /** Validate authored proof points. Anything half-written is dropped rather than
- *  padded — a headline with no substantiation is worse than no section. */
+ *  padded — a headline with no substantiation is worse than no section. And
+ *  anything that promises shipping, returns, certification or social proof is
+ *  dropped whatever it says, because the merchant would be the one held to it. */
 function parseProof(raw: unknown, max: number): ProofPoint[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -290,6 +358,7 @@ function parseProof(raw: unknown, max: number): ProofPoint[] {
       return { title: str(o.title, 48), detail: str(o.detail, 160) };
     })
     .filter((p) => p.title && p.detail)
+    .filter((p) => !isUnsupportedClaim(p.title, p.detail))
     .slice(0, max);
 }
 function snapWeight(v: unknown): number {
