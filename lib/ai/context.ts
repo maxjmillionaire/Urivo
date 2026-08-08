@@ -162,6 +162,11 @@ export async function loadAssistantContext(userId: string): Promise<AssistantCon
         .from("store_visits")
         .select("session_hash")
         .eq("store_id", top.id)
+        // Humans only, matching the dashboard (0047) and the attribution
+        // subsystem. Counting crawlers here would understate the conversion
+        // rate the assistant then reasons out loud about — a wrong number is
+        // worse in advice than on a tile, because it comes with a conclusion.
+        .eq("is_bot", false)
         .gte("created_at", since)
         .limit(5000);
       return data ?? [];

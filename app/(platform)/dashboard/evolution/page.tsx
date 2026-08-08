@@ -38,12 +38,29 @@ export default async function EvolutionPage() {
             </span>
           )}
         </div>
+        {/*
+          * Says what it is, above the fold and before anyone pays.
+          *
+          * This read "Urivo doesn't generate one store — it generates a hundred,
+          * scores every one, and lets them evolve across generations until only
+          * the highest-performing storefront remains." The Lab itself is
+          * labelled a simulation, but that label is INSIDE the paid feature: a
+          * Free visitor read the promise, upgraded, and only then found out the
+          * scores were a fitness model rather than live tests. The label has to
+          * come before the money, not after it.
+          *
+          * The capability described here is the one that actually exists, and
+          * it is genuinely useful — a hundred directions explored and ranked in
+          * seconds, spending no traffic and no credits.
+          */}
         <h1 className="mt-3 text-[30px] font-semibold leading-tight tracking-tight text-ivory">
-          Watch intelligence evolve your store.
+          Explore a hundred versions of your store.
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-mist">
-          Urivo doesn&apos;t generate one store — it generates a hundred, scores every one, and lets
-          them evolve across generations until only the highest-performing storefront remains.
+          The Lab generates a hundred storefront directions, scores each one against Urivo&apos;s
+          fitness model and evolves the strongest across generations — instantly, on no live
+          traffic and no credits. The scores are a model of what converts, not measured conversion,
+          so treat the winner as a strong starting direction rather than a proven result.
         </p>
       </header>
 
@@ -59,11 +76,16 @@ export default async function EvolutionPage() {
               Founder &amp; Pro
             </p>
             <h2 className="relative mx-auto mt-3 max-w-lg text-[22px] font-semibold leading-snug tracking-tight text-ivory">
-              The Evolution Lab breeds a hundred storefronts and keeps only the winner.
+              Try a hundred directions for your store before you commit to one.
             </h2>
             <p className="relative mx-auto mt-3 max-w-md text-sm leading-relaxed text-mist">
-              Upgrade to run evolution on any idea. Pro unlocks Advanced Evolution with the
-              winning store&apos;s full seven-signal fitness breakdown.
+              The Lab scores a hundred generated storefronts against Urivo&apos;s fitness model and
+              evolves the strongest — in seconds, on no live traffic and no credits. Pro adds the
+              winner&apos;s full signal breakdown.
+            </p>
+            <p className="relative mx-auto mt-3 max-w-md text-xs leading-relaxed text-mist-dim">
+              A design exploration, not a live A/B test — the scores model what tends to convert
+              rather than measuring your own traffic.
             </p>
             <Link
               href="/dashboard/billing"
