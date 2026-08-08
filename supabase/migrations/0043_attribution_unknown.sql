@@ -39,7 +39,15 @@ comment on column public.orders.attribution_basis is
 -- behaviour, and exactly why the SQL names every basis explicitly rather than
 -- sweeping the remainder into an else.
 -- ------------------------------------------------------------
-create or replace function public.attribution_coverage(p_store_id uuid, p_days integer default 30)
+/*
+ * Dropped first, not replaced. `create or replace` cannot change a function's
+ * OUT parameters, and adding the two unknown_* columns changes the returned
+ * row type — PostgreSQL rejects it with 42P13. Grants are re-issued below,
+ * because a drop takes them with it.
+ */
+drop function if exists public.attribution_coverage(uuid, integer);
+
+create function public.attribution_coverage(p_store_id uuid, p_days integer default 30)
 returns table (
     attributed_orders   integer,
     attributed_cents    integer,
