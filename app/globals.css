@@ -434,11 +434,33 @@
   background-image: linear-gradient(90deg, rgba(232, 205, 128, 0), rgba(232, 205, 128, 0.6), rgba(232, 205, 128, 0));
 }
 
-/* Frosted glass — only where it improves layering/readability. */
+/*
+ * Frosted glass — the surface under every overlay in the product: the mobile
+ * navigation drawer, the Ask Urivo rail, the account menu, the sticky header,
+ * the auth card and the consent dialog.
+ *
+ * It is written to survive the blur not happening. Two things can take it away,
+ * and both are silent: an ancestor that creates a containing block kills the
+ * backdrop root, and the CSS minifier was collapsing this rule to the -webkit-
+ * property alone, which left every one of those overlays a flat 55% wash —
+ * legible over an empty background, and unreadable over the landing hero, where
+ * page content showed through the consent dialog's own text.
+ *
+ * So the opaque value is the DEFAULT and the translucent one is the upgrade,
+ * applied only where the browser confirms it can actually blur. The standard
+ * property is declared last so that if the minifier keeps only one, it keeps
+ * the one modern browsers read.
+ */
 .u-glass {
-  background: rgba(18, 28, 48, 0.55);
-  backdrop-filter: blur(16px) saturate(140%);
+  background: rgba(18, 28, 48, 0.92);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+}
+
+@supports ((backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px))) {
+  .u-glass {
+    background: rgba(18, 28, 48, 0.62);
+  }
 }
 
 /* Floating panel — soft depth + a whisper of top highlight. */

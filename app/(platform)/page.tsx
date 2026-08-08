@@ -3,6 +3,8 @@ import Image from "next/image";
 import logo from "@/assets/brand/urivo-logo.png";
 import { PLANS, formatPrice, isLaunchWindow } from "@/lib/plans";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
+import { Reveal } from "./_motion/reveal";
+import { RevealStagger } from "./_motion/reveal-stagger";
 
 /*
  * Marketing landing — Midnight (dark slate-navy, warm ivory, metallic gold).
@@ -157,9 +159,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How it works */}
+      {/*
+        * How it works. The hero above is deliberately left alone — it is the
+        * first paint and must simply be there. From here down the page assembles
+        * as you scroll: RevealStagger takes the grid's own classes, so the cards
+        * stay the grid's direct children and the layout is byte-for-byte what it
+        * was without it.
+        */}
       <section className="mx-auto max-w-5xl px-6 py-24">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <RevealStagger className="grid gap-4 sm:grid-cols-3">
           {[
             ["Describe", "Tell Urivo what you want to sell — one sentence is enough."],
             ["Generate", "AI designs your brand, writes your catalog and builds the store."],
@@ -173,12 +181,12 @@ export default function Home() {
               <p className="mt-2 text-sm leading-relaxed text-mist">{body}</p>
             </div>
           ))}
-        </div>
+        </RevealStagger>
       </section>
 
       {/* Pricing */}
       <section id="pricing" className="mx-auto max-w-6xl px-6 pb-24">
-        <div className="text-center">
+        <Reveal className="text-center">
           {launch && (
             <span className="mb-5 inline-block rounded-full border border-gold/25 bg-gold/[0.06] px-4 py-1.5 text-xs font-semibold tracking-wide text-gold-soft">
               Founder pricing — locked for life, until 15 August
@@ -186,9 +194,9 @@ export default function Home() {
           )}
           <h2 className="text-4xl font-semibold tracking-tight text-ivory">Simple, premium pricing</h2>
           <p className="mt-3 text-mist">From your idea to a live store in minutes.</p>
-        </div>
+        </Reveal>
 
-        <div className="mt-14 grid gap-6 md:grid-cols-3">
+        <RevealStagger className="mt-14 grid gap-6 md:grid-cols-3">
           {TIERS.map((tier) => (
             <div
               key={tier.name}
@@ -231,7 +239,7 @@ export default function Home() {
               </Link>
             </div>
           ))}
-        </div>
+        </RevealStagger>
         <p className="mt-8 text-center text-sm text-mist">
           {launch
             ? "Subscribe during the launch window and keep your price for the lifetime of your subscription."
@@ -241,8 +249,12 @@ export default function Home() {
 
       {/* FAQ */}
       <section id="faq" className="mx-auto max-w-3xl px-6 pb-24">
-        <h2 className="text-center text-3xl font-semibold tracking-tight text-ivory">Questions, answered</h2>
-        <div className="u-float mt-10 divide-y divide-hair overflow-hidden rounded-2xl border border-hair bg-panel/70">
+        <Reveal as="h2" className="text-center text-3xl font-semibold tracking-tight text-ivory">
+          Questions, answered
+        </Reveal>
+        {/* One reveal for the whole panel — staggering rows inside a divided
+            list reads as the list redrawing itself, not as it arriving. */}
+        <Reveal className="u-float mt-10 divide-y divide-hair overflow-hidden rounded-2xl border border-hair bg-panel/70">
           {FAQ.map(([q, a]) => (
             <details key={q} className="group px-6 py-5 [&_summary::-webkit-details-marker]:hidden">
               <summary className="flex cursor-pointer items-center justify-between gap-4 text-base font-medium text-ivory">
@@ -254,7 +266,7 @@ export default function Home() {
               <p className="mt-3 text-sm leading-relaxed text-mist">{a}</p>
             </details>
           ))}
-        </div>
+        </Reveal>
       </section>
 
       {/* Footer */}
@@ -264,10 +276,12 @@ export default function Home() {
             <Image src={logo} alt="Urivo" width={22} height={22} className="rounded-md" />
             <p className="text-sm text-mist">© {new Date().getFullYear()} Urivo</p>
           </div>
+          {/* -my-2 py-2: a finger-sized target on a phone, with the row's
+              visual position unchanged. */}
           <div className="flex gap-6 text-sm font-medium text-mist">
-            <Link href="/impressum" className="hover:text-ivory">Legal Notice</Link>
-            <Link href="/datenschutz" className="hover:text-ivory">Privacy Policy</Link>
-            <Link href="/agb" className="hover:text-ivory">Terms of Service</Link>
+            <Link href="/impressum" className="-my-2 py-2 transition-colors hover:text-ivory">Legal Notice</Link>
+            <Link href="/datenschutz" className="-my-2 py-2 transition-colors hover:text-ivory">Privacy Policy</Link>
+            <Link href="/agb" className="-my-2 py-2 transition-colors hover:text-ivory">Terms of Service</Link>
           </div>
         </div>
       </footer>

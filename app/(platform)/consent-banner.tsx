@@ -57,7 +57,10 @@ export function ConsentBanner() {
         <p className="text-sm leading-relaxed text-mist">
           We use necessary cookies to keep you signed in. With your consent we
           also use analytics to improve Urivo.{" "}
-          <Link href="/datenschutz" className="font-medium text-gold-soft underline-offset-4 hover:underline">
+          <Link
+            href="/datenschutz"
+            className="-my-2 inline-block py-2 font-medium text-gold-soft underline-offset-4 hover:underline"
+          >
             Learn more
           </Link>
         </p>
