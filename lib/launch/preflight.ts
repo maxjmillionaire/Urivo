@@ -56,6 +56,8 @@ export const REQUIRED_RPCS = [
   // which is the one state the model forbids: a number more confident than
   // the evidence behind it.
   "attribution_coverage",
+  // Spec 10 §11. Retention that is documented but not callable is not retention.
+  "expire_click_events",
   "attribute_store_outcome",
   "comped_accounts",
   "creator_payout_summary",

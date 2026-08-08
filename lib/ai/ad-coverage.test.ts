@@ -16,6 +16,7 @@ const cov = (over: Partial<AttributionCoverage> = {}): AttributionCoverage => ({
   returning: eur(2, 180),
   expired: eur(1, 90),
   unattributed: eur(1, 70),
+  unknown: eur(0, 0),
   total: eur(7, 598),
   coveragePct: 43.1,
   days: 30,
@@ -32,7 +33,11 @@ describe("the split always accounts for every euro", () => {
      */
     const c = cov();
     const parts =
-      c.attributed.revenueEUR + c.returning.revenueEUR + c.expired.revenueEUR + c.unattributed.revenueEUR;
+      c.attributed.revenueEUR +
+      c.returning.revenueEUR +
+      c.expired.revenueEUR +
+      c.unattributed.revenueEUR +
+      c.unknown.revenueEUR;
     expect(parts).toBe(c.total.revenueEUR);
   });
 
@@ -43,15 +48,24 @@ describe("the split always accounts for every euro", () => {
      * absorbed into "direct" and reported as traffic the merchant never bought.
      */
     const sql = readFileSync(
-      join(__dirname, "..", "..", "supabase", "migrations", "0040_attribution_coverage.sql"),
+      join(__dirname, "..", "..", "supabase", "migrations", "0043_attribution_unknown.sql"),
       "utf8",
     );
-    for (const basis of ["creative", "returning", "expired", "none"]) {
+    for (const basis of ["creative", "returning", "expired", "none", "unknown"]) {
       expect(sql).toMatch(new RegExp(`filter \\(where basis = '${basis}'\\)`));
     }
-    // Judge the SQL, not the prose about it: the comments discuss the very
-    // else-branch this forbids, and matching them would pass or fail on wording.
-    const code = sql.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*--.*$/gm, "");
+    /*
+     * Scoped to the coverage function alone. The same migration also defines
+     * attribute_order, whose plpgsql body uses if/else legitimately — judging
+     * the whole file would fail on unrelated, correct code.
+     *
+     * Comments stripped too: they discuss the very else-branch this forbids,
+     * so matching them would pass or fail on wording rather than on SQL.
+     */
+    const fn = sql.slice(sql.indexOf("function public.attribution_coverage"));
+    const body = fn.slice(0, fn.indexOf("$$;") + 3);
+    const code = body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*--.*$/gm, "");
+    expect(code).toMatch(/filter \(where basis = 'unknown'\)/);
     expect(code).not.toMatch(/\belse\b/i);
   });
 
@@ -90,7 +104,7 @@ describe("the gap is explained, not just measured", () => {
 
   it("says so plainly when nothing is missing", () => {
     const out = explainCoverage(
-      cov({ attributed: eur(7, 598), returning: eur(0, 0), expired: eur(0, 0), unattributed: eur(0, 0) }),
+      cov({ attributed: eur(7, 598), returning: eur(0, 0), expired: eur(0, 0), unattributed: eur(0, 0), unknown: eur(0, 0) }),
     )!;
     expect(out).toMatch(/every sale in this period is joined/i);
   });

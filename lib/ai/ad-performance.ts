@@ -226,6 +226,12 @@ export interface AttributionCoverage {
   expired: { orders: number; revenueEUR: number };
   /** Direct, organic, cross-device, or an ad launched without a tracked link. */
   unattributed: { orders: number; revenueEUR: number };
+  /**
+   * Not assessed, or assessment failed. Never folded into another bucket —
+   * this is the number that makes a broken attribution path visible instead
+   * of letting it inflate "direct" with revenue nobody measured.
+   */
+  unknown: { orders: number; revenueEUR: number };
   total: { orders: number; revenueEUR: number };
   /** Attributed share of revenue. Null when there is no revenue to divide. */
   coveragePct: number | null;
@@ -248,6 +254,7 @@ export async function loadAttributionCoverage(
     returning: { orders: 0, revenueEUR: 0 },
     expired: { orders: 0, revenueEUR: 0 },
     unattributed: { orders: 0, revenueEUR: 0 },
+    unknown: { orders: 0, revenueEUR: 0 },
     total: { orders: 0, revenueEUR: 0 },
     coveragePct: null,
     days,
@@ -272,6 +279,7 @@ export async function loadAttributionCoverage(
       returning: bucket(row.returning_orders, row.returning_cents),
       expired: bucket(row.expired_orders, row.expired_cents),
       unattributed: bucket(row.unattributed_orders, row.unattributed_cents),
+      unknown: bucket(row.unknown_orders, row.unknown_cents),
       total,
       coveragePct:
         total.revenueEUR > 0
@@ -299,6 +307,12 @@ export function explainCoverage(c: AttributionCoverage): string | null {
     [c.returning.revenueEUR, `most of it is returning customers — that is retention revenue, not an ad result, and it is reported separately on purpose`],
     [c.unattributed.revenueEUR, `most of it arrived without a tracked link — either from somewhere other than your ads, or from an ad pointing at your plain store address`],
     [c.expired.revenueEUR, `most of it came from a tracked ad, but the purchase happened more than 7 days after the click, which is past the window Urivo will credit`],
+    /*
+     * Deliberately worded as a fault rather than a finding. Unknown revenue is
+     * not a fact about the merchant's marketing — it is Urivo failing to
+     * measure, and saying otherwise would dress a bug up as an insight.
+     */
+    [c.unknown.revenueEUR, `most of it could not be assessed at all — that is a fault on our side, not a finding about your ads, and it is being looked at`],
   ];
   gaps.sort((a, b) => b[0] - a[0]);
 

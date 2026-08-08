@@ -101,6 +101,17 @@ describe("the chain from click to sale is complete", () => {
     expect(read("app/api/track/route.ts")).toMatch(/creativeId: uc/);
   });
 
+  it("no attribution identifier is written to the visitor's device", () => {
+    /*
+     * Spec 10 §2. The sessionStorage id outlived its purpose by a release: the
+     * server stopped reading it when the HttpOnly cookie arrived, but the page
+     * kept minting one — an identifier stored on someone's machine for nothing,
+     * while the specification claimed none existed.
+     */
+    expect(read("app/(store)/store/[subdomain]/visit-beacon.tsx")).not.toMatch(/urivo_sid/);
+    expect(read("app/(store)/store/[subdomain]/cart/store-cart.tsx")).not.toMatch(/urivo_sid/);
+  });
+
   it("checkout takes the session from the cookie, never from the page", () => {
     /*
      * Spec 10 §2/§16.7. The session is HttpOnly and server-issued precisely so

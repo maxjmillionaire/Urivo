@@ -5,26 +5,19 @@ import { useEffect } from "react";
 /*
  * Anonymous storefront visit beacon. Fires once per browser session per store
  * so the merchant's Command Center can show real Visitors + Conversion. The
- * session id is a random string held in sessionStorage — cookieless, no PII,
- * cleared when the tab closes. Never rendered for owner previews.
+ * session is the server-issued HttpOnly commerce cookie (spec 10 §2), which
+ * this file cannot read and does not need to: the browser attaches it to the
+ * request automatically, and /api/track takes it from there.
+ *
+ * No identifier is written to the visitor's device from here. An earlier
+ * version minted one in sessionStorage; the server stopped reading it when the
+ * cookie arrived, and it survived for a release as dead weight — an id stored
+ * on someone's machine for no purpose, while the specification claimed none
+ * existed. Removed.
+ *
+ * The one thing still kept locally is a boolean "already counted this store",
+ * which carries no id and cannot be used to recognise anybody.
  */
-
-function sessionId(): string {
-  const KEY = "urivo_sid";
-  try {
-    let id = sessionStorage.getItem(KEY);
-    if (!id) {
-      id =
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : Math.random().toString(36).slice(2) + Date.now().toString(36);
-      sessionStorage.setItem(KEY, id);
-    }
-    return id;
-  } catch {
-    return "";
-  }
-}
 
 export function VisitBeacon({ subdomain }: { subdomain: string }) {
   useEffect(() => {
@@ -35,9 +28,6 @@ export function VisitBeacon({ subdomain }: { subdomain: string }) {
     } catch {
       return;
     }
-    const sid = sessionId();
-    if (!sid) return;
-
     /*
      * ?uc= is the ad that sent this visitor — Urivo's own tracking link. It is
      * read once, on the first pageview of the session, which is what makes the
@@ -47,7 +37,6 @@ export function VisitBeacon({ subdomain }: { subdomain: string }) {
     const params = new URLSearchParams(window.location.search);
     const payload = JSON.stringify({
       subdomain,
-      sid,
       path: window.location.pathname,
       uc: params.get("uc") ?? undefined,
       campaign: params.get("utm_campaign") ?? undefined,

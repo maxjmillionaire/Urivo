@@ -28,6 +28,7 @@ interface Coverage {
   returning: Bucket;
   expired: Bucket;
   unattributed: Bucket;
+  unknown: Bucket;
   total: Bucket;
   coveragePct: number | null;
   days: number;
@@ -311,6 +312,9 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
                       ["returning", coverage.returning.revenueEUR, "bg-live/70"],
                       ["expired", coverage.expired.revenueEUR, "bg-mist/50"],
                       ["unattributed", coverage.unattributed.revenueEUR, "bg-white/15"],
+                      // Alert-toned on purpose: unknown revenue is our fault,
+                      // not a fact about the merchant's marketing.
+                      ["unknown", coverage.unknown.revenueEUR, "bg-alert/50"],
                     ] as const
                   ).map(([key, value, tone]) =>
                     value > 0 && coverage.total.revenueEUR > 0 ? (
@@ -323,13 +327,14 @@ export function AdStudio({ store }: { store: { id: string; name: string } | null
                   )}
                 </div>
 
-                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-5">
                   {(
                     [
                       ["Attributed to an ad", coverage.attributed, "text-gold-soft"],
                       ["Returning customers", coverage.returning, "text-live"],
                       ["Outside the window", coverage.expired, "text-mist"],
                       ["No tracked link", coverage.unattributed, "text-mist"],
+                      ["Could not assess", coverage.unknown, "text-alert"],
                     ] as const
                   ).map(([label, b, tone]) => (
                     <div key={label}>

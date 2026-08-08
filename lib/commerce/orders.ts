@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type Stripe from "stripe";
+import { captureException } from "@/lib/monitoring";
 
 /*
  * Order persistence. Orders are created ONLY from a verified Stripe webhook
@@ -70,15 +71,47 @@ export async function recordPaidOrder(
    * carried a creative — first touch, so the ad that introduced the brand gets
    * the sale rather than whatever retargeting ad ran last.
    *
-   * Best-effort and last: an order that exists without attribution is a
-   * missing insight, an order that failed to record is lost money.
+   * Attribution may fail without breaking commerce, but it must never fail
+   * invisibly. The previous form — .then(() => undefined, () => undefined) —
+   * discarded a rejection AND never inspected the `error` that supabase-js
+   * returns in the result object, which is where a real failure actually
+   * arrives. It hid a 42804 for an entire release: every unattributed order
+   * raised, the row kept its default, and the default read as a confident
+   * answer.
+   *
+   * The order is already inserted at this point, so nothing here can lose a
+   * sale. What changes is that the row stays 'unknown' — not 'none' — and the
+   * failure reaches monitoring.
    */
   const sid = typeof s.metadata?.sid === "string" ? s.metadata.sid : null;
   if (sid) {
-    await admin.rpc("attribute_order", { p_order_id: order.id, p_session_hash: sid }).then(
-      () => undefined,
-      () => undefined,
-    );
+    try {
+      const { error } = await admin.rpc("attribute_order", {
+        p_order_id: order.id,
+        p_session_hash: sid,
+      });
+      if (error) {
+        captureException(new Error(`attribute_order failed: ${error.message}`), {
+          orderId: order.id,
+          storeId: params.storeId,
+          route: "orders:attribute",
+        });
+      }
+    } catch (err) {
+      captureException(err, { orderId: order.id, storeId: params.storeId, route: "orders:attribute" });
+    }
+  } else {
+    /*
+     * No commerce session on the Stripe metadata. Left at 'unknown' rather
+     * than decided: the checkout may predate the cookie, or the metadata may
+     * have been dropped. Claiming "this sale came from no ad" would be an
+     * answer we did not earn.
+     */
+    captureException(new Error("attribute_order skipped: no session on checkout metadata"), {
+      orderId: order.id,
+      storeId: params.storeId,
+      route: "orders:attribute",
+    });
   }
 
   if (params.lines.length > 0) {
