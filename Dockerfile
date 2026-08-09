@@ -27,7 +27,17 @@ ENV PORT=3000
 # Non-root user
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 
-COPY --from=build /app/public ./public
+# No `public/` copy: Urivo does not have one, and does not need one.
+#
+# The icons live in the App Router — app/icon.png and app/apple-icon.png — and
+# app/manifest.ts points at the URLs Next generates from them. Nothing is served
+# from a static root directory, so `public/` was never created; git tracks no
+# empty directories, and the build stage therefore had no /app/public to copy.
+# The COPY failed its checksum and stopped the image build.
+#
+# An empty public/ with a .gitkeep would have turned the build green while
+# leaving a directory that exists only to satisfy a line that should not be
+# there. If real static assets are ever added, restore this COPY along with them.
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 
