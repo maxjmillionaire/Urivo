@@ -3,6 +3,7 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/storefront";
 import { parseDesignSystem, themeToDesignSystem, fontStack } from "@/lib/storefront/design-system";
+import { STOREFRONT_FONT_VARS } from "@/lib/storefront/fonts";
 import { ClearCart } from "./clear-cart";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,7 @@ export default async function OrderSuccessPage({
 
   return (
     <main
+      className={STOREFRONT_FONT_VARS}
       style={{
         minHeight: "100vh",
         display: "flex",

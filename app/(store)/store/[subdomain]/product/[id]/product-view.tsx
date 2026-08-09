@@ -14,6 +14,7 @@
  */
 import Link from "next/link";
 import { fontStack, type StoreDesignSystem } from "@/lib/storefront/design-system";
+import { STOREFRONT_FONT_VARS } from "@/lib/storefront/fonts";
 import { toCents, formatMoney } from "@/lib/commerce/types";
 import { StoreCartProvider, CartButton, BuyBox } from "../../cart/store-cart";
 
@@ -82,7 +83,7 @@ export function ProductView({
   };
 
   return (
-    <div id="uv-store" style={vars}>
+    <div id="uv-store" className={STOREFRONT_FONT_VARS} style={vars}>
       <style dangerouslySetInnerHTML={{ __html: PDP_CSS }} />
       <StoreCartProvider subdomain={subdomain} currency={currency}>
         <header style={{ borderBottom: `1px solid ${p.line}`, position: "sticky", top: 0, zIndex: 20, background: p.background }}>

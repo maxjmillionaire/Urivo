@@ -164,30 +164,30 @@ export function parseLogo(themeConfig: unknown): StoreLogo | null {
 /* ------------------------------- font library ------------------------------ */
 /*
  * Curated, pairing-tested library. The AI selects a KEY; we resolve it to a
- * safe CSS stack + a Google Fonts import spec. No arbitrary font URLs.
+ * safe CSS stack. No arbitrary font URLs, and nothing is fetched at runtime —
+ * the faces themselves are self-hosted at build time by ./fonts.ts.
  */
 export interface FontDef {
   stack: string;
-  import: string; // family spec for fonts.googleapis.com css2
 }
 
 export const FONT_LIBRARY: Record<string, FontDef> = {
-  playfair: { stack: "'Playfair Display', Georgia, serif", import: "Playfair+Display:ital,wght@0,400;0,500;0,700;1,400" },
-  cormorant: { stack: "'Cormorant Garamond', Georgia, serif", import: "Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400" },
-  fraunces: { stack: "'Fraunces', Georgia, serif", import: "Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,400" },
-  spectral: { stack: "'Spectral', Georgia, serif", import: "Spectral:ital,wght@0,300;0,400;0,600;1,400" },
-  libre: { stack: "'Libre Baskerville', Georgia, serif", import: "Libre+Baskerville:ital,wght@0,400;0,700;1,400" },
-  inter: { stack: "'Inter', system-ui, sans-serif", import: "Inter:wght@400;500;600;700" },
-  manrope: { stack: "'Manrope', system-ui, sans-serif", import: "Manrope:wght@400;500;600;700;800" },
-  dmsans: { stack: "'DM Sans', system-ui, sans-serif", import: "DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700" },
-  spacegrotesk: { stack: "'Space Grotesk', system-ui, sans-serif", import: "Space+Grotesk:wght@400;500;600;700" },
-  sora: { stack: "'Sora', system-ui, sans-serif", import: "Sora:wght@400;500;600;700" },
-  jost: { stack: "'Jost', system-ui, sans-serif", import: "Jost:wght@400;500;600;700" },
-  epilogue: { stack: "'Epilogue', system-ui, sans-serif", import: "Epilogue:wght@400;600;700;800" },
-  archivo: { stack: "'Archivo', system-ui, sans-serif", import: "Archivo:wght@400;600;700;800;900" },
-  syne: { stack: "'Syne', system-ui, sans-serif", import: "Syne:wght@400;600;700;800" },
-  bebas: { stack: "'Bebas Neue', Impact, sans-serif", import: "Bebas+Neue" },
-  ibmmono: { stack: "'IBM Plex Mono', ui-monospace, monospace", import: "IBM+Plex+Mono:wght@400;500;600" },
+  playfair: { stack: "'Playfair Display', Georgia, serif" },
+  cormorant: { stack: "'Cormorant Garamond', Georgia, serif" },
+  fraunces: { stack: "'Fraunces', Georgia, serif" },
+  spectral: { stack: "'Spectral', Georgia, serif" },
+  libre: { stack: "'Libre Baskerville', Georgia, serif" },
+  inter: { stack: "'Inter', system-ui, sans-serif" },
+  manrope: { stack: "'Manrope', system-ui, sans-serif" },
+  dmsans: { stack: "'DM Sans', system-ui, sans-serif" },
+  spacegrotesk: { stack: "'Space Grotesk', system-ui, sans-serif" },
+  sora: { stack: "'Sora', system-ui, sans-serif" },
+  jost: { stack: "'Jost', system-ui, sans-serif" },
+  epilogue: { stack: "'Epilogue', system-ui, sans-serif" },
+  archivo: { stack: "'Archivo', system-ui, sans-serif" },
+  syne: { stack: "'Syne', system-ui, sans-serif" },
+  bebas: { stack: "'Bebas Neue', Impact, sans-serif" },
+  ibmmono: { stack: "'IBM Plex Mono', ui-monospace, monospace" },
 };
 
 /** The font keys the AI may choose from (tuple for schema enums). */
@@ -196,20 +196,19 @@ export const FONT_KEYS = Object.keys(FONT_LIBRARY) as [string, ...string[]];
 const DEFAULT_HEADING = "playfair";
 const DEFAULT_BODY = "inter";
 
+/**
+ * CSS `font-family` for a library key.
+ *
+ * The face itself is self-hosted and bound to `--f-<key>` by
+ * lib/storefront/fonts.ts (see the note there on why it is not loaded from
+ * Google at runtime). The literal family name is kept behind the variable so
+ * the stack still resolves if the variable is ever out of scope, and the
+ * generic fallbacks stay last so text is always readable while a face swaps in.
+ */
 export function fontStack(key: string): string {
-  return FONT_LIBRARY[key]?.stack ?? FONT_LIBRARY[DEFAULT_BODY].stack;
-}
-
-/** Build a single, deduped Google Fonts stylesheet URL for a design system. */
-export function googleFontsUrl(ds: StoreDesignSystem): string {
-  const specs = new Set<string>();
-  const h = FONT_LIBRARY[ds.fonts.headingKey]?.import;
-  const b = FONT_LIBRARY[ds.fonts.bodyKey]?.import;
-  if (h) specs.add(h);
-  if (b) specs.add(b);
-  if (specs.size === 0) return "";
-  const families = [...specs].map((s) => `family=${s}`).join("&");
-  return `https://fonts.googleapis.com/css2?${families}&display=swap`;
+  const def = FONT_LIBRARY[key] ?? FONT_LIBRARY[DEFAULT_BODY];
+  const varName = FONT_LIBRARY[key] ? `--f-${key}` : `--f-${DEFAULT_BODY}`;
+  return `var(${varName}), ${def.stack}`;
 }
 
 /* ------------------------------- colour math ------------------------------- */
