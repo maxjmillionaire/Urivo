@@ -1,12 +1,11 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
-  "build": { "builder": "NIXPACKS" },
+  "build": { "builder": "DOCKERFILE", "dockerfilePath": "Dockerfile" },
   "deploy": {
-    "startCommand": "node .next/standalone/server.js",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
   },
-  "//": "Scheduled jobs are configured per-service in Railway. Two are required:",
+  "//startCommand": "Deliberately absent. The Dockerfile's CMD is the entrypoint, and it is the only place that knows the image layout. A startCommand here previously read 'node .next/standalone/server.js' — the path used to run the server from a repo checkout, not the path inside the image, where COPY .next/standalone ./ puts server.js at /app/server.js. It silently overrode the correct CMD and every container exited with MODULE_NOT_FOUND.",
   "//cron:expire-clicks": "0 3 * * *  — GET /api/cron/expire-clicks with the CRON_SECRET bearer token. Deletes click events past the 90-day retention window (specifications/10-attribution.md §11). Retention that is documented but never executed is not retention.",
   "//cron:weekly-digest": "0 8 * * 1  — GET /api/cron/weekly-digest with the same token."
 }
