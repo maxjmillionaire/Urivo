@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { PLANS } from "./plans";
+import { PLANS, priceForUser } from "./plans";
 
 /*
  * Pricing drift.
@@ -102,6 +102,42 @@ describe("no price is written anywhere but the source of truth", () => {
     }
 
     expect(offenders, `Interpolate from PLANS instead:\n${offenders.join("\n")}`).toEqual([]);
+  });
+
+  it("the public pricing card advertises the founding price, gated on the real counter", () => {
+    /*
+     * The Founding 50 offer was fully enforced in billing — migration 0023
+     * claims a spot atomically at signup, /api/checkout reads price_type and
+     * stamps the Stripe unit_amount — while the landing page advertised €49 and
+     * €199 under a "Founder pricing" banner. The offer existed and no visitor
+     * could see it.
+     *
+     * The cause was subtle: the card rendered price.launch against
+     * price.regular, and those are equal for both paid tiers, so the
+     * strike-through branch was unreachable and the discount silently never
+     * appeared. The real discount lives in price.founding.
+     */
+    const landing = readFileSync(join(ROOT, "app", "(platform)", "page.tsx"), "utf8");
+    const code = landing.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, "")).replace(/^\s*\/\/.*$/gm, "");
+
+    expect(code, "the card must read the founding price").toMatch(/price\.founding/);
+    expect(code, "the offer must be gated on the live counter, not a date").toMatch(/getFoundingOffer/);
+
+    /*
+     * price.launch must not drive the public discount. While launch equals
+     * regular it renders nothing; if someone later sets it to a third value it
+     * would advertise a price no checkout path can produce, because checkout
+     * resolves standard-vs-founding from profiles.price_type.
+     */
+    expect(code, "price.launch must not drive the public discount").not.toMatch(/price\.launch/);
+  });
+
+  it("the founding prices shown publicly are the ones checkout charges", () => {
+    // The invariant in one line: what the visitor reads is what the card pays.
+    for (const key of ["core", "pro"] as const) {
+      expect(priceForUser(key, "founding")).toBe(PLANS[key].price.founding);
+      expect(priceForUser(key, "standard")).toBe(PLANS[key].price.regular);
+    }
   });
 
   it("the admin founding line is derived, not typed", () => {

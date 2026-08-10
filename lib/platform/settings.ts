@@ -121,6 +121,45 @@ export async function setFreeGenerationsEnabled(enabled: boolean): Promise<void>
 // Founding members (first 50) — private tracking for the founder.
 // ------------------------------------------------------------------
 
+/**
+ * Whether the Founding 50 offer is still open — the ONLY founding fact a public
+ * page may read.
+ *
+ * Deliberately separate from getFoundingStatus(), which returns the members
+ * themselves. The landing page is unauthenticated: pulling a list of customer
+ * email addresses into its render, displayed or not, is the kind of mistake
+ * that only looks harmless until something serialises it. This reads two
+ * integers and nothing else.
+ *
+ * The landing page needs it because the advertised price must equal the price
+ * the visitor will actually be charged. Once the cap is claimed a new signup is
+ * stamped 'standard' and pays €49, so a page still showing €29 would be quoting
+ * a price nobody can get.
+ */
+export interface FoundingOffer {
+  /** True while a new signup would still claim a founding spot. */
+  open: boolean;
+  remaining: number;
+}
+
+export async function getFoundingOffer(): Promise<FoundingOffer> {
+  const { data, error } = await supabaseAdmin()
+    .from("platform_settings")
+    .select("founding_cap, founding_claimed")
+    .eq("id", true)
+    .maybeSingle();
+
+  /*
+   * Fail CLOSED. If the counter cannot be read we do not know whether spots
+   * remain, and advertising a price we cannot honour is worse than showing the
+   * standard one — the standard price is always true.
+   */
+  if (error || !data) return { open: false, remaining: 0 };
+
+  const remaining = Math.max(0, (data.founding_cap ?? 0) - (data.founding_claimed ?? 0));
+  return { open: remaining > 0, remaining };
+}
+
 export interface FoundingMember {
   email: string;
   createdAt: string;
