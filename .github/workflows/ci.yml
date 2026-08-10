@@ -18,6 +18,13 @@ jobs:
         run: npm ci
       - name: Type check
         run: npm run typecheck
+      # The unit suite runs here too. It did not, which meant the pricing-drift
+      # and entitlement tests — written precisely because those failures are
+      # silent — were only ever run by hand. `npm test` uses vitest.config.ts and
+      # cannot reach the integration suite: that one needs a real database and is
+      # gated behind `npm run test:db` plus URIVO_INTEGRATION_DB=1.
+      - name: Unit tests
+        run: npm test
       - name: Build
         run: npm run build
         env:

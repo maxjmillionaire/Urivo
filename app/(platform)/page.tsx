@@ -15,6 +15,24 @@ import { RevealStagger } from "./_motion/reveal-stagger";
  */
 
 /*
+ * Rendered per request, because the price on it is live state.
+ *
+ * This page reads the Founding 50 counter, and a spot is claimed by any signup
+ * at any moment. Prerendered at build time it would serve whatever the counter
+ * said at deploy — so the 51st visitor would still be quoted €29 until someone
+ * happened to redeploy. A marketing page may be stale about its wording; it may
+ * not be stale about its price.
+ *
+ * It also decouples the build from the database: a static export had to reach
+ * Supabase with a service-role key to render the landing page, which is a
+ * secret CI has no business holding.
+ *
+ * The cost is one primary-key read per visit. If that ever shows up in TTFB,
+ * the answer is a short revalidate window here — not baking the price in.
+ */
+export const dynamic = "force-dynamic";
+
+/*
  * Pricing cards, driven by the same PLANS object billing charges from.
  *
  * `founding` is the real Founding 50 price (migration 0023): a spot is claimed
