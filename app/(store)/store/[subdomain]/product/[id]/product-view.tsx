@@ -17,6 +17,7 @@ import { fontStack, type StoreDesignSystem } from "@/lib/storefront/design-syste
 import { STOREFRONT_FONT_VARS } from "@/lib/storefront/fonts";
 import { toCents, formatMoney } from "@/lib/commerce/types";
 import { needsAiDisclosure, aiDisclosureFor } from "@/lib/storefront/ai-disclosure";
+import { gpsrEntries } from "@/lib/commerce/gpsr";
 import { StoreCartProvider, CartButton, BuyBox } from "../../cart/store-cart";
 
 /*
@@ -36,6 +37,15 @@ export interface PdpProduct {
   image_url?: string | null;
   inventory_count?: number | null;
   image_source?: string | null;
+  /** GPSR Art. 19 — see lib/commerce/gpsr.ts. Absent until the merchant fills it. */
+  manufacturer_name?: string | null;
+  manufacturer_address?: string | null;
+  manufacturer_email?: string | null;
+  eu_responsible_name?: string | null;
+  eu_responsible_address?: string | null;
+  eu_responsible_email?: string | null;
+  product_identifier?: string | null;
+  safety_warnings?: string | null;
 }
 export interface PdpRelated {
   id: string;
@@ -77,6 +87,14 @@ export function ProductView({
   const aiNotice = needsAiDisclosure([product, ...related])
     ? aiDisclosureFor(ds.story || ds.tagline || ds.personality)
     : null;
+
+  /*
+   * GPSR Art. 19 — manufacturer, EU responsible person, identifier, warnings,
+   * visible before the sale. Rendered only for what the merchant actually
+   * supplied: an empty section is worse than none, and Urivo will not author a
+   * manufacturer's address on their behalf.
+   */
+  const safety = gpsrEntries(product);
 
   const vars: React.CSSProperties = {
     ["--bg" as string]: p.background,
@@ -189,6 +207,24 @@ export function ProductView({
                       </span>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {safety.length > 0 && (
+                <div style={{ marginTop: "1.9rem", borderTop: `1px solid ${p.line}`, paddingTop: "1.6rem" }}>
+                  <p className="uv-eyebrow" style={{ fontSize: ".68rem", letterSpacing: ".16em", textTransform: "uppercase", color: p.muted, fontWeight: 600 }}>
+                    Product &amp; safety information
+                  </p>
+                  <dl style={{ marginTop: ".9rem", display: "grid", gap: ".7rem" }}>
+                    {safety.map((entry) => (
+                      <div key={entry.label}>
+                        <dt style={{ fontSize: ".76rem", fontWeight: 600, color: p.muted }}>{entry.label}</dt>
+                        <dd style={{ margin: 0, fontSize: ".84rem", lineHeight: 1.6, whiteSpace: "pre-line" }}>
+                          {entry.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
                 </div>
               )}
             </div>

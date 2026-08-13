@@ -72,6 +72,27 @@ export async function PATCH(
   if (body.priceEUR !== undefined) update.price_eur = body.priceEUR;
   if (body.inventoryCount !== undefined) update.inventory_count = body.inventoryCount;
   if (body.showLogo !== undefined) update.show_logo = body.showLogo;
+
+  /*
+   * GPSR Art. 19. An empty string is stored as NULL rather than as "": the
+   * completeness rule in lib/commerce/gpsr.ts treats blank as missing, and
+   * keeping one representation of "not supplied" means the dashboard, the
+   * storefront and the database cannot disagree about whether a field is filled.
+   */
+  const GPSR = [
+    ["manufacturerName", "manufacturer_name"],
+    ["manufacturerAddress", "manufacturer_address"],
+    ["manufacturerEmail", "manufacturer_email"],
+    ["euResponsibleName", "eu_responsible_name"],
+    ["euResponsibleAddress", "eu_responsible_address"],
+    ["euResponsibleEmail", "eu_responsible_email"],
+    ["productIdentifier", "product_identifier"],
+    ["safetyWarnings", "safety_warnings"],
+  ] as const;
+  for (const [key, column] of GPSR) {
+    const value = body[key];
+    if (value !== undefined) update[column] = value.length > 0 ? value : null;
+  }
   if (Object.keys(update).length === 0) {
     return fail(400, "INVALID_INPUT", "Nothing to update.");
   }

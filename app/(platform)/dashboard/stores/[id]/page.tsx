@@ -8,6 +8,7 @@ import { auditStoreSeo } from "@/lib/seo";
 import { SeoCard } from "./seo-card";
 import { env } from "@/lib/env";
 import { StoreManager } from "./store-manager";
+import { gpsrFormFrom } from "@/lib/commerce/gpsr";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,9 @@ export default async function StoreDetailPage({
           inventoryCount: p.inventory_count,
           imageUrl: p.image_url ?? null,
           showLogo: (p as { show_logo?: boolean }).show_logo ?? true,
+          // GPSR (0050). Read through a cast so an un-migrated environment shows
+          // empty fields rather than failing the whole catalogue to load.
+          ...gpsrFormFrom(p as Record<string, unknown>),
         }))}
         initialLogo={parseLogo(store.theme_config)}
         initialTheme={{

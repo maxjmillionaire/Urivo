@@ -33,7 +33,11 @@ const load = cache(async (subdomain: string, id: string) => {
     // out of the query arrives as undefined, which the disclosure rule reads as
     // "provenance unknown" — the safe direction, but it would make every store
     // disclose, including merchants who shot their own photographs.
-    .select("id, title, description, price_eur, image_url, inventory_count, image_source")
+    // One string literal on purpose: the Supabase client infers the row type
+    // from the literal, and a concatenated expression collapses it to an error
+    // type — every field access below then fails to typecheck.
+    // The GPSR columns (0050) must be visible before the sale, so they load here.
+    .select("id, title, description, price_eur, image_url, inventory_count, image_source, manufacturer_name, manufacturer_address, manufacturer_email, eu_responsible_name, eu_responsible_address, eu_responsible_email, product_identifier, safety_warnings")
     .eq("id", id)
     .eq("store_id", store.id)
     .maybeSingle();
