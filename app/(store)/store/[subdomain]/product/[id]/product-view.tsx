@@ -16,6 +16,7 @@ import Link from "next/link";
 import { fontStack, type StoreDesignSystem } from "@/lib/storefront/design-system";
 import { STOREFRONT_FONT_VARS } from "@/lib/storefront/fonts";
 import { toCents, formatMoney } from "@/lib/commerce/types";
+import { needsAiDisclosure, aiDisclosureFor } from "@/lib/storefront/ai-disclosure";
 import { StoreCartProvider, CartButton, BuyBox } from "../../cart/store-cart";
 
 /*
@@ -34,12 +35,14 @@ export interface PdpProduct {
   price_eur: number | string;
   image_url?: string | null;
   inventory_count?: number | null;
+  image_source?: string | null;
 }
 export interface PdpRelated {
   id: string;
   title: string;
   price_eur: number | string;
   image_url?: string | null;
+  image_source?: string | null;
 }
 
 export function ProductView({
@@ -63,6 +66,17 @@ export function ProductView({
   const inStock = (product.inventory_count ?? 1) > 0;
   const brandWord = ds.personality.split(",")[0]?.trim() || "New";
   const promise = ds.brief?.positioning?.trim() || ds.story?.trim() || ds.tagline?.trim();
+
+  /*
+   * EU AI Act Art. 50 disclosure — the same rule the homepage applies, on the
+   * screen where it matters most. The homepage discloses beneath the collection
+   * grid; here the shopper is looking at one photograph, large, deciding to buy,
+   * so the line sits directly under the gallery rather than at the foot of the
+   * page. Covers the related thumbnails too: they are imagery on this page.
+   */
+  const aiNotice = needsAiDisclosure([product, ...related])
+    ? aiDisclosureFor(ds.story || ds.tagline || ds.personality)
+    : null;
 
   const vars: React.CSSProperties = {
     ["--bg" as string]: p.background,
@@ -127,6 +141,11 @@ export function ProductView({
                     <img src={product.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   </div>
                 </div>
+              )}
+              {aiNotice && (
+                <p style={{ marginTop: "1rem", fontSize: ".76rem", color: p.muted, letterSpacing: ".01em" }}>
+                  {aiNotice}
+                </p>
               )}
             </div>
 

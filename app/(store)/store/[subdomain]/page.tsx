@@ -58,7 +58,7 @@ const loadStorefront = cache(async (slug: string) => {
 
   // Same fallback as the cached path: an optional column must never cost the
   // merchant their whole catalogue on an un-migrated environment.
-  const PRODUCT_CORE = "id, title, description, price_eur, image_url, show_logo";
+  const PRODUCT_CORE = "id, title, description, price_eur, image_url, show_logo, inventory_count";
   const full = await supabase
     .from("products")
     .select(`${PRODUCT_CORE}, image_source`)
@@ -147,6 +147,7 @@ export default async function StorefrontPage({ params }: Props) {
     tagline: theme.tagline,
     subdomain,
     url: storeUrl(subdomain),
+    currency: store.currency,
     products,
   });
 

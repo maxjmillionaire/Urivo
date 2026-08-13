@@ -59,9 +59,11 @@ export interface RenderProduct {
   description: string | null;
   price_eur: number | string;
   image_url?: string | null;
-  show_logo?: boolean;
+  show_logo?: boolean | null;
   /** 'ai' | 'uploaded' | 'supplier' | 'placeholder' | null (unknown). */
   image_source?: string | null;
+  /** null/undefined = not tracked; drives Offer availability in JSON-LD. */
+  inventory_count?: number | null;
 }
 
 /** A navigation entry. Only ever built for a destination that exists. */

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/storefront";
 import { parseDesignSystem, themeToDesignSystem } from "@/lib/storefront/design-system";
+import { productJsonLd, jsonLdScript, storefrontUrl } from "@/lib/seo";
 import { ProductView } from "./product-view";
 
 export const dynamic = "force-dynamic";
@@ -27,16 +28,23 @@ const load = cache(async (subdomain: string, id: string) => {
   if (!store) return null;
   const { data: product } = await supabase
     .from("products")
-    .select("id, title, description, price_eur, image_url, inventory_count")
+    // image_source carries per-image provenance (migration 0032) and is read by
+    // the AI Act Art. 50 disclosure. Selecting it is not optional: a column left
+    // out of the query arrives as undefined, which the disclosure rule reads as
+    // "provenance unknown" — the safe direction, but it would make every store
+    // disclose, including merchants who shot their own photographs.
+    .select("id, title, description, price_eur, image_url, inventory_count, image_source")
     .eq("id", id)
     .eq("store_id", store.id)
     .maybeSingle();
   if (!product) return null;
 
   // The rest of the collection — a real, honest cross-sell ("More from …").
+  // Their thumbnails are imagery on this page too, so their provenance counts
+  // toward the disclosure exactly as the main product's does.
   const { data: related } = await supabase
     .from("products")
-    .select("id, title, price_eur, image_url")
+    .select("id, title, price_eur, image_url, image_source")
     .eq("store_id", store.id)
     .neq("id", id)
     .order("position", { ascending: true })
@@ -70,15 +78,33 @@ export default async function ProductPage({ params }: Props) {
   const rootDomain = (process.env.ROOT_DOMAIN ?? "localhost:3000").toLowerCase();
   const storeBase = rootDomain.startsWith("localhost") ? `/store/${subdomain}` : "";
 
+  /*
+   * Structured data for the one page that can actually be transacted against.
+   * The store page publishes an ItemList; a crawler learns the product exists
+   * there and everything else here — identifier, canonical URL, price, currency,
+   * live availability, seller.
+   */
+  const base = storefrontUrl(subdomain);
+  const jsonLd = productJsonLd({
+    product,
+    storeName: store.store_name,
+    storeUrl: base,
+    productUrl: `${base}/product/${product.id}`,
+    currency,
+  });
+
   return (
-    <ProductView
-      storeName={store.store_name}
-      subdomain={subdomain}
-      storeBase={storeBase}
-      currency={currency}
-      ds={ds}
-      product={product}
-      related={related}
-    />
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }} />
+      <ProductView
+        storeName={store.store_name}
+        subdomain={subdomain}
+        storeBase={storeBase}
+        currency={currency}
+        ds={ds}
+        product={product}
+        related={related}
+      />
+    </>
   );
 }
