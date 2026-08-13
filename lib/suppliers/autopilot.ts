@@ -5,6 +5,7 @@ import { parseDesignSystem, themeToDesignSystem } from "@/lib/storefront/design-
 import { getPlanForUser } from "@/lib/plan-access";
 import { optimizeProductCopy } from "@/lib/ai/product-optimizer";
 import { getConnection, toEur } from "./import";
+import { landedCostEur, marginAfterDuty } from "@/lib/finance/import-duty";
 import { getSupplierProvider } from "./registry";
 import { scoreSupplierProduct, type UrivoScore } from "./scoring";
 import { learnedSignalsForMany, recordProductOutcome } from "./intelligence";
@@ -218,8 +219,28 @@ export async function autoSourceStore(
     const variant = cand.product.variants.find((v) => v.externalVariantId === cand.variantId) ?? cand.product.variants[0];
     const cost = variant?.cost ?? cand.product.fromCost;
     const costEur = Math.round(toEur(cost) * 100) / 100;
-    const priceEur = priceByArm(arms.pricing, costEur, cand.intentPriceEur, opts);
-    const marginPct = priceEur > 0 ? Math.round(((priceEur - costEur) / priceEur) * 100) : 0;
+    /*
+     * Price and margin are computed against LANDED cost, not the supplier's
+     * price. The EU's €150 duty exemption ended on 1 July 2026, so a non-EU
+     * parcel now carries a flat customs charge per line item — €3, and €5 once
+     * the handling fee joins it in November. On the cheap products this
+     * autopilot is most likely to pick, that charge IS the margin: an €8 item
+     * sold at €24 is 67% before duty and 46% after.
+     *
+     * Pricing off supplier cost would let every arm hit its margin target on
+     * paper while the merchant sells at a fraction of it — or, below roughly
+     * €10, at a loss. The origin comes from the supplier's own shipping signal;
+     * unknown counts as an import, which is the direction that cannot bankrupt
+     * anyone.
+     */
+    const dutyInput = {
+      shipsFromCountry: cand.product.signals?.shipsFromCountry ?? null,
+      shipsToCountry: opts.shipsTo,
+    };
+    const landedEur = Math.round(landedCostEur(costEur, dutyInput) * 100) / 100;
+    const priceEur = priceByArm(arms.pricing, landedEur, cand.intentPriceEur, opts);
+    const trueMargin = marginAfterDuty(priceEur, costEur, dutyInput);
+    const marginPct = trueMargin != null ? Math.round(trueMargin * 100) : 0;
     return {
       cand, variantId: variant?.externalVariantId ?? null, inventory: variant?.inventory ?? null,
       cost, costEur, priceEur, marginPct,

@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCreditBalance, getCreditExpiry, STORE_GENERATION_COST, type CreditExpiry } from "@/lib/credits";
 import { planName, canPublish as planCanPublish, volumeMessage, entitledPlanKey } from "@/lib/plans";
 import { storeStatsFor, sumStats, type StoreStats } from "@/lib/analytics/visits";
+import { marginAfterDuty } from "@/lib/finance/import-duty";
 
 /*
  * The Executive Command Center data layer.
@@ -223,7 +224,7 @@ export async function buildDashboardOverview(
     storeIds.length
       ? admin
           .from("product_sources")
-          .select("product_id, store_id, supplier_cost_eur, sync_status, created_at")
+          .select("product_id, store_id, supplier_cost_eur, sync_status, created_at, ships_from_country")
           .in("store_id", storeIds)
       : Promise.resolve({ data: [] as SourceRow[] }),
     admin
@@ -275,8 +276,19 @@ export async function buildDashboardOverview(
     const price = priceByProduct.get(s.product_id);
     const cost = s.supplier_cost_eur != null ? Number(s.supplier_cost_eur) : null;
     if (price && price > 0 && cost != null) {
-      marginSum += (price - cost) / price;
-      marginCount++;
+      /*
+       * Net of EU import charges, not (price - cost)/price. The €150 duty
+       * exemption ended on 1 July 2026 and a non-EU parcel now carries a flat
+       * per-item customs charge, so the naive figure overstates every imported
+       * product's margin — by 21 points on an €8 item sold at €24. Telling a
+       * merchant their margins are healthy on a number that ignores the charge
+       * is worse than telling them nothing.
+       */
+      const real = marginAfterDuty(price, cost, { shipsFromCountry: s.ships_from_country ?? null });
+      if (real != null) {
+        marginSum += real;
+        marginCount++;
+      }
     }
   }
   const avgMargin = marginCount > 0 ? marginSum / marginCount : null;
@@ -285,7 +297,13 @@ export async function buildDashboardOverview(
     for (const s of sources) {
       const price = priceByProduct.get(s.product_id);
       const cost = s.supplier_cost_eur != null ? Number(s.supplier_cost_eur) : null;
-      if (price && price > 0 && cost != null && (price - cost) / price < 0.4) n++;
+      // Same landed-cost basis as avgMargin — a product can clear 40% on the
+      // supplier's price and sit well under it once duty is counted.
+      const real =
+        price && price > 0 && cost != null
+          ? marginAfterDuty(price, cost, { shipsFromCountry: s.ships_from_country ?? null })
+          : null;
+      if (real != null && real < 0.4) n++;
     }
     return n;
   })();
@@ -512,6 +530,8 @@ interface SourceRow {
   supplier_cost_eur: number | null;
   sync_status: string;
   created_at: string;
+  /** ISO-2 origin (migration 0049). null = unknown, treated as an import. */
+  ships_from_country?: string | null;
 }
 interface OrderRow {
   store_id: string;
