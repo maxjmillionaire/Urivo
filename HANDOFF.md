@@ -101,8 +101,10 @@ nothing else about the deployment matters.
 
 ## Blocked on purchases, not on effort
 
-See `LAUNCH.md` Block 0. Domain · Railway (deployment + the two cron schedules
-in `railway.json`) · Higgsfield (visual ad creative, real image cost via
+See `LAUNCH.md` Block 0. Domain · Railway (deployment + the two scheduled jobs,
+which have to be created by hand — `railway.json` only documents the intended
+times in inert `//` comments and Railway schedules nothing from it; see
+`LAUNCH.md` Block 3) · Higgsfield (visual ad creative, real image cost via
 `rebase_image_costs`).
 
 Two things genuinely cannot be checked here and must be done once the project

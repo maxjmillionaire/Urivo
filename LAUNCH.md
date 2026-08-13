@@ -52,7 +52,7 @@ and pushed; the items here are blocked on access, not on effort.
 | # | Purchase | Unblocks | State of the code |
 |---|---|---|---|
 | 1 | **Domain** | Custom-domain routes · canonical URLs · Stripe return URLs · owner-preview exclusion (spec 10 §13) | Routing and middleware are written and pass locally; none of it can be verified against a real host until the domain exists |
-| 2 | **Railway** | Deployment · the two cron schedules in `railway.json` — daily `/api/cron/expire-clicks` (retention, spec 10 §11) and weekly digest | Both endpoints are built and callable; retention that is never scheduled is not retention |
+| 2 | **Railway** | Deployment · the two scheduled jobs (Block 3) — daily `/api/cron/expire-clicks` (retention, spec 10 §11) and weekly digest | Both endpoints are built and callable. Nothing schedules them yet: `railway.json` only *documents* the intended times in inert `//` comments, and Railway does not read schedules from that file — the jobs must be created by hand. Retention that is never scheduled is not retention |
 | 3 | **Higgsfield API key** | Visual ad creative — the image or video that *is* the ad · real image cost replacing the estimate everywhere | Ad Studio writes, measures, learns and exports; only the visual is missing. `rebase_image_costs` (0037) is waiting to replace every estimated figure with the real one |
 
 ### Why the visual is last and not first
@@ -164,22 +164,44 @@ Run through them on the deployed staging URL and confirm each:
 - [ ] **Legal** pages (Impressum / Datenschutz / AGB) load.
 - [ ] Preflight still returns `"ok": true`; check Sentry receives a test error.
 
-## Block 3 — Weekly business digest (scheduled)
+## Block 3 — The two scheduled jobs (retention + weekly digest)
 
-The digest aggregates each merchant's week and emails a summary with one
-next-best-action. The endpoint is built and secured; it needs a scheduler.
+Both endpoints are built and secured. **Neither is scheduled by anything in this
+repository.** `railway.json` carries the intended times as inert `//` comments —
+Railway does not read schedules from that file, and no deployment step creates
+these jobs. They must be created by hand, once, here.
+
+This is the block most likely to be skipped, because skipping it looks exactly
+like success: an unscheduled job raises no error, writes no log, and shows
+nothing in the dashboard. The only symptom is that the work never happens.
 
 - [ ] Set `CRON_SECRET` on Railway to a long random string.
-- [ ] Point a weekly job at `POST /api/cron/weekly-digest` with header
-      `Authorization: Bearer <CRON_SECRET>` (Railway cron, Supabase `pg_cron` +
-      `net.http_post`, GitHub Actions, or cron-job.org). `GET` also works for
+- [ ] **Retention (daily, `0 3 * * *`)** — point a job at
+      `GET /api/cron/expire-clicks` with header `Authorization: Bearer <CRON_SECRET>`.
+      Deletes click events past the 90-day window (spec 10 §11). This is a
+      commitment made in the privacy documentation, so it is not optional.
+- [ ] **Weekly digest (Mondays, `0 8 * * 1`)** — point a job at
+      `POST /api/cron/weekly-digest` with the same header. `GET` also works for
       schedulers that only issue GET.
-- [ ] Confirm `/api/health` → `recommended.weeklyDigest: true`.
-- [ ] Trigger it once by hand and confirm the JSON summary
-      (`eligible` / `emailed` / `notified`) and that a digest lands in the inbox.
+- [ ] Scheduler options, any one of: a Railway cron service (a *separate*
+      service from the web app — the web service cannot also be a cron),
+      Supabase `pg_cron` + `net.http_post`, GitHub Actions, or cron-job.org.
+- [ ] Confirm `/api/health` → `recommended.weeklyDigest: true`. **Note what this
+      does and does not prove:** it reports only that `CRON_SECRET` is set, not
+      that either job is scheduled or has ever run. Green here is necessary and
+      nowhere near sufficient.
+- [ ] Trigger **both** by hand once and read the response, not just the status
+      code: the digest returns `eligible` / `emailed` / `notified` (and a mail
+      should land in the inbox); expire-clicks returns the number of rows it
+      deleted.
+- [ ] **The day after go-live, confirm each one actually fired on its own**
+      — the digest in the inbox on Monday, and the retention job's deletion
+      count in the scheduler's run history. Verifying the endpoint by hand only
+      proves the endpoint works; it says nothing about the schedule, which is
+      the half that is missing today.
 
-Unset `CRON_SECRET` disables the endpoint (503) — it fails closed, so an
-unconfigured deployment can never fan out mail.
+Unset `CRON_SECRET` disables both endpoints (503) — they fail closed, so an
+unconfigured deployment can never fan out mail or delete rows.
 
 ## Block 4 — Stripe Connect merchant onboarding (built — verify with live keys)
 
