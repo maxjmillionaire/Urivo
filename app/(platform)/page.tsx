@@ -282,7 +282,7 @@ export default async function Home() {
       </section>
 
       {/* Product visual — see DemoShot above for why the imagery is drawn. */}
-      <section className="relative mx-auto mt-16 max-w-5xl px-6">
+      <section className="relative mx-auto mt-10 max-w-5xl px-6 sm:mt-12">
         <div className="u-float overflow-hidden rounded-2xl border border-hair bg-panel/70">
           <div className="flex items-center gap-1.5 border-b border-hair px-4 py-2.5">
             <span className="h-2.5 w-2.5 rounded-full bg-alert/70" />

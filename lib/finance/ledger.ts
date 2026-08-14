@@ -31,6 +31,15 @@ export interface RecordAiUsageInput {
   /** The model used (any string — models are env-routable). Stored verbatim;
    *  unpriced models fall back to the default's rate for the cost estimate. */
   model?: string;
+  /**
+   * Wall-clock milliseconds the action took, end to end (migration 0051).
+   *
+   * Recorded because the landing page promises a storefront "in under a
+   * minute" and nothing measured whether that was true. Optional so existing
+   * call sites keep compiling; a caller that omits it simply writes NULL
+   * rather than a fabricated number.
+   */
+  durationMs?: number;
   requestId?: string;
 }
 
@@ -58,6 +67,9 @@ export async function recordAiUsage(input: RecordAiUsageInput): Promise<void> {
         output_tokens: usage.outputTokens,
         images,
         model,
+        // Rounded to a whole millisecond; NULL when the caller did not measure,
+        // which is honest in a way that a zero would not be.
+        duration_ms: typeof input.durationMs === "number" ? Math.max(0, Math.round(input.durationMs)) : null,
         anthropic_cost_usd: round6(cost.anthropicUsd),
         image_cost_usd: round6(cost.imageUsd),
         total_cost_usd: round6(cost.totalUsd),
