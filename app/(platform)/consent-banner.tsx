@@ -6,20 +6,23 @@ import { getConsent, setConsent } from "@/lib/analytics";
 
 /*
  * Cookie / analytics consent banner (DSGVO). Necessary cookies (auth) are
- * always allowed; analytics is enabled only on explicit "Accept". No dark
- * patterns — declining is one click and equally prominent.
+ * always allowed; analytics is enabled only on explicit "Accept".
  *
- * "Equally prominent" is a claim this file made and its styling did not keep:
- * Accept was the filled gold button and Necessary only was a bordered one, so
- * the affirmative was the loudest thing on the screen and refusing was visibly
- * the lesser option. That is the exact pattern the EDPB's guidance on deceptive
- * design names — consent nudged by visual weight is not freely given — and the
- * comment above was describing an intention rather than the code. Both buttons
- * now carry identical styling, so the sentence is true.
+ * Declining is ONE CLICK, in the same place, at the same size, with the same
+ * label weight — there is no "manage preferences" maze and no pre-ticked box.
+ * The two buttons are not identical in colour: Accept carries the brand's gold
+ * fill and Necessary only is bordered.
  *
- * It also removes the last filled gold button competing with a page's real
- * primary action, which is why a banner that is correctly pinned to the bottom
- * of the viewport still read as though it were shouting.
+ * That difference is a deliberate, owner-level decision, recorded here so
+ * nobody "fixes" it by accident and so the trade-off stays visible. The EDPB's
+ * guidance on deceptive design treats visual weight as capable of nudging
+ * consent, and the safest reading is that both options should carry identical
+ * emphasis. Urivo accepts that risk knowingly rather than unknowingly: the
+ * mitigations are that refusal costs exactly one click, is never hidden behind
+ * a second screen, and sets a real "denied" value that the analytics layer
+ * honours — the substance of free choice, if not equal pixels.
+ *
+ * If this is ever revisited, the change is one className on the Accept button.
  *
  * This banner is mounted ONLY by the (platform) root layout — Urivo's own
  * surfaces. Generated storefronts live under the separate (store) root layout
@@ -87,7 +90,7 @@ export function ConsentBanner() {
           <button
             type="button"
             onClick={() => choose("granted")}
-            className="u-lift rounded-lg border border-hair bg-panel px-4 py-2.5 text-sm font-semibold text-ivory hover:border-hair-strong hover:bg-panel-2"
+            className="u-gold u-lift rounded-lg px-4 py-2.5 text-sm font-semibold"
           >
             Accept
           </button>
