@@ -108,6 +108,108 @@ const FAQ = (foundingOpen: boolean): [string, string][] => [
   ],
 ];
 
+/*
+ * The storefront the hero promises, on the one screen whose entire job is to
+ * show what Urivo produces.
+ *
+ * This block was a wireframe: flat grey squares where the photography goes and
+ * grey pills where the product names go. On a page selling "AI builds you a
+ * premium store", the proof-of-product read as unfinished — the single worst
+ * thing a generated storefront could look like.
+ *
+ * The imagery is COMPOSED IN CSS rather than shipped as files, for three
+ * reasons and not for cheapness. The page stays self-contained, so there is no
+ * asset pipeline and nothing to go stale. A photograph of a real vase would be
+ * a picture of someone else's product used to sell ours. And a stock image is
+ * exactly the shortcut this product exists to make unnecessary.
+ *
+ * Each shot is a drawn object on seamless paper, lit from the upper left, with
+ * a contact shadow beneath it — which is what a studio product photograph is.
+ */
+type DemoShape = "vessel" | "throw" | "taper";
+
+const SHAPE: Record<DemoShape, { width: string; height: string; borderRadius: string }> = {
+  // An organic thrown vessel: wide shoulder, drawn-in foot.
+  vessel: { width: "40%", height: "60%", borderRadius: "44% 44% 34% 34% / 26% 26% 66% 66%" },
+  // A folded stack of cloth: soft corners, wider than tall.
+  throw: { width: "66%", height: "38%", borderRadius: "10px" },
+  // A slim brass taper holder.
+  taper: { width: "11%", height: "56%", borderRadius: "3px" },
+};
+
+const DEMO_PRODUCTS: { name: string; price: string; shape: DemoShape; body: string }[] = [
+  { name: "Fjord stoneware vase", price: "€128", shape: "vessel", body: "linear-gradient(148deg,#DFBC97,#BE8F62 42%,#8C6742)" },
+  { name: "Lambswool throw, ash", price: "€154", shape: "throw", body: "linear-gradient(148deg,#DED7CB,#BCB2A2 42%,#918676)" },
+  { name: "Brass taper holder", price: "€42", shape: "taper", body: "linear-gradient(148deg,#E6C888,#BE9A4E 42%,#8A6C2E)" },
+];
+
+function DemoShot({ shape, body, tall = false }: { shape: DemoShape; body: string; tall?: boolean }) {
+  return (
+    <div
+      className="relative overflow-hidden rounded-lg"
+      style={{
+        aspectRatio: tall ? "4 / 3" : "1 / 1",
+        background: "radial-gradient(125% 95% at 50% 0%, #FCFAF5, #E7E0D3)",
+      }}
+    >
+      {/* Contact shadow. Without it the object floats and the whole thing reads as clipart. */}
+      <div
+        className="absolute"
+        style={{
+          left: "50%",
+          bottom: "13%",
+          width: "56%",
+          height: "8%",
+          transform: "translateX(-50%)",
+          background: "radial-gradient(50% 50% at 50% 50%, rgba(56,42,26,0.36), transparent 72%)",
+          filter: "blur(3px)",
+        }}
+      />
+      <div
+        className="absolute"
+        style={{
+          left: "50%",
+          bottom: "16%",
+          transform: "translateX(-50%)",
+          background: body,
+          boxShadow: "inset 0 7px 15px rgba(255,255,255,0.40), inset -9px -11px 20px rgba(0,0,0,0.24)",
+          ...SHAPE[shape],
+        }}
+      />
+      {/* Folds, so the throw reads as cloth rather than as a rounded rectangle. */}
+      {shape === "throw" && (
+        <div
+          className="absolute"
+          style={{
+            left: "17%",
+            bottom: "16%",
+            width: "66%",
+            height: "38%",
+            borderRadius: "10px",
+            background: "repeating-linear-gradient(101deg, rgba(255,255,255,0.15) 0 2px, transparent 2px 16px)",
+          }}
+        />
+      )}
+      {/* The holder needs a foot or it reads as a stick. */}
+      {shape === "taper" && (
+        <div
+          className="absolute"
+          style={{
+            left: "50%",
+            bottom: "15%",
+            width: "30%",
+            height: "4.5%",
+            transform: "translateX(-50%)",
+            borderRadius: "999px",
+            background: body,
+            boxShadow: "inset 0 2px 5px rgba(255,255,255,0.42)",
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 export default async function Home() {
   /*
    * Read from the live counter, not from a date. The offer is capped at 50
@@ -179,7 +281,7 @@ export default async function Home() {
         <p className="mt-5 text-xs text-mist-dim">No credit card required</p>
       </section>
 
-      {/* Product visual */}
+      {/* Product visual — see DemoShot above for why the imagery is drawn. */}
       <section className="relative mx-auto mt-16 max-w-5xl px-6">
         <div className="u-float overflow-hidden rounded-2xl border border-hair bg-panel/70">
           <div className="flex items-center gap-1.5 border-b border-hair px-4 py-2.5">
@@ -188,25 +290,62 @@ export default async function Home() {
             <span className="h-2.5 w-2.5 rounded-full bg-live/70" />
             <span className="mx-auto rounded-md bg-night px-3 py-1 font-mono text-[11px] text-mist-dim">nordljus.urivo.ai</span>
           </div>
-          <div className="grid gap-0 sm:grid-cols-[1fr_1.3fr]">
-            <div className="border-b border-hair p-8 sm:border-b-0 sm:border-r" style={{ background: "#F2EFE9", color: "#242A33" }}>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] opacity-50">New collection</p>
-              <h3 className="mt-3 text-4xl font-semibold leading-none tracking-tight" style={{ fontFamily: "Georgia, serif" }}>
-                Nordljus
-              </h3>
-              <p className="mt-2 text-sm italic opacity-70">Quiet luxury for the Scandinavian home.</p>
-              <span className="mt-6 inline-block rounded-md px-4 py-2 text-xs font-semibold" style={{ background: "#242A33", color: "#F2EFE9" }}>
-                Shop collection
+
+          <div style={{ background: "#F4F0E8", color: "#23272C" }}>
+            {/*
+              The merchant's own navigation, in the merchant's own colours. An
+              ink bar under the browser chrome is what stops the whole block
+              reading as a blank page with boxes on it.
+            */}
+            <div className="flex items-center justify-between px-5 py-3 sm:px-7" style={{ background: "#1C2025", color: "#F2EFE9" }}>
+              <span className="text-[12px] font-semibold tracking-[0.3em] sm:text-[13px]" style={{ fontFamily: "Georgia, serif" }}>
+                NORDLJUS
               </span>
+              <div className="hidden items-center gap-7 text-[11px] tracking-wide sm:flex" style={{ opacity: 0.66 }}>
+                <span>Objects</span>
+                <span>Textiles</span>
+                <span>Lighting</span>
+              </div>
+              <span className="text-[11px]" style={{ opacity: 0.66 }}>Cart (0)</span>
             </div>
-            <div className="grid grid-cols-2 gap-4 p-8" style={{ background: "#F6F4EF" }}>
-              {["€42", "€128", "€76", "€154"].map((p, i) => (
-                <div key={i} className="rounded-lg p-3" style={{ background: "#fff" }}>
-                  <div className="aspect-square rounded" style={{ background: "#EDE9E1" }} />
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="h-1.5 w-10 rounded-full" style={{ background: "#D8D2C6" }} />
-                    <span className="text-xs font-semibold" style={{ color: "#B0842F" }}>{p}</span>
-                  </div>
+
+            <div className="grid items-center gap-7 px-5 py-7 sm:grid-cols-[1fr_1fr] sm:gap-10 sm:px-8 sm:py-9">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: "#A98551" }}>
+                  Autumn collection
+                </p>
+                <h3
+                  className="mt-3 text-[30px] leading-[1.06] tracking-tight sm:text-[38px]"
+                  style={{ fontFamily: "Georgia, serif", fontWeight: 500 }}
+                >
+                  Quiet luxury for
+                  <br />
+                  the Scandinavian home.
+                </h3>
+                <p className="mt-4 max-w-[34ch] text-[13px] leading-relaxed" style={{ opacity: 0.66 }}>
+                  Stoneware thrown in Jutland, lambswool woven in Borås. Made in
+                  small numbers, kept for decades.
+                </p>
+                <span
+                  className="mt-6 inline-block rounded-md px-5 py-2.5 text-[12px] font-semibold tracking-wide"
+                  style={{ background: "#1C2025", color: "#F2EFE9" }}
+                >
+                  Shop the collection
+                </span>
+              </div>
+              <div className="hidden sm:block">
+                <DemoShot shape="vessel" body="linear-gradient(148deg,#E0BE99,#C09164 42%,#8F6A44)" tall />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 px-5 pb-7 sm:gap-5 sm:px-8 sm:pb-9">
+              {DEMO_PRODUCTS.map((p) => (
+                <div key={p.name}>
+                  <DemoShot shape={p.shape} body={p.body} />
+                  <p className="mt-2.5 text-[11px] font-medium leading-snug sm:text-[12.5px]">{p.name}</p>
+                  <p className="mt-0.5 text-[11px] font-semibold sm:text-[12px]" style={{ color: "#A98551" }}>
+                    {p.price}
+                  </p>
                 </div>
               ))}
             </div>
