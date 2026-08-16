@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Environment — never commit secrets
+.env
+.env.*
+!.env.example
+
+# Logs & caches
+*.log
+.turbo/
+.vercel/
+
+# OS noise
+.DS_Store
+
+# TypeScript incremental build info
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Local scratch/overview generator (not part of the product)
+scratchpad_gen.py
+
+# Captured screenshots. A full set is ~56 MB of PNGs that go stale the next time
+# anyone touches the UI, and git keeps every version of a binary forever.
+# Regenerate with scripts/capture-screenshots.mjs instead.
+screenshots/

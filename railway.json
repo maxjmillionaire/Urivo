@@ -1,0 +1,12 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": { "builder": "NIXPACKS" },
+  "deploy": {
+    "startCommand": "node .next/standalone/server.js",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  },
+  "//": "Scheduled jobs are configured per-service in Railway. Two are required:",
+  "//cron:expire-clicks": "0 3 * * *  — GET /api/cron/expire-clicks with the CRON_SECRET bearer token. Deletes click events past the 90-day retention window (specifications/10-attribution.md §11). Retention that is documented but never executed is not retention.",
+  "//cron:weekly-digest": "0 8 * * 1  — GET /api/cron/weekly-digest with the same token."
+}

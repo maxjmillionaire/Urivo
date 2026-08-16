@@ -1,0 +1,557 @@
+@import "tailwindcss";
+
+/*
+ * Urivo Design System v2 — single source: docs/design/design-system.md
+ * Light, premium, AI-first. Slate #1F293B · Gold #D4AF37 · light surfaces.
+ * Feel: Linear / Stripe / Vercel. Consistency over creativity.
+ */
+@theme {
+  /* Brand */
+  --color-brand: #1f293b;
+  --color-brand-hover: #18202f;
+  --color-brand-soft: #eef1f6;
+  /* Metallic gold-bronze — rich, alive, with highlight + shadow bands */
+  --color-gold: #e4c069;        /* mid gold (flat use) */
+  --color-gold-soft: #f2dd9c;   /* highlight */
+  --color-gold-hi: #f8ecc0;     /* champagne highlight */
+  --color-gold-deep: #b0842f;   /* bronze shadow */
+  --color-gold-tint: #faf5e6;
+
+  /* Surfaces & text */
+  --color-canvas: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f5f9;
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-line: #e2e8f0;
+
+  /* Semantic */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+
+  /* Radius scale — 8 / 12 / 16 / 20 */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+
+  /* Soft, low-opacity elevation */
+  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.12);
+  --shadow-lift: 0 2px 4px rgba(15, 23, 42, 0.05), 0 18px 40px -18px rgba(15, 23, 42, 0.18);
+
+  --font-sans: var(--font-geist-sans), "SF Pro Display", system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  --ease-urivo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Metallic gold gradient (surfaces) + text-clip variant used via utilities below */
+  --grad-gold: linear-gradient(135deg, #f8ecc0 0%, #ecce7e 28%, #cfa14a 56%, #b0842f 76%, #e4c069 100%);
+  --grad-gold-soft: linear-gradient(135deg, #f8ecc0 0%, #e8cd80 45%, #cba44f 100%);
+
+  /* ---------------------------------------------------------------- */
+  /* Midnight (v3) — the product's dark slate-navy identity.          */
+  /* Canvas from the logo tile, warm-ivory text, gold accent (the U). */
+  /* ---------------------------------------------------------------- */
+  --color-night: #0b1220;        /* app canvas — deepest */
+  --color-night-2: #0e1626;      /* inset wells */
+  --color-panel: #121c30;        /* cards / panels */
+  --color-panel-2: #1a2540;      /* hover / elevated */
+  --color-hair: #223049;         /* borders */
+  --color-hair-strong: #2c3c5a;
+  --color-ivory: #f4f1e8;        /* primary text (warm ivory) */
+  --color-cloud: #e7ecf3;        /* clean near-white text */
+  --color-mist: #93a3bc;         /* secondary text */
+  --color-mist-dim: #7c8ca6;     /* tertiary / captions — AA (≥4.5:1 on cards) */
+  --color-navymark: #24324c;     /* logo-tile navy for chips */
+  --color-live: #34d399;         /* LIVE / success on dark */
+  --color-alert: #f87171;        /* error on dark */
+
+  /* Elevation for the dark theme */
+  --shadow-night: 0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 44px -20px rgba(0, 0, 0, 0.7);
+  --shadow-night-lift: 0 2px 6px rgba(0, 0, 0, 0.45), 0 30px 60px -24px rgba(0, 0, 0, 0.8);
+}
+
+/* Motion standard: one curve, purposeful durations (UEOS Book VI) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Keyboard focus: always visible (accessibility standard) */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* Generation loader shimmer (screens-v1 §5) */
+@keyframes urivo-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Generation Cinema — the signature creation sequence (spec 6.6)     */
+/* ------------------------------------------------------------------ */
+
+/* Ambient volumetric glow that slowly breathes behind the whole scene */
+@keyframes urivo-ambient {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1) translateY(0);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.12) translateY(-2%);
+  }
+}
+
+/* Gold motes drifting through depth */
+@keyframes urivo-mote {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  15% {
+    opacity: var(--mote-opacity, 0.5);
+  }
+  85% {
+    opacity: var(--mote-opacity, 0.5);
+  }
+  100% {
+    transform: translate3d(var(--mote-x, 20px), var(--mote-y, -60px), 0);
+    opacity: 0;
+  }
+}
+
+/* The logo mark igniting at the start */
+@keyframes urivo-ignite {
+  0% {
+    opacity: 0;
+    transform: scale(0.7) translateZ(0);
+    filter: blur(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateZ(0);
+    filter: blur(0);
+  }
+}
+
+/* Halo breathing around the mark during research */
+@keyframes urivo-halo {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.15);
+  }
+}
+
+/* Sonar scan rings expanding outward */
+@keyframes urivo-ring {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+/* A candidate card materializing out of depth */
+@keyframes urivo-card-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(var(--cx, 0), var(--cy, 40px), -900px) rotateY(var(--cr, 0deg))
+      scale(0.6);
+    filter: blur(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(var(--cx, 0), var(--cy, 0), var(--cz, 0)) rotateY(var(--cr, 0deg))
+      scale(1);
+    filter: blur(0);
+  }
+}
+
+/* A losing candidate dissolving away — falls back into depth and blurs out */
+@keyframes urivo-card-out {
+  0% {
+    opacity: 1;
+    transform: translate3d(var(--cx, 0), var(--cy, 0), var(--cz, 0)) rotateY(var(--cr, 0deg))
+      scale(1);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--cx, 0), calc(var(--cy, 0px) + 80px), -700px)
+      rotateY(var(--cr, 0deg)) scale(0.7);
+    filter: blur(10px) grayscale(1);
+  }
+}
+
+/* Survivor pulse — a soft gold breath as a card advances a round */
+@keyframes urivo-survive {
+  0%,
+  100% {
+    box-shadow: 0 20px 50px -24px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(198, 155, 60, 0.25);
+  }
+  50% {
+    box-shadow: 0 24px 60px -22px rgba(0, 0, 0, 0.75), 0 0 22px 2px rgba(198, 155, 60, 0.4);
+  }
+}
+
+/* The winning card blooming forward at the reveal */
+@keyframes urivo-bloom {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.94);
+    filter: blur(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* Reveal details rising softly into place, staggered */
+@keyframes urivo-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Keynote Optimization Arena — the lightning selection (spec 6.6)     */
+/* Dark "stage" exception: variants compete, losers strike red and     */
+/* dissolve, winners strike green and advance, down to one champion.   */
+/* ------------------------------------------------------------------ */
+
+/* The live status dot breathing */
+@keyframes urivo-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* A charged light beam sweeping across the field each round */
+@keyframes urivo-beam {
+  0% { transform: translateX(-12%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(112%); opacity: 0; }
+}
+
+/* Jagged bolt flicker at the moment of a strike */
+@keyframes urivo-bolt {
+  0%, 100% { opacity: 0; }
+  6% { opacity: 1; }
+  12% { opacity: 0.25; }
+  18% { opacity: 0.9; }
+  30% { opacity: 0; }
+}
+
+/* A surviving variant strikes green and settles brighter */
+@keyframes urivo-win {
+  0% { box-shadow: 0 16px 40px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(34,197,94,0.3); }
+  35% { box-shadow: 0 16px 40px -20px rgba(0,0,0,0.85), 0 0 34px 6px rgba(34,197,94,0.85), 0 0 0 1px rgba(34,197,94,1); }
+  100% { box-shadow: 0 16px 40px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(34,197,94,0.55); }
+}
+
+/* A losing variant strikes red, then dissolves back into the dark */
+@keyframes urivo-die {
+  0% { box-shadow: 0 16px 40px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(239,68,68,0.35); }
+  22% { box-shadow: 0 16px 40px -20px rgba(0,0,0,0.85), 0 0 30px 6px rgba(239,68,68,0.85), 0 0 0 1px rgba(239,68,68,1); opacity: 1; filter: none; }
+  100% { opacity: 0; filter: grayscale(1) brightness(0.45) blur(5px); box-shadow: 0 0 0 1px rgba(239,68,68,0); }
+}
+
+/* The champion's steady green aura */
+@keyframes urivo-champion {
+  0%, 100% { box-shadow: 0 24px 60px -22px rgba(0,0,0,0.9), 0 0 0 1px rgba(34,197,94,0.6), 0 0 40px -4px rgba(34,197,94,0.35); }
+  50% { box-shadow: 0 24px 60px -22px rgba(0,0,0,0.9), 0 0 0 1px rgba(34,197,94,0.85), 0 0 58px 2px rgba(34,197,94,0.55); }
+}
+
+/* Terminal scanline drift for ambient depth */
+@keyframes urivo-scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+/* Voice-capture waveform bars */
+@keyframes urivo-wave {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+
+/* Keynote arena: a quick flash as the lightning strikes a round */
+@keyframes urivo-strikeflash {
+  0% { opacity: 0; }
+  10% { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+
+/* Gold burst when the champion is crowned */
+@keyframes urivo-burst {
+  0% { opacity: 0; transform: scale(0.6); }
+  30% { opacity: 0.8; }
+  100% { opacity: 0; transform: scale(2.2); }
+}
+
+/* Champion reveal — a soft gold light passing once across the winning card. */
+@keyframes urivo-goldsweep {
+  0% { transform: translateX(-130%) skewX(-14deg); opacity: 0; }
+  18% { opacity: 0.85; }
+  100% { transform: translateX(130%) skewX(-14deg); opacity: 0; }
+}
+
+/* Champion reveal — the gold outline growing around the winner, then settling. */
+@keyframes urivo-goldcrown {
+  0% { box-shadow: 0 24px 60px -24px rgba(0,0,0,0.9), 0 0 0 0 rgba(224,192,105,0), 0 0 0 0 rgba(224,192,105,0); }
+  55% { box-shadow: 0 32px 72px -24px rgba(0,0,0,0.9), 0 0 48px 2px rgba(224,192,105,0.42), 0 0 0 2px rgba(224,192,105,0.95); }
+  100% { box-shadow: 0 28px 66px -24px rgba(0,0,0,0.9), 0 0 34px -2px rgba(224,192,105,0.3), 0 0 0 1.5px rgba(224,192,105,0.72); }
+}
+.u-goldcrown { animation: urivo-goldcrown 1200ms var(--ease-urivo) both; }
+
+/* Champion reveal — the "analyzing" pulse on a candidate under evaluation. */
+@keyframes urivo-analyze {
+  0%, 100% { border-color: rgba(224,192,105,0.18); }
+  50% { border-color: rgba(224,192,105,0.5); }
+}
+
+/* Champion reveal — the winner card zooming forward into the build handoff. */
+@keyframes urivo-hero-launch {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.06) translateY(-6px); opacity: 0; }
+}
+
+/* Skeleton shimmer for loading states */
+@keyframes urivo-skel {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.u-skel {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: urivo-skel 1.6s ease-in-out infinite;
+}
+
+/* Ask Urivo "thinking" — three dots breathing while a reply streams. */
+@keyframes urivo-thinking {
+  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+  40% { opacity: 0.9; transform: translateY(-2px); }
+}
+
+/* ================================================================== */
+/* Premium finish — metallic gold, glass, depth, motion               */
+/* ================================================================== */
+
+/* Metallic gold fill for primary/premium surfaces (buttons, badges).  */
+.u-gold {
+  background-image: var(--grad-gold);
+  color: #1a1206;
+  box-shadow: inset 0 1px 0 rgba(255, 248, 220, 0.65), 0 8px 22px -10px rgba(224, 192, 105, 0.5);
+  transition: box-shadow 240ms var(--ease-urivo), background-image 240ms var(--ease-urivo),
+    transform 240ms var(--ease-urivo);
+}
+.u-gold:hover {
+  background-image: var(--grad-gold-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 248, 220, 0.75), 0 12px 34px -10px rgba(224, 192, 105, 0.6);
+}
+.u-gold:active {
+  transform: translateY(1px) scale(0.985);
+  box-shadow: inset 0 1px 0 rgba(255, 248, 220, 0.55), 0 4px 14px -8px rgba(224, 192, 105, 0.5);
+}
+
+/*
+ * Palette-driven premium CTA — the SAME luxurious finish as .u-gold (metallic
+ * gloss, inner top highlight, colored depth shadow, hover glow, tactile press)
+ * but rendered in an arbitrary brand accent. This is what generated storefronts
+ * use: merchant's colour, Urivo's craftsmanship. Colours arrive as CSS vars so
+ * one class serves every brand.
+ *   --cta-hi  top highlight tone   --cta-base mid   --cta-lo bottom shade
+ *   --cta-ink readable text        --cta-glow colored ambient shadow
+ */
+.u-cta-premium {
+  background-image: linear-gradient(180deg, var(--cta-hi), var(--cta-base) 48%, var(--cta-lo));
+  color: var(--cta-ink);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+    0 8px 22px -10px var(--cta-glow);
+  transition: box-shadow 240ms var(--ease-urivo), transform 200ms var(--ease-urivo),
+    filter 240ms var(--ease-urivo);
+}
+.u-cta-premium:hover {
+  filter: brightness(1.05) saturate(1.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+    0 14px 34px -10px var(--cta-glow);
+}
+.u-cta-premium:active {
+  transform: translateY(1px) scale(0.985);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+    0 4px 14px -8px var(--cta-glow);
+}
+
+/* Metallic gold text (headlines, key numbers, accents). */
+.u-gold-text {
+  background-image: linear-gradient(120deg, #f8ecc0 0%, #e9cf82 45%, #cfa552 72%, #f2dd9c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Subtle gold hairline (dividers, focus rings under panels). */
+.u-gold-line {
+  background-image: linear-gradient(90deg, rgba(232, 205, 128, 0), rgba(232, 205, 128, 0.6), rgba(232, 205, 128, 0));
+}
+
+/* Frosted glass — only where it improves layering/readability. */
+.u-glass {
+  background: rgba(18, 28, 48, 0.55);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+/* Floating panel — soft depth + a whisper of top highlight. */
+.u-float {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 2px 6px rgba(0, 0, 0, 0.35),
+    0 24px 60px -28px rgba(0, 0, 0, 0.75);
+}
+
+/* Warm gold glow for emphasis (hover on premium items). */
+.u-glow-gold {
+  box-shadow: 0 10px 34px -10px rgba(224, 192, 105, 0.4);
+}
+
+/* Refined hover lift used across interactive cards/buttons. */
+.u-lift {
+  transition: transform 240ms var(--ease-urivo), box-shadow 240ms var(--ease-urivo),
+    border-color 240ms var(--ease-urivo), background-color 200ms var(--ease-urivo);
+}
+/* Hover lift only on real pointers — never fire the jump on a touch tap. */
+@media (hover: hover) and (pointer: fine) {
+  .u-lift:hover {
+    transform: translateY(-2px);
+  }
+}
+.u-lift:active {
+  transform: translateY(0) scale(0.99);
+}
+
+/* Reusable tactile press for buttons/chips that don't lift. */
+.u-press {
+  transition: transform 130ms var(--ease-urivo);
+}
+.u-press:active {
+  transform: scale(0.96);
+}
+
+/*
+ * Premium card hover — a whisper of elevation, a 1.2% scale and a warm gold
+ * halo. Compositor-only (transform + shadow), 280ms on the signature curve.
+ * Used on KPI + store cards so they feel alive without ever distracting.
+ */
+.u-hover-card {
+  transition: transform 280ms var(--ease-urivo), box-shadow 280ms var(--ease-urivo),
+    border-color 280ms var(--ease-urivo), background-color 200ms var(--ease-urivo);
+}
+@media (hover: hover) and (pointer: fine) {
+  .u-hover-card:hover {
+    transform: translateY(-3px) scale(1.012);
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.35),
+      0 24px 60px -28px rgba(0, 0, 0, 0.75),
+      0 0 0 1px rgba(224, 192, 105, 0.12),
+      0 18px 48px -22px rgba(224, 192, 105, 0.2);
+  }
+}
+.u-hover-card:active {
+  transform: translateY(0) scale(0.995);
+}
+
+/* Ask Urivo: message bubbles + proposed-change card rise in, never pop. */
+@keyframes urivo-msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.u-msg-in { animation: urivo-msg-in 220ms var(--ease-urivo) both; }
+
+/* Focus ring on dark surfaces (accessibility). */
+:focus-visible {
+  outline: 2px solid rgba(232, 205, 128, 0.7);
+  outline-offset: 2px;
+}
+
+/* ---- Branded loading experience ---- */
+
+/* The gold mark breathing + its aura pulsing. */
+@keyframes urivo-mark-breathe {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(232, 205, 128, 0)); }
+  50% { transform: scale(1.04); filter: drop-shadow(0 0 22px rgba(232, 205, 128, 0.45)); }
+}
+
+/* A conic gold sweep circling the mark. */
+@keyframes urivo-orbit {
+  to { transform: rotate(360deg); }
+}
+
+/* Wordmark + tagline rising softly. */
+@keyframes urivo-fade-up {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* A slim gold progress shimmer. */
+@keyframes urivo-loadbar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(320%); }
+}
+
+/* Ambient page-enter for shell content. */
+@keyframes urivo-enter {
+  0% { opacity: 0; transform: translateY(10px) scale(0.995); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.u-enter { animation: urivo-enter 560ms var(--ease-urivo) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  [class*="urivo-anim-"],
+  .u-enter,
+  .u-msg-in,
+  [style*="urivo-"] {
+    animation: none !important;
+  }
+  .u-lift:hover { transform: none; }
+  .u-hover-card:hover { transform: none; }
+}
