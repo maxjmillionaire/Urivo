@@ -96,6 +96,10 @@ export const REQUIRED_RPCS = [
   "store_for_domain",
   "store_payout_account",
   "store_subscriber_counts",
+  // 0054. Reports whether `stores` is still owner-only and `storefronts` is
+  // still free of private columns. A database provisioned before 0054 answers
+  // every other check green while leaking every merchant's payout account.
+  "storefront_isolation_intact",
   "submit_feedback",
   "subscribe_to_store",
   "weekly_digest_data",
@@ -248,6 +252,62 @@ async function checkEntitlementColumns(): Promise<Check> {
       ok: false,
       severity: "blocker",
       detail: `Column-privilege check failed: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+}
+
+/*
+ * Tenant isolation on `stores`, checked rather than assumed.
+ *
+ * Migration 0052 revoked anon's select and granted back a public column list,
+ * and it revoked from `anon` alone — `authenticated` kept table-level select on
+ * every column. Combined with `stores: public storefront read`, which was
+ * written in 0001 with no role list and therefore applied to PUBLIC, any
+ * signed-in account could read every live store's `user_id` and
+ * `stripe_account_id`. Measured, not theorised: a second account with a real
+ * session enumerated the lot.
+ *
+ * 0054 splits the relation — `public.storefronts` is the shop window,
+ * `public.stores` is owner-only — and this refuses to call a database ready
+ * until that split is actually in place. Same reasoning as the check above: a
+ * policy that is missing has no symptoms. Every screen renders, the storefront
+ * works, and the only sign is that a stranger who signed up this morning can
+ * read your payout account.
+ */
+async function checkStorefrontIsolation(): Promise<Check> {
+  try {
+    const { data, error } = await supabaseAdmin().rpc("storefront_isolation_intact");
+    if (error) {
+      return {
+        name: "tenancy.stores",
+        ok: false,
+        severity: "blocker",
+        detail: `Could not verify store isolation: ${error.message}. If the function is missing, migration 0054 has not been applied — until it is, any signed-in user can read every live store's owner and Stripe Connect id.`,
+      };
+    }
+    if (data !== true) {
+      return {
+        name: "tenancy.stores",
+        ok: false,
+        severity: "blocker",
+        detail:
+          "`stores` is still readable beyond its owner, or `storefronts` carries a private column. " +
+          "Apply supabase/migrations/0054_storefront_view_owner_only_stores.sql — without it, any " +
+          "signed-in account can enumerate every live store with its owner id and payout account.",
+      };
+    }
+    return {
+      name: "tenancy.stores",
+      ok: true,
+      severity: "info",
+      detail: "`stores` is owner-only; the public storefront reads `storefronts`, which carries no private column.",
+    };
+  } catch (e) {
+    return {
+      name: "tenancy.stores",
+      ok: false,
+      severity: "blocker",
+      detail: `Store isolation check failed: ${e instanceof Error ? e.message : String(e)}`,
     };
   }
 }
@@ -448,6 +508,7 @@ export async function runPreflight(): Promise<PreflightReport> {
     checkDatabase(),
     checkSchema(),
     checkEntitlementColumns(),
+    checkStorefrontIsolation(),
     checkStripeReachable(),
   ]);
 
