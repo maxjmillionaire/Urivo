@@ -137,6 +137,17 @@ export async function POST(request: NextRequest) {
 
   const requestId = newRequestId();
 
+  /*
+   * Start of the clock the landing page is making a promise about.
+   *
+   * Taken here rather than at the top of the handler on purpose: auth, plan
+   * lookup, rate limiting and credit reservation are Urivo's own overhead and
+   * are not what "generated in under a minute" refers to. This measures the
+   * generation itself — the model call plus the imagery — which is the part a
+   * merchant experiences as waiting.
+   */
+  const startedAt = Date.now();
+
   // 5. Generate (AI)
   let generated;
   try {
@@ -235,6 +246,7 @@ export async function POST(request: NextRequest) {
     usage: generated.usage,
     images: imageUrls.filter(Boolean).length,
     model: STORE_GENERATOR_MODEL,
+    durationMs: Date.now() - startedAt,
     requestId,
   });
 

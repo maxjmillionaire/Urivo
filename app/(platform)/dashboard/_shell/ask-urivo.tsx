@@ -2,6 +2,7 @@
 
 import { AttachButton } from "./attach";
 import type { Attachment } from "@/lib/ai/attachments";
+import { AI_ASSISTANT_LABEL, AI_ASSISTANT_NOTICE } from "@/lib/ai/assistant-disclosure";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -427,6 +428,12 @@ export function AskUrivo({
         <div className="flex items-center gap-1.5">
           <IconSpark className="text-gold" width={13} height={13} />
           <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mist">Ask Urivo</span>
+          {/*
+            * AI Act Art. 50(1). Persistent rather than first-message-only: the
+            * duty attaches to the person, and someone returning to yesterday's
+            * conversation never sees a first-exchange notice.
+            */}
+          <span className="text-[10px] font-medium tracking-[0.06em] text-mist-dim">· {AI_ASSISTANT_LABEL}</span>
         </div>
         {hasTranscript && (
           <button onClick={reset} className="rounded-md px-1.5 py-0.5 text-[10px] font-medium text-mist-dim transition-colors hover:text-mist active:scale-[0.96]">
@@ -455,7 +462,13 @@ export function AskUrivo({
           </div>
         ) : (
           <div className="pb-2">
-            <p className="text-xs leading-relaxed text-mist">
+            {/*
+              * The Art. 50(1) notice proper — before the first message, in its
+              * own line rather than folded into the pitch, so it reads as a
+              * statement of fact and not as marketing.
+              */}
+            <p className="text-[11px] font-medium text-mist-dim">{AI_ASSISTANT_NOTICE}</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-mist">
               {hasStore
                 ? "Ask for a change and I'll propose it — copy, palette, fonts, layout, products. You approve before it goes live."
                 : "Tell me your idea and I'll help you shape a brand worth launching."}

@@ -23,11 +23,28 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+# Bind to every interface, not loopback.
+#
+# Next's standalone server reads HOSTNAME and falls back to localhost. Inside a
+# container that means it listens only on 127.0.0.1: the platform's proxy and
+# the healthcheck below both fail to reach it, the container is marked unhealthy
+# and killed — after a build that succeeded and a process that started cleanly.
+ENV HOSTNAME=0.0.0.0
 
 # Non-root user
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 
-COPY --from=build /app/public ./public
+# No `public/` copy: Urivo does not have one, and does not need one.
+#
+# The icons live in the App Router — app/icon.png and app/apple-icon.png — and
+# app/manifest.ts points at the URLs Next generates from them. Nothing is served
+# from a static root directory, so `public/` was never created; git tracks no
+# empty directories, and the build stage therefore had no /app/public to copy.
+# The COPY failed its checksum and stopped the image build.
+#
+# An empty public/ with a .gitkeep would have turned the build green while
+# leaving a directory that exists only to satisfy a line that should not be
+# there. If real static assets are ever added, restore this COPY along with them.
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 

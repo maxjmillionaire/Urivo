@@ -1,7 +1,7 @@
 -- ============================================================
 -- URIVO — Complete database setup (one-shot).
 -- Paste this whole file into Supabase → SQL Editor → New query → Run.
--- It applies migrations 0001–0038 in order. Safe to run once on a fresh project.
+-- It applies migrations 0001–0053 in order. Safe to run once on a fresh project.
 --
 -- GENERATED FILE — do not edit by hand.
 -- Regenerate with: npm run db:build
@@ -3921,3 +3921,1795 @@ grant execute on function public.attribute_order(uuid, text) to service_role;
 
 comment on function public.ad_performance(uuid) is
     'Clicks, orders and revenue per generated ad. Exact rather than pixel-based: Urivo owns both the click and the sale.';
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0039_attribution_model.sql
+-- ─────────────────────────────────────────────────────────
+-- ------------------------------------------------------------
+-- 0039 — The attribution model (specifications/10-attribution.md)
+--
+-- 0038 built the chain: click -> visit -> order. This makes it correct.
+--
+-- What was wrong, in order of how much money it moves:
+--
+--   1. NO WINDOW. The session lived in sessionStorage, so attribution ended
+--      when the browser tab closed. Every considered purchase — click today,
+--      buy tomorrow — was reported as zero next to the ad that caused it. A
+--      measurement system that silently under-reports makes merchants switch
+--      off ads that were working. §3
+--
+--   2. NOT IDEMPOTENT. attribute_order overwrote on every call, and Stripe
+--      delivers webhooks at least once. A retry could rewrite a decision the
+--      merchant had already read. §8
+--
+--   3. NO OWNERSHIP CHECK. A ?uc= belonging to another store attributed
+--      happily. Copy a competitor's tracked link, and their ad takes credit
+--      for your sale. §5
+--
+--   4. REPEAT PURCHASES CREDITED. One good ad quietly absorbed a year of
+--      loyal revenue and looked unbeatable, after which every budget decision
+--      ran against a number that was mostly not about advertising. §6
+--
+-- The architectural rule this preserves: every click stays a row, and the
+-- attribution rule is applied when the report is read. Changing to last-touch
+-- or time-decay later is a query change, not a migration, and not a year of
+-- history thrown away. §4
+-- ------------------------------------------------------------
+
+-- ------------------------------------------------------------
+-- 1. Bot traffic never enters the numbers
+--
+-- Excluded from BOTH sides of every ratio: counting a crawler in the
+-- denominator depresses conversion exactly as counting it in the numerator
+-- inflates clicks. Stored rather than dropped so a merchant asking "where did
+-- my visitor go" gets an answer instead of a shrug. §13
+-- ------------------------------------------------------------
+alter table public.store_visits
+    add column if not exists is_bot boolean not null default false,
+    add column if not exists bot_reason text;
+
+-- Every read of real traffic filters on this, so it leads the index.
+create index if not exists idx_store_visits_human
+    on public.store_visits (store_id, created_at desc)
+    where is_bot = false;
+
+comment on column public.store_visits.is_bot is
+    'Automated client (crawler, link unfurler, monitor). Excluded from every metric on both sides of the ratio.';
+
+-- ------------------------------------------------------------
+-- 2. How an order was attributed, recorded with the decision
+--
+-- The basis is as important as the answer. "Attributed to nothing" and
+-- "deliberately excluded because this is a returning customer" are different
+-- facts, and a dashboard that cannot tell them apart cannot be honest. §14
+-- ------------------------------------------------------------
+do $$
+begin
+    if not exists (select 1 from pg_type where typname = 'attribution_basis') then
+        create type public.attribution_basis as enum (
+            'creative',   -- joined to a specific ad inside the window
+            'returning',  -- known customer; excluded from ad attribution by rule
+            'expired',    -- a tracked click exists, but outside the window
+            'none'        -- direct, organic, or no tracked click at all
+        );
+    end if;
+end $$;
+
+alter table public.orders
+    add column if not exists attribution_basis public.attribution_basis not null default 'none',
+    add column if not exists attributed_at timestamptz;
+
+comment on column public.orders.attribution_basis is
+    'Why this order carries the creative it carries — or why it carries none. See specifications/10-attribution.md.';
+
+-- ------------------------------------------------------------
+-- 3. The window, in one place
+--
+-- A policy, not a constant scattered through the code. Changing it changes
+-- reporting; it never requires a migration, because the raw click events are
+-- retained independently of it. §3
+-- ------------------------------------------------------------
+create or replace function public.attribution_window()
+returns interval
+language sql
+immutable
+as $$ select interval '7 days' $$;
+
+comment on function public.attribution_window() is
+    'Click-to-paid-order window. 7 days: long enough for a considered purchase, short enough that the commerce session stays defensible as cart continuity.';
+
+-- ------------------------------------------------------------
+-- 4. Attribute an order — the whole model in one function
+--
+-- Order of the checks is the order of the rules, and each one is a decision
+-- the merchant can be shown rather than a silent skip.
+-- ------------------------------------------------------------
+create or replace function public.attribute_order(p_order_id uuid, p_session_hash text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_creative uuid;
+    v_store    uuid;
+    v_email    text;
+    v_placed   timestamptz;
+    v_existing public.attribution_basis;
+    v_had_click boolean;
+begin
+    select store_id, lower(btrim(customer_email)), created_at, attribution_basis
+      into v_store, v_email, v_placed, v_existing
+      from public.orders
+     where id = p_order_id;
+
+    if v_store is null then
+        return null;
+    end if;
+
+    /*
+     * FIRST WRITE WINS. Stripe retries on any non-2xx and may deliver out of
+     * order; without this a retry could rewrite a decision the merchant has
+     * already read. A number that changes after it has been seen is worse
+     * than one that is slightly conservative. §8
+     */
+    if v_existing <> 'none' then
+        return (select creative_id from public.orders where id = p_order_id);
+    end if;
+
+    /*
+     * RETURNING CUSTOMERS ARE NOT AD ACQUISITIONS. Checked before the session
+     * lookup, because a returning customer who clicks an ad is still a
+     * returning customer — crediting the ad would let it absorb loyal revenue
+     * indefinitely and look unbeatable. Ad Studio measures acquisition; this
+     * revenue is reported separately. §6
+     */
+    if v_email is not null and length(v_email) > 0 and exists (
+        select 1 from public.orders o
+         where o.store_id = v_store
+           and o.id <> p_order_id
+           and lower(btrim(o.customer_email)) = v_email
+           and o.status in ('paid', 'fulfilled', 'refunded')
+           and o.created_at < v_placed
+    ) then
+        update public.orders
+           set attribution_basis = 'returning',
+               session_hash      = coalesce(p_session_hash, session_hash),
+               attributed_at     = now()
+         where id = p_order_id;
+        return null;
+    end if;
+
+    if p_session_hash is null or length(btrim(p_session_hash)) < 6 then
+        update public.orders set attribution_basis = 'none', attributed_at = now() where id = p_order_id;
+        return null;
+    end if;
+
+    /*
+     * FIRST TOUCH inside the window. Last touch would hand nearly every sale
+     * to whatever retargeting ad ran immediately before checkout — the most
+     * common way a small budget drifts toward the channel that did least. §4
+     *
+     * The creative must belong to THIS store: a tracked link copied from
+     * somewhere else must never take credit here. §5
+     *
+     * Bots are excluded at the source, so a crawler that followed the link
+     * cannot become the first touch. §13
+     */
+    select v.creative_id into v_creative
+      from public.store_visits v
+      join public.ad_creatives c on c.id = v.creative_id
+     where v.session_hash = p_session_hash
+       and v.store_id     = v_store
+       and c.store_id     = v_store
+       and v.is_bot       = false
+       and v.created_at  >= v_placed - public.attribution_window()
+       and v.created_at  <= v_placed
+     order by v.created_at asc
+     limit 1;
+
+    if v_creative is not null then
+        update public.orders
+           set creative_id       = v_creative,
+               session_hash      = p_session_hash,
+               attribution_basis = 'creative',
+               attributed_at     = now()
+         where id = p_order_id;
+        return v_creative;
+    end if;
+
+    /*
+     * A tracked click exists but fell outside the window. Distinct from "no
+     * ad involved at all" — the merchant should see that their window is what
+     * cost them the credit, not conclude the ad did nothing. §12
+     */
+    select exists (
+        select 1 from public.store_visits v
+         where v.session_hash = p_session_hash
+           and v.store_id     = v_store
+           and v.creative_id is not null
+           and v.is_bot       = false
+    ) into v_had_click;
+
+    update public.orders
+       set session_hash      = p_session_hash,
+           attribution_basis = case when v_had_click then 'expired' else 'none' end,
+           attributed_at     = now()
+     where id = p_order_id;
+
+    return null;
+end $$;
+
+revoke execute on function public.attribute_order(uuid, text) from public, anon, authenticated;
+grant execute on function public.attribute_order(uuid, text) to service_role;
+
+-- ------------------------------------------------------------
+-- 5. Performance per creative — net of refunds, humans only
+--
+-- Revenue must match money the merchant actually kept, or it will be used to
+-- justify spend against income that was returned. An ad showing orders with
+-- near-zero revenue is a real signal: usually the wrong buyer. §10
+-- ------------------------------------------------------------
+
+-- Declared before the function that reads it: PostgreSQL parses a SQL-language
+-- body at creation time, so a column added afterwards would fail the migration.
+alter table public.orders
+    add column if not exists amount_refunded integer not null default 0
+        check (amount_refunded >= 0);
+
+create or replace function public.ad_performance(p_store_id uuid)
+returns table (
+    creative_id   uuid,
+    run_id        uuid,
+    platform      text,
+    headline      text,
+    angle         text,
+    launched_at   timestamptz,
+    clicks        integer,
+    orders        integer,
+    revenue_cents integer,
+    created_at    timestamptz
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select c.id,
+           c.run_id,
+           c.platform,
+           c.headline,
+           c.angle,
+           c.launched_at,
+           coalesce((
+               -- Distinct sessions, never pageviews: a visitor who reloads
+               -- four times is one click. Bots are not visitors at all.
+               select count(distinct v.session_hash)::integer
+               from public.store_visits v
+               where v.creative_id = c.id and v.is_bot = false
+           ), 0),
+           coalesce((
+               select count(*)::integer
+               from public.orders o
+               where o.creative_id = c.id
+                 and o.attribution_basis = 'creative'
+                 and o.status in ('paid', 'fulfilled')
+           ), 0),
+           coalesce((
+               select sum(o.amount_total - coalesce(o.amount_refunded, 0))::integer
+               from public.orders o
+               where o.creative_id = c.id
+                 and o.attribution_basis = 'creative'
+                 and o.status in ('paid', 'fulfilled')
+           ), 0),
+           c.created_at
+    from public.ad_creatives c
+    where c.store_id = p_store_id
+      and c.archived_at is null
+    order by c.created_at desc;
+$$;
+
+revoke execute on function public.ad_performance(uuid) from public, anon;
+grant execute on function public.ad_performance(uuid) to authenticated, service_role;
+
+-- ------------------------------------------------------------
+-- 6. Retention — a period that only exists in a document is not a period
+--
+-- Click events outlive the 7-day window by a wide margin on purpose, so a
+-- webhook delayed by hours or days still attributes correctly. That headroom
+-- is the concrete advantage of holding the window on the server rather than on
+-- a device that may have cleared its storage. §11
+-- ------------------------------------------------------------
+create or replace function public.expire_click_events()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_deleted integer;
+begin
+    delete from public.store_visits
+     where created_at < now() - interval '90 days';
+    get diagnostics v_deleted = row_count;
+    return v_deleted;
+end $$;
+
+revoke execute on function public.expire_click_events() from public, anon, authenticated;
+grant execute on function public.expire_click_events() to service_role;
+
+comment on function public.expire_click_events() is
+    'Deletes click events past the 90-day retention window. Run daily.';
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0040_attribution_coverage.sql
+-- ─────────────────────────────────────────────────────────
+-- ------------------------------------------------------------
+-- 0040 — Attribution coverage (specifications/10-attribution.md §14)
+--
+-- The number that makes every other number trustworthy.
+--
+-- A merchant shown "€258 from your ads" concludes their ads produced €258.
+-- Shown "€258 attributed · €340 not attributable · 43% coverage" they reason
+-- correctly — and they can see that the gap is mostly returning customers, or
+-- mostly people who bought without ever clicking a tracked link, which are
+-- entirely different problems with entirely different fixes.
+--
+-- No advertising platform reports its own blind spots. That is the point.
+--
+-- The invariant this exists to make checkable (§16.4): attributed and
+-- not-attributable revenue must sum to total paid revenue. No euro may fall
+-- between the two buckets — a coverage figure that quietly loses revenue is
+-- worse than no coverage figure, because it looks like arithmetic.
+-- ------------------------------------------------------------
+
+create or replace function public.attribution_coverage(p_store_id uuid, p_days integer default 30)
+returns table (
+    -- Joined to a specific ad inside the window.
+    attributed_orders   integer,
+    attributed_cents    integer,
+    -- Known customer. Deliberately excluded from ad attribution (§6) — this is
+    -- retention revenue, and reporting it as an ad result would let one good ad
+    -- absorb a year of loyalty and look unbeatable.
+    returning_orders    integer,
+    returning_cents     integer,
+    -- A tracked click exists, but outside the 7-day window. Distinct from "no
+    -- ad involved": the merchant should see that the window cost them the
+    -- credit, not conclude the ad did nothing.
+    expired_orders      integer,
+    expired_cents       integer,
+    -- Direct, organic, cross-device, or an ad launched without a tracked link.
+    unattributed_orders integer,
+    unattributed_cents  integer,
+    total_orders        integer,
+    total_cents         integer
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    with paid as (
+        select o.attribution_basis as basis,
+               -- Net of refunds everywhere, so coverage is computed on money
+               -- the merchant actually kept (§10).
+               (o.amount_total - coalesce(o.amount_refunded, 0)) as net
+        from public.orders o
+        where o.store_id = p_store_id
+          and o.status in ('paid', 'fulfilled')
+          and o.created_at >= now() - make_interval(days => greatest(p_days, 1))
+    )
+    select
+        coalesce(count(*) filter (where basis = 'creative'), 0)::integer,
+        coalesce(sum(net) filter (where basis = 'creative'), 0)::integer,
+        coalesce(count(*) filter (where basis = 'returning'), 0)::integer,
+        coalesce(sum(net) filter (where basis = 'returning'), 0)::integer,
+        coalesce(count(*) filter (where basis = 'expired'), 0)::integer,
+        coalesce(sum(net) filter (where basis = 'expired'), 0)::integer,
+        /*
+         * 'none' is named explicitly rather than caught by an else-branch. If a
+         * future basis is added and this function is not updated, its revenue
+         * must go MISSING from a bucket — loudly breaking the sum invariant —
+         * rather than being silently absorbed into "direct" and misreported as
+         * traffic the merchant never bought.
+         */
+        coalesce(count(*) filter (where basis = 'none'), 0)::integer,
+        coalesce(sum(net) filter (where basis = 'none'), 0)::integer,
+        coalesce(count(*), 0)::integer,
+        coalesce(sum(net), 0)::integer
+    from paid;
+$$;
+
+revoke execute on function public.attribution_coverage(uuid, integer) from public, anon;
+grant execute on function public.attribution_coverage(uuid, integer) to authenticated, service_role;
+
+comment on function public.attribution_coverage(uuid, integer) is
+    'Attributed vs not-attributable revenue for a store, split by reason. The buckets must sum to the total — see specifications/10-attribution.md §16.4.';
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0041_fix_attribution_basis_cast.sql
+-- ─────────────────────────────────────────────────────────
+-- ------------------------------------------------------------
+-- 0041 — Fix: attribute_order raised on every unattributed order
+--
+-- 0039 ended with:
+--
+--     attribution_basis = case when v_had_click then 'expired' else 'none' end
+--
+-- The CASE yields `text`; the column is an enum. PostgreSQL refuses the
+-- assignment with 42804 rather than coercing it, so EVERY order that reached
+-- the final branch — all direct traffic, and every click that fell outside the
+-- window — raised instead of being labelled.
+--
+-- It failed silently, which is the worst part. attribute_order is called
+-- best-effort from the Stripe webhook so an order is never lost to an
+-- attribution problem, and that same safety net swallowed the exception. The
+-- orders then kept the column default, 'none', which is the correct answer for
+-- direct traffic and the WRONG answer for an expired click — the two became
+-- indistinguishable, which is precisely the distinction §12 exists to draw.
+-- Nothing logged, nothing broke, and the coverage split would have quietly
+-- under-reported the "outside the window" bucket forever.
+--
+-- Found by checking the RPC's HTTP status in an end-to-end run rather than
+-- only reading the row afterwards: the row looked plausible, and the response
+-- was a 400.
+--
+-- Also stamped: session_hash and attributed_at on these orders, which the
+-- raised statement never wrote.
+-- ------------------------------------------------------------
+
+create or replace function public.attribute_order(p_order_id uuid, p_session_hash text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_creative uuid;
+    v_store    uuid;
+    v_email    text;
+    v_placed   timestamptz;
+    v_existing public.attribution_basis;
+    v_basis    public.attribution_basis;
+begin
+    select store_id, lower(btrim(customer_email)), created_at, attribution_basis
+      into v_store, v_email, v_placed, v_existing
+      from public.orders
+     where id = p_order_id;
+
+    if v_store is null then
+        return null;
+    end if;
+
+    -- First write wins: a Stripe retry must never rewrite a decision the
+    -- merchant has already read (§8).
+    if v_existing <> 'none' then
+        return (select creative_id from public.orders where id = p_order_id);
+    end if;
+
+    -- A returning customer is not an ad acquisition, even when they clicked
+    -- one. Checked first, so a good ad cannot absorb loyal revenue (§6).
+    if v_email is not null and length(v_email) > 0 and exists (
+        select 1 from public.orders o
+         where o.store_id = v_store
+           and o.id <> p_order_id
+           and lower(btrim(o.customer_email)) = v_email
+           and o.status in ('paid', 'fulfilled', 'refunded')
+           and o.created_at < v_placed
+    ) then
+        update public.orders
+           set attribution_basis = 'returning'::public.attribution_basis,
+               session_hash      = coalesce(p_session_hash, session_hash),
+               attributed_at     = now()
+         where id = p_order_id;
+        return null;
+    end if;
+
+    if p_session_hash is null or length(btrim(p_session_hash)) < 6 then
+        update public.orders
+           set attribution_basis = 'none'::public.attribution_basis,
+               attributed_at     = now()
+         where id = p_order_id;
+        return null;
+    end if;
+
+    -- First touch inside the window, this store's own ad, humans only
+    -- (§4, §5, §13).
+    select v.creative_id into v_creative
+      from public.store_visits v
+      join public.ad_creatives c on c.id = v.creative_id
+     where v.session_hash = p_session_hash
+       and v.store_id     = v_store
+       and c.store_id     = v_store
+       and v.is_bot       = false
+       and v.created_at  >= v_placed - public.attribution_window()
+       and v.created_at  <= v_placed
+     order by v.created_at asc
+     limit 1;
+
+    if v_creative is not null then
+        update public.orders
+           set creative_id       = v_creative,
+               session_hash      = p_session_hash,
+               attribution_basis = 'creative'::public.attribution_basis,
+               attributed_at     = now()
+         where id = p_order_id;
+        return v_creative;
+    end if;
+
+    /*
+     * Resolved into a typed variable rather than cast inline. The inline CASE
+     * is what broke: it is easy to write, easy to read, and silently produces
+     * `text` where an enum is required.
+     *
+     * 'expired' rather than 'none' when a tracked click exists but fell outside
+     * the window — the merchant should see that the window cost them the
+     * credit, not conclude the ad did nothing (§12).
+     */
+    if exists (
+        select 1 from public.store_visits v
+         where v.session_hash = p_session_hash
+           and v.store_id     = v_store
+           and v.creative_id is not null
+           and v.is_bot       = false
+    ) then
+        v_basis := 'expired'::public.attribution_basis;
+    else
+        v_basis := 'none'::public.attribution_basis;
+    end if;
+
+    update public.orders
+       set session_hash      = p_session_hash,
+           attribution_basis = v_basis,
+           attributed_at     = now()
+     where id = p_order_id;
+
+    return null;
+end $$;
+
+revoke execute on function public.attribute_order(uuid, text) from public, anon, authenticated;
+grant execute on function public.attribute_order(uuid, text) to service_role;
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0042_expired_requires_own_ad.sql
+-- ─────────────────────────────────────────────────────────
+-- ------------------------------------------------------------
+-- 0042 — 'expired' must mean OUR ad, not any ad
+--
+-- 0041 decided between 'expired' and 'none' with:
+--
+--     exists (select 1 from store_visits v
+--              where v.session_hash = ... and v.store_id = v_store
+--                and v.creative_id is not null and v.is_bot = false)
+--
+-- The attribution query one block above joins ad_creatives and requires the
+-- creative to belong to this store (§5). This check does not — so a visit
+-- carrying ANOTHER store's creative id counts as "there was a click", and the
+-- order is labelled 'expired'.
+--
+-- The number stays right and the sentence goes wrong, which is the harder
+-- failure to notice. 'expired' tells the merchant their 7-day window cost them
+-- the credit and invites them to think about consideration cycles — when in
+-- fact the link was never theirs. Somebody pasted a tracked URL copied from
+-- elsewhere, and the honest label is 'none'.
+--
+-- Caught because the end-to-end run prints the basis next to every assertion.
+-- The assertion itself only checked that no creative was credited, which was
+-- true; the label beside it was wrong. Checking the value without checking the
+-- word for it is how a misleading dashboard passes its own tests.
+-- ------------------------------------------------------------
+
+create or replace function public.attribute_order(p_order_id uuid, p_session_hash text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_creative uuid;
+    v_store    uuid;
+    v_email    text;
+    v_placed   timestamptz;
+    v_existing public.attribution_basis;
+    v_basis    public.attribution_basis;
+begin
+    select store_id, lower(btrim(customer_email)), created_at, attribution_basis
+      into v_store, v_email, v_placed, v_existing
+      from public.orders
+     where id = p_order_id;
+
+    if v_store is null then
+        return null;
+    end if;
+
+    -- First write wins: a Stripe retry must never rewrite a decision the
+    -- merchant has already read (§8).
+    if v_existing <> 'none' then
+        return (select creative_id from public.orders where id = p_order_id);
+    end if;
+
+    -- A returning customer is not an ad acquisition, even when they clicked
+    -- one. Checked first, so a good ad cannot absorb loyal revenue (§6).
+    if v_email is not null and length(v_email) > 0 and exists (
+        select 1 from public.orders o
+         where o.store_id = v_store
+           and o.id <> p_order_id
+           and lower(btrim(o.customer_email)) = v_email
+           and o.status in ('paid', 'fulfilled', 'refunded')
+           and o.created_at < v_placed
+    ) then
+        update public.orders
+           set attribution_basis = 'returning'::public.attribution_basis,
+               session_hash      = coalesce(p_session_hash, session_hash),
+               attributed_at     = now()
+         where id = p_order_id;
+        return null;
+    end if;
+
+    if p_session_hash is null or length(btrim(p_session_hash)) < 6 then
+        update public.orders
+           set attribution_basis = 'none'::public.attribution_basis,
+               attributed_at     = now()
+         where id = p_order_id;
+        return null;
+    end if;
+
+    -- First touch inside the window, this store's own ad, humans only
+    -- (§4, §5, §13).
+    select v.creative_id into v_creative
+      from public.store_visits v
+      join public.ad_creatives c on c.id = v.creative_id
+     where v.session_hash = p_session_hash
+       and v.store_id     = v_store
+       and c.store_id     = v_store
+       and v.is_bot       = false
+       and v.created_at  >= v_placed - public.attribution_window()
+       and v.created_at  <= v_placed
+     order by v.created_at asc
+     limit 1;
+
+    if v_creative is not null then
+        update public.orders
+           set creative_id       = v_creative,
+               session_hash      = p_session_hash,
+               attribution_basis = 'creative'::public.attribution_basis,
+               attributed_at     = now()
+         where id = p_order_id;
+        return v_creative;
+    end if;
+
+    /*
+     * 'expired' only when one of THIS store's own ads was clicked outside the
+     * window — the same ownership join as the attribution query above, minus
+     * the time bound. Without the join, a tracked link copied from another
+     * store would be reported to this merchant as their own window expiring.
+     */
+    if exists (
+        select 1
+          from public.store_visits v
+          join public.ad_creatives c on c.id = v.creative_id
+         where v.session_hash = p_session_hash
+           and v.store_id     = v_store
+           and c.store_id     = v_store
+           and v.is_bot       = false
+    ) then
+        v_basis := 'expired'::public.attribution_basis;
+    else
+        v_basis := 'none'::public.attribution_basis;
+    end if;
+
+    update public.orders
+       set session_hash      = p_session_hash,
+           attribution_basis = v_basis,
+           attributed_at     = now()
+     where id = p_order_id;
+
+    return null;
+end $$;
+
+revoke execute on function public.attribute_order(uuid, text) from public, anon, authenticated;
+grant execute on function public.attribute_order(uuid, text) to service_role;
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0043_attribution_unknown.sql
+-- ─────────────────────────────────────────────────────────
+-- ------------------------------------------------------------
+-- 0043 — KNOWN NONE and UNKNOWN are not the same state
+--
+-- Until now an order that was never attributed and an order determined to
+-- have no ad behind it were both 'none'. They are different facts:
+--
+--   'none'    — we looked, and this sale did not come from an ad.
+--   'unknown' — we did not look, or looking failed. We do not know.
+--
+-- Collapsing them made every attribution failure invisible. The 42804 raised
+-- by 0039 left orders sitting at the column default, 'none', which reads as a
+-- confident answer; the coverage panel then reported that revenue as direct
+-- traffic the merchant never bought. A dashboard cannot be honest if the
+-- schema cannot express uncertainty.
+--
+-- The default is now 'unknown'. An order starts out un-assessed, and only a
+-- successful run of attribute_order can move it to a decided state. That
+-- inverts the failure mode: a broken attribution path now shows up as growing
+-- 'unknown' revenue rather than silently inflating 'direct'.
+-- ------------------------------------------------------------
+
+alter type public.attribution_basis add value if not exists 'unknown';
+
+-- Committed before the new enum label is used below: PostgreSQL cannot use a
+-- value added by ALTER TYPE in the same transaction that added it.
+commit;
+
+alter table public.orders
+    alter column attribution_basis set default 'unknown'::public.attribution_basis;
+
+comment on column public.orders.attribution_basis is
+    'Why this order carries the attribution it carries. ''unknown'' means not yet assessed or assessment failed — never treat it as ''none''. See specifications/10-attribution.md.';
+
+-- ------------------------------------------------------------
+-- Coverage gains the bucket, or the reconciliation hides it
+--
+-- Spec §16.4 requires the buckets to sum to the total. Adding a state without
+-- adding its bucket would have broken that sum loudly — which is the designed
+-- behaviour, and exactly why the SQL names every basis explicitly rather than
+-- sweeping the remainder into an else.
+-- ------------------------------------------------------------
+/*
+ * Dropped first, not replaced. `create or replace` cannot change a function's
+ * OUT parameters, and adding the two unknown_* columns changes the returned
+ * row type — PostgreSQL rejects it with 42P13. Grants are re-issued below,
+ * because a drop takes them with it.
+ */
+drop function if exists public.attribution_coverage(uuid, integer);
+
+create function public.attribution_coverage(p_store_id uuid, p_days integer default 30)
+returns table (
+    attributed_orders   integer,
+    attributed_cents    integer,
+    returning_orders    integer,
+    returning_cents     integer,
+    expired_orders      integer,
+    expired_cents       integer,
+    unattributed_orders integer,
+    unattributed_cents  integer,
+    -- Not assessed, or assessment failed. Never folded into any other bucket:
+    -- this is the number that makes a broken attribution path visible.
+    unknown_orders      integer,
+    unknown_cents       integer,
+    total_orders        integer,
+    total_cents         integer
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    with paid as (
+        select o.attribution_basis as basis,
+               (o.amount_total - coalesce(o.amount_refunded, 0)) as net
+        from public.orders o
+        where o.store_id = p_store_id
+          and o.status in ('paid', 'fulfilled')
+          and o.created_at >= now() - make_interval(days => greatest(p_days, 1))
+    )
+    select
+        coalesce(count(*) filter (where basis = 'creative'), 0)::integer,
+        coalesce(sum(net) filter (where basis = 'creative'), 0)::integer,
+        coalesce(count(*) filter (where basis = 'returning'), 0)::integer,
+        coalesce(sum(net) filter (where basis = 'returning'), 0)::integer,
+        coalesce(count(*) filter (where basis = 'expired'), 0)::integer,
+        coalesce(sum(net) filter (where basis = 'expired'), 0)::integer,
+        coalesce(count(*) filter (where basis = 'none'), 0)::integer,
+        coalesce(sum(net) filter (where basis = 'none'), 0)::integer,
+        coalesce(count(*) filter (where basis = 'unknown'), 0)::integer,
+        coalesce(sum(net) filter (where basis = 'unknown'), 0)::integer,
+        coalesce(count(*), 0)::integer,
+        coalesce(sum(net), 0)::integer
+    from paid;
+$$;
+
+revoke execute on function public.attribution_coverage(uuid, integer) from public, anon;
+grant execute on function public.attribution_coverage(uuid, integer) to authenticated, service_role;
+
+-- ------------------------------------------------------------
+-- attribute_order: 'unknown' is never a decided answer
+--
+-- Only the first-write-wins guard changes. It previously treated anything
+-- other than 'none' as already decided; 'unknown' must remain re-attemptable,
+-- or a transient failure would freeze an order as permanently un-assessed.
+-- ------------------------------------------------------------
+create or replace function public.attribute_order(p_order_id uuid, p_session_hash text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_creative uuid;
+    v_store    uuid;
+    v_email    text;
+    v_placed   timestamptz;
+    v_existing public.attribution_basis;
+    v_basis    public.attribution_basis;
+begin
+    select store_id, lower(btrim(customer_email)), created_at, attribution_basis
+      into v_store, v_email, v_placed, v_existing
+      from public.orders
+     where id = p_order_id;
+
+    if v_store is null then
+        return null;
+    end if;
+
+    /*
+     * First write wins for any DECIDED state (§8) — a Stripe retry must never
+     * rewrite a decision the merchant has already read. 'unknown' is not a
+     * decision, so a retry after a failure is allowed to settle it.
+     */
+    if v_existing is not null and v_existing not in ('none', 'unknown') then
+        return (select creative_id from public.orders where id = p_order_id);
+    end if;
+    if v_existing = 'none' then
+        return null;
+    end if;
+
+    if v_email is not null and length(v_email) > 0 and exists (
+        select 1 from public.orders o
+         where o.store_id = v_store
+           and o.id <> p_order_id
+           and lower(btrim(o.customer_email)) = v_email
+           and o.status in ('paid', 'fulfilled', 'refunded')
+           and o.created_at < v_placed
+    ) then
+        update public.orders
+           set attribution_basis = 'returning'::public.attribution_basis,
+               session_hash      = coalesce(p_session_hash, session_hash),
+               attributed_at     = now()
+         where id = p_order_id;
+        return null;
+    end if;
+
+    if p_session_hash is null or length(btrim(p_session_hash)) < 6 then
+        /*
+         * No session at all. This IS a decided answer: the checkout carried no
+         * commerce session, so there is no click to find. Distinct from never
+         * having run — which leaves the row at 'unknown'.
+         */
+        update public.orders
+           set attribution_basis = 'none'::public.attribution_basis,
+               attributed_at     = now()
+         where id = p_order_id;
+        return null;
+    end if;
+
+    select v.creative_id into v_creative
+      from public.store_visits v
+      join public.ad_creatives c on c.id = v.creative_id
+     where v.session_hash = p_session_hash
+       and v.store_id     = v_store
+       and c.store_id     = v_store
+       and v.is_bot       = false
+       and v.created_at  >= v_placed - public.attribution_window()
+       and v.created_at  <= v_placed
+     order by v.created_at asc
+     limit 1;
+
+    if v_creative is not null then
+        update public.orders
+           set creative_id       = v_creative,
+               session_hash      = p_session_hash,
+               attribution_basis = 'creative'::public.attribution_basis,
+               attributed_at     = now()
+         where id = p_order_id;
+        return v_creative;
+    end if;
+
+    -- 'expired' only for this store's own ad, clicked outside the window (§5).
+    if exists (
+        select 1
+          from public.store_visits v
+          join public.ad_creatives c on c.id = v.creative_id
+         where v.session_hash = p_session_hash
+           and v.store_id     = v_store
+           and c.store_id     = v_store
+           and v.is_bot       = false
+    ) then
+        v_basis := 'expired'::public.attribution_basis;
+    else
+        v_basis := 'none'::public.attribution_basis;
+    end if;
+
+    update public.orders
+       set session_hash      = p_session_hash,
+           attribution_basis = v_basis,
+           attributed_at     = now()
+     where id = p_order_id;
+
+    return null;
+end $$;
+
+revoke execute on function public.attribute_order(uuid, text) from public, anon, authenticated;
+grant execute on function public.attribute_order(uuid, text) to service_role;
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0044_click_retention.sql
+-- ─────────────────────────────────────────────────────────
+-- ------------------------------------------------------------
+-- 0044 — Click-event retention (specifications/10-attribution.md §11)
+--
+-- A retention period that exists only in a document is not a retention period.
+--
+-- 0039 shipped expire_click_events as a bare DELETE. It was never scheduled,
+-- so nothing was ever deleted, and it deleted indiscriminately — which matters
+-- more than it sounds:
+--
+--   A visit still referenced by an order is EVIDENCE. orders.creative_id is
+--   denormalised so revenue attribution survives, but the visit row is the
+--   record of how that decision was reached. Deleting it while the order still
+--   points at the ad leaves an attribution nobody can audit — and for a refund
+--   dispute or a tax question, "the system says so" is not an answer.
+--
+-- So retention is selective: visits are deleted once they are past the window
+-- AND no order depends on them. Everything else is kept and counted, so the
+-- job can report what it declined to remove rather than staying silent.
+-- ------------------------------------------------------------
+
+create or replace function public.expire_click_events(p_days integer default 90)
+returns table (deleted integer, retained_for_orders integer, cutoff timestamptz)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_cutoff  timestamptz := now() - make_interval(days => greatest(p_days, 1));
+    v_deleted integer := 0;
+    v_kept    integer := 0;
+begin
+    /*
+     * Kept despite being old: the session is named by an order, so this row is
+     * the audit trail for a financial record. Counted first so the number is
+     * reported even when nothing is deleted.
+     */
+    select count(*)::integer into v_kept
+      from public.store_visits v
+     where v.created_at < v_cutoff
+       and exists (
+           select 1 from public.orders o
+            where o.session_hash = v.session_hash
+              and o.store_id     = v.store_id
+       );
+
+    delete from public.store_visits v
+     where v.created_at < v_cutoff
+       and not exists (
+           select 1 from public.orders o
+            where o.session_hash = v.session_hash
+              and o.store_id     = v.store_id
+       );
+    get diagnostics v_deleted = row_count;
+
+    /*
+     * Idempotent by construction: the predicate is a property of the rows, not
+     * of a cursor or a run log. A second run in the same minute deletes nothing
+     * because nothing matches any more.
+     */
+    return query select v_deleted, v_kept, v_cutoff;
+end $$;
+
+revoke execute on function public.expire_click_events(integer) from public, anon, authenticated;
+grant execute on function public.expire_click_events(integer) to service_role;
+
+comment on function public.expire_click_events(integer) is
+    'Deletes click events past the retention window, except those still referenced by an order. Idempotent; returns what it removed and what it kept.';
+
+-- The old zero-argument form would otherwise linger and shadow the new one.
+drop function if exists public.expire_click_events();
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0045_column_privileges.sql
+-- ─────────────────────────────────────────────────────────
+-- ------------------------------------------------------------
+-- 0045 — Column privileges: stop a logged-in user writing their own entitlement
+--
+-- Row Level Security answers "which ROWS may this user touch". It has nothing
+-- to say about which COLUMNS. Every policy here was written correctly against
+-- that question — `auth.uid() = id`, `auth.uid() = user_id` — and every one of
+-- them was still wide open, because owning the row was enough.
+--
+-- The anon key ships to the browser by design; a signed-in user holds a real
+-- `authenticated` session against PostgREST. So both of these ran, from a
+-- console, against a correct policy:
+--
+--     supabase.from('profiles').update({ plan: 'pro',
+--                                        subscription_status: 'active' })
+--             .eq('id', myId)                       -- → Pro, for free, forever
+--
+--     supabase.from('stores').update({ is_active: true })
+--             .eq('user_id', myId)                  -- → every store live, on Free
+--
+-- The second one bypassed `publish_store` entirely — the function that holds the
+-- live-store cap under a lock, and the reason capacity was believed to be
+-- enforced in the database rather than in application code. A cap is only a cap
+-- if the column behind it cannot be written directly.
+--
+-- The fix is the privilege system, not another policy: REVOKE the blanket
+-- UPDATE and grant back only the columns a user is genuinely allowed to set
+-- about themselves. Everything that decides money, access or capacity is now
+-- writable exclusively by `service_role` — which is where the webhook, the
+-- admin RPCs and `publish_store` already write from.
+--
+-- RLS still applies on top: these grants say WHICH COLUMNS, the policies still
+-- say WHICH ROWS. A user needs both, and now has exactly both.
+-- ------------------------------------------------------------
+
+-- ------------------------------------------------------------
+-- PROFILES — a user may edit their display name and their email preference.
+-- Nothing else: plan, subscription_status, price_type, comped_until and every
+-- stripe_* column are set by the Stripe webhook or an admin RPC.
+--
+-- INSERT is the `handle_new_user` trigger's job (security definer) and DELETE
+-- happens through account deletion on auth.users, so neither is granted here.
+-- ------------------------------------------------------------
+revoke insert, update, delete on public.profiles from anon, authenticated;
+grant update (full_name, marketing_opt_in) on public.profiles to authenticated;
+
+-- ------------------------------------------------------------
+-- STORES — a user may rename their store and restyle it.
+--
+-- is_active is deliberately absent: publishing is a paid capability and a
+-- capacity decision, so it belongs to `publish_store` alone. published_at is
+-- first-sale instrumentation and must never be reset by hand. user_id would be
+-- an ownership transfer. The stripe_* columns on this table are the deprecated
+-- per-store Connect fields (superseded by profiles in 0026) and are nobody's to
+-- write.
+--
+-- INSERT is revoked outright: stores are created by `generate_store_atomic`
+-- (security definer), which is also what charges the credits for one. A user
+-- who could INSERT directly would mint stores for free — and, since is_active
+-- DEFAULTS TO TRUE, mint them already live.
+--
+-- DELETE stays: a merchant may delete their own store, and the policy scopes it
+-- to rows they own.
+-- ------------------------------------------------------------
+revoke insert, update on public.stores from anon, authenticated;
+grant update (store_name, theme_config) on public.stores to authenticated;
+
+-- ------------------------------------------------------------
+-- The remaining owner-writable tables (products, ad_creatives,
+-- store_subscribers) carry a merchant's own content. Every column on them is
+-- theirs to set, and none of them decides entitlement, capacity or money, so
+-- their grants are left as they are.
+-- ------------------------------------------------------------
+
+-- ------------------------------------------------------------
+-- Make the fix VERIFIABLE from the deployed application.
+--
+-- A missing GRANT is invisible in a way a missing table is not: every screen
+-- works, every RPC answers, and the only symptom is that anyone can write
+-- themselves a plan. The preflight already refuses to launch over a missing
+-- function, so this reports the privilege state as a function and the deploy
+-- check reads it — a database that predates this migration now fails preflight
+-- loudly instead of running open.
+-- ------------------------------------------------------------
+create or replace function public.entitlement_columns_locked()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select not (
+         has_column_privilege('authenticated', 'public.profiles', 'plan',                   'UPDATE')
+      or has_column_privilege('authenticated', 'public.profiles', 'subscription_status',    'UPDATE')
+      or has_column_privilege('authenticated', 'public.profiles', 'comped_until',           'UPDATE')
+      or has_column_privilege('authenticated', 'public.profiles', 'price_type',             'UPDATE')
+      or has_column_privilege('authenticated', 'public.profiles', 'stripe_subscription_id', 'UPDATE')
+      or has_column_privilege('authenticated', 'public.stores',   'is_active',              'UPDATE')
+      or has_column_privilege('authenticated', 'public.stores',   'user_id',                'UPDATE')
+      or has_column_privilege('anon',          'public.profiles', 'plan',                   'UPDATE')
+      or has_column_privilege('anon',          'public.stores',   'is_active',              'UPDATE')
+    );
+$$;
+
+revoke execute on function public.entitlement_columns_locked() from public, anon, authenticated;
+grant execute on function public.entitlement_columns_locked() to service_role;
+
+comment on function public.entitlement_columns_locked() is
+    'True when plan, subscription and publish columns are service-role-only. Read by /api/health?deep=1.';
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0046_fix_publish_store_lock.sql
+-- ─────────────────────────────────────────────────────────
+-- ------------------------------------------------------------
+-- 0046 — publish_store could never publish a store
+--
+-- 0030 meant to lock the merchant's rows before counting them:
+--
+--     select count(*)::integer into v_live
+--     from public.stores
+--     where user_id = v_user_id and is_active = true
+--     for update;                                  -- ← invalid
+--
+-- PostgreSQL refuses that outright: "FOR UPDATE is not allowed with aggregate
+-- functions". It is not a slow path or an edge case — the statement raises
+-- every time control reaches it, which is every publish of a store that is not
+-- already live. The API turned that into a 500 and told the merchant to try
+-- again, which never helped.
+--
+-- It stayed hidden because almost nothing reaches it in a first run: a
+-- generated store is created with is_active DEFAULT TRUE, so a merchant's first
+-- store is born live without publish_store ever being asked. The function only
+-- runs when someone pauses a store and takes it live again, or takes a second
+-- one live — so the capacity cap that Founder and Pro are sold on was also the
+-- one path nobody exercised.
+--
+-- The lock and the count have to be two statements. Row locks are taken over
+-- the merchant's stores first — a concurrent publish blocks there — and the
+-- count runs afterwards, so the cap still holds under concurrency exactly as
+-- 0030 intended.
+-- ------------------------------------------------------------
+
+create or replace function public.publish_store(
+    p_store_id uuid,
+    -- NULL means unlimited (Pro). The caller passes the plan's capacity; the
+    -- plan table lives in the app, the enforcement lives here.
+    p_max_live integer default null
+)
+returns table (published boolean, live_count integer, reason text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_user_id uuid;
+    v_is_live boolean;
+    v_live    integer;
+begin
+    select s.user_id, s.is_active into v_user_id, v_is_live
+    from public.stores s
+    where s.id = p_store_id
+    for update;
+
+    if v_user_id is null then
+        return query select false, 0, 'NOT_FOUND'::text;
+        return;
+    end if;
+
+    -- Already live: publishing again is a no-op, never a cap failure.
+    if v_is_live then
+        select count(*)::integer into v_live
+        from public.stores where user_id = v_user_id and is_active = true;
+        return query select true, v_live, 'ALREADY_LIVE'::text;
+        return;
+    end if;
+
+    -- Lock every store this merchant owns, so a concurrent publish waits here
+    -- rather than racing the count. Separate from the count on purpose: a row
+    -- lock and an aggregate cannot be the same statement.
+    perform 1 from public.stores where user_id = v_user_id for update;
+
+    select count(*)::integer into v_live
+    from public.stores
+    where user_id = v_user_id and is_active = true;
+
+    if p_max_live is not null and v_live >= p_max_live then
+        return query select false, v_live, 'AT_CAPACITY'::text;
+        return;
+    end if;
+
+    -- published_at is stamped by the 0027 trigger, once and never reset.
+    update public.stores set is_active = true, updated_at = now() where id = p_store_id;
+
+    return query select true, v_live + 1, 'PUBLISHED'::text;
+end $$;
+
+revoke execute on function public.publish_store(uuid, integer) from public, anon, authenticated;
+grant execute on function public.publish_store(uuid, integer) to service_role;
+
+comment on function public.publish_store(uuid, integer) is
+    'Atomically take a store live within the plan''s live-store capacity. NULL capacity = unlimited.';
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0047_analytics_exclude_bots.sql
+-- ─────────────────────────────────────────────────────────
+-- ------------------------------------------------------------
+-- 0047 — "Visitors" must mean people
+--
+-- store_visits gained an is_bot column in 0039, and every attribution function
+-- written since filters on it: attribute_order, the coverage report and the
+-- creative rollups all count `v.is_bot = false`. The two functions the MERCHANT
+-- actually reads did not, because they were written in 0017, two years of
+-- migrations before the column existed.
+--
+-- So the product held two different definitions of "a visitor" at once, and the
+-- dashboard used the wrong one. A crawler hitting a storefront raised
+-- "Visitors today" and, because conversion is orders ÷ visitors, quietly pushed
+-- the merchant's conversion rate DOWN. That is the number Urivo tells them to
+-- steer by, on the screen it puts in front of them first — and it was being
+-- diluted by traffic that was never going to buy anything.
+--
+-- Verified on a real database before this migration: three visits, one of them
+-- flagged is_bot, returned visitors_today = 3 from both functions while the
+-- attribution side counted 2.
+--
+-- Both functions are recreated verbatim apart from the predicate, so the shape,
+-- the grants and the UTC day boundaries are unchanged.
+-- ------------------------------------------------------------
+
+create or replace function public.store_visit_summary(p_store_ids uuid[])
+returns table (
+    store_id uuid,
+    visitors_today bigint,
+    visitors_yesterday bigint,
+    visitors_7d bigint,
+    views_today bigint
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    with b as (select date_trunc('day', now()) as d0)
+    select s.id,
+        count(distinct v.session_hash) filter (where v.created_at >= b.d0),
+        count(distinct v.session_hash) filter (where v.created_at >= b.d0 - interval '1 day' and v.created_at < b.d0),
+        count(distinct v.session_hash) filter (where v.created_at >= b.d0 - interval '6 days'),
+        count(*) filter (where v.created_at >= b.d0)
+    from unnest(p_store_ids) as s(id)
+    cross join b
+    -- The predicate lives in the JOIN, not a WHERE: a store with only bot
+    -- traffic must still return a row of zeroes rather than disappear from the
+    -- dashboard entirely.
+    left join public.store_visits v
+           on v.store_id = s.id
+          and v.is_bot = false
+    group by s.id;
+$$;
+
+create or replace function public.dashboard_store_stats(p_store_ids uuid[])
+returns table (
+    store_id uuid,
+    revenue_today_cents bigint,
+    revenue_yesterday_cents bigint,
+    revenue_7d_cents bigint,
+    revenue_prev7d_cents bigint,
+    revenue_total_cents bigint,
+    orders_today bigint,
+    orders_yesterday bigint,
+    orders_7d bigint,
+    orders_total bigint,
+    visitors_today bigint,
+    visitors_yesterday bigint,
+    visitors_7d bigint,
+    views_today bigint
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    with b as (select date_trunc('day', now()) as d0)
+    select
+        s.id,
+        coalesce(o.revenue_today, 0),
+        coalesce(o.revenue_yesterday, 0),
+        coalesce(o.revenue_7d, 0),
+        coalesce(o.revenue_prev7d, 0),
+        coalesce(o.revenue_total, 0),
+        coalesce(o.orders_today, 0),
+        coalesce(o.orders_yesterday, 0),
+        coalesce(o.orders_7d, 0),
+        coalesce(o.orders_total, 0),
+        coalesce(v.visitors_today, 0),
+        coalesce(v.visitors_yesterday, 0),
+        coalesce(v.visitors_7d, 0),
+        coalesce(v.views_today, 0)
+    from unnest(p_store_ids) as s(id)
+    cross join b
+    left join lateral (
+        select
+            sum(oo.amount_total) filter (where oo.created_at >= b.d0)                                                          as revenue_today,
+            sum(oo.amount_total) filter (where oo.created_at >= b.d0 - interval '1 day' and oo.created_at < b.d0)              as revenue_yesterday,
+            sum(oo.amount_total) filter (where oo.created_at >= b.d0 - interval '6 days')                                      as revenue_7d,
+            sum(oo.amount_total) filter (where oo.created_at >= b.d0 - interval '13 days' and oo.created_at < b.d0 - interval '6 days') as revenue_prev7d,
+            sum(oo.amount_total)                                                                                               as revenue_total,
+            count(*) filter (where oo.created_at >= b.d0)                                                                      as orders_today,
+            count(*) filter (where oo.created_at >= b.d0 - interval '1 day' and oo.created_at < b.d0)                          as orders_yesterday,
+            count(*) filter (where oo.created_at >= b.d0 - interval '6 days')                                                  as orders_7d,
+            count(*)                                                                                                           as orders_total
+        from public.orders oo
+        where oo.store_id = s.id and oo.status in ('paid', 'fulfilled')
+    ) o on true
+    left join lateral (
+        select
+            count(distinct vv.session_hash) filter (where vv.created_at >= b.d0)                                                     as visitors_today,
+            count(distinct vv.session_hash) filter (where vv.created_at >= b.d0 - interval '1 day' and vv.created_at < b.d0)         as visitors_yesterday,
+            count(distinct vv.session_hash) filter (where vv.created_at >= b.d0 - interval '6 days')                                 as visitors_7d,
+            count(*) filter (where vv.created_at >= b.d0)                                                                            as views_today
+        from public.store_visits vv
+        where vv.store_id = s.id
+          and vv.is_bot = false
+    ) v on true;
+$$;
+
+revoke execute on function public.store_visit_summary(uuid[]) from public, anon;
+revoke execute on function public.dashboard_store_stats(uuid[]) from public, anon;
+grant execute on function public.store_visit_summary(uuid[]) to service_role;
+grant execute on function public.dashboard_store_stats(uuid[]) to service_role;
+
+comment on function public.dashboard_store_stats(uuid[]) is
+    'Per-store sales + human traffic in one round-trip. Bots excluded (0047).';
+comment on function public.store_visit_summary(uuid[]) is
+    'Per-store human visitor counts. Bots excluded (0047).';
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0048_founding_release_on_delete.sql
+-- ─────────────────────────────────────────────────────────
+-- ------------------------------------------------------------
+-- 0048 — A deleted founding member releases their spot
+--
+-- 0023 claims a Founding 50 spot when an account is created and nothing ever
+-- gave one back. `founding_claimed` is a denormalised counter, so the moment a
+-- founding account is deleted the counter and reality disagree — permanently,
+-- and silently, because nothing reads the two against each other.
+--
+-- It had already happened. On the live database the counter stood at 10 while
+-- exactly ONE profile carried price_type = 'founding': nine spots were held by
+-- accounts that no longer existed, so the offer would have closed after 41 real
+-- merchants instead of 50. Nobody would have noticed — the cap simply arrives
+-- early, and the landing page correctly stops advertising a price it can no
+-- longer honour.
+--
+-- The business rule does not change: exactly the first 50 eligible merchants
+-- get launch pricing. This makes the counter able to say so truthfully.
+--
+-- Concurrency: the release is a conditional UPDATE on the SAME single settings
+-- row the claim in 0023 locks, so a claim and a release can never interleave —
+-- Postgres serialises them on that row. `greatest(..., 0)` keeps the counter
+-- off the floor even if a spot is somehow released twice, which the table's
+-- own `founding_claimed >= 0` check would otherwise turn into a failed delete.
+-- ------------------------------------------------------------
+
+create or replace function public.release_founding_slot()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    update public.platform_settings
+       set founding_claimed = greatest(founding_claimed - 1, 0),
+           updated_at = now()
+     where id = true;
+    return old;
+end;
+$$;
+
+-- Row trigger with a WHEN clause: a non-founding delete never reaches the
+-- function at all, so "deleting a standard account leaves the count alone" is a
+-- structural property rather than a branch someone could later edit away.
+--
+-- AFTER DELETE, so the spot is only returned once the row is really gone. Fires
+-- for a direct delete and for the cascade from auth.users, which is how an
+-- account is actually removed.
+drop trigger if exists trg_release_founding_slot on public.profiles;
+create trigger trg_release_founding_slot
+    after delete on public.profiles
+    for each row
+    when (old.price_type = 'founding')
+    execute function public.release_founding_slot();
+
+-- ------------------------------------------------------------
+-- Reconcile the counter with reality, once.
+--
+-- The trigger prevents future drift; it cannot undo the drift already there.
+-- Derived from the profiles table rather than written as a literal, so this is
+-- correct on the live database, on a fresh provision from setup_all.sql (where
+-- it evaluates to 0), and on any restored copy.
+-- ------------------------------------------------------------
+update public.platform_settings
+   set founding_claimed = least(
+           (select count(*) from public.profiles where price_type = 'founding'),
+           founding_cap
+       ),
+       updated_at = now()
+ where id = true;
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0049_source_origin_country.sql
+-- ─────────────────────────────────────────────────────────
+-- Origin country on a product's supplier source.
+--
+-- The EU's €150 duty exemption ended on 1 July 2026. A parcel entering the EU
+-- now carries a flat customs charge per line item — €3, rising to €5 once the
+-- handling fee joins it on 1 November 2026 — and on the low-cost goods that
+-- dropshipping runs on, that charge is not a rounding error, it is the margin.
+-- An €8 product sold at €24 is 67% before duty and 46% after.
+--
+-- The dashboard computes each merchant's average margin as (price - cost)/price
+-- straight from this table, so without knowing where the goods ship FROM it
+-- cannot tell an EU-sourced product (no customs line at all) from an import.
+-- It has therefore been reporting the pre-July number to every merchant.
+--
+-- Nullable on purpose, and null is NOT read as "domestic": lib/finance/
+-- import-duty.ts treats unknown origin as an import, because under-stating cost
+-- sells at a loss the merchant discovers after the ad spend, while over-stating
+-- it costs a little volume. Those are not symmetric mistakes.
+
+alter table public.product_sources
+  add column if not exists ships_from_country text;
+
+comment on column public.product_sources.ships_from_country is
+  'ISO-3166-1 alpha-2 origin of the goods. Drives EU import duty in margin '
+  'calculations (lib/finance/import-duty.ts). NULL = unknown, which is treated '
+  'as a non-EU import rather than as domestic.';
+
+-- Two characters, upper case, or nothing. A malformed code would silently fall
+-- through the EU-membership check and be treated as an import, which is the
+-- safe direction but hides the data problem rather than surfacing it.
+alter table public.product_sources
+  drop constraint if exists product_sources_ships_from_country_iso2;
+
+alter table public.product_sources
+  add constraint product_sources_ships_from_country_iso2
+  check (ships_from_country is null or ships_from_country ~ '^[A-Z]{2}$');
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0050_gpsr_product_safety.sql
+-- ─────────────────────────────────────────────────────────
+-- GPSR product safety information (Regulation (EU) 2023/988).
+--
+-- The General Product Safety Regulation has applied since 13 December 2024, and
+-- 2026 is its enforcement year: Safety Gate recorded 4,671 alerts in 2025, the
+-- highest ever and 13% up on the year before, and market surveillance
+-- authorities now have the powers to order a listing taken down.
+--
+-- Article 19 requires every distance-selling offer — which is what a generated
+-- Urivo storefront is — to show, before the sale:
+--
+--   * the manufacturer's name, postal address and electronic address
+--   * for goods made outside the EU, the EU "responsible person" and theirs
+--   * the product's identifying details (type, batch or serial)
+--   * any warnings or safety information
+--
+-- Urivo generates listings, so it generates the surface these belong on. The
+-- fields are nullable because Urivo cannot invent them: a merchant who does not
+-- know their manufacturer's registered address must be shown that the listing is
+-- incomplete, not handed a plausible-looking address the AI made up. That is the
+-- same rule the storefront already applies to shipping terms and eco claims —
+-- the platform never authors a statement the merchant is legally bound by.
+--
+-- Every column here is the merchant's own content and none decides entitlement,
+-- capacity or money, so the products grants are left as migration 0045 set them.
+
+alter table public.products
+  add column if not exists manufacturer_name text,
+  add column if not exists manufacturer_address text,
+  add column if not exists manufacturer_email text,
+  add column if not exists eu_responsible_name text,
+  add column if not exists eu_responsible_address text,
+  add column if not exists eu_responsible_email text,
+  add column if not exists product_identifier text,
+  add column if not exists safety_warnings text;
+
+comment on column public.products.manufacturer_name is
+  'GPSR Art. 19: manufacturer name or registered trademark. NULL = the merchant '
+  'has not supplied it; the listing is incomplete and says so.';
+comment on column public.products.eu_responsible_name is
+  'GPSR Art. 16: the EU-established responsible person, required when the '
+  'manufacturer is outside the EU. NULL is only correct for EU-made goods.';
+comment on column public.products.product_identifier is
+  'GPSR Art. 19: type, batch or serial number identifying the specific product.';
+comment on column public.products.safety_warnings is
+  'GPSR Art. 19: warnings and safety information shown before purchase.';
+
+-- Length ceilings only. No format checks and no NOT NULL: a constraint that
+-- rejects a merchant's real, oddly-formatted manufacturer address would push
+-- them to type something false, which is worse than an empty field.
+alter table public.products
+  drop constraint if exists products_gpsr_lengths;
+
+alter table public.products
+  add constraint products_gpsr_lengths check (
+    coalesce(char_length(manufacturer_name), 0) <= 200
+    and coalesce(char_length(manufacturer_address), 0) <= 500
+    and coalesce(char_length(manufacturer_email), 0) <= 320
+    and coalesce(char_length(eu_responsible_name), 0) <= 200
+    and coalesce(char_length(eu_responsible_address), 0) <= 500
+    and coalesce(char_length(eu_responsible_email), 0) <= 320
+    and coalesce(char_length(product_identifier), 0) <= 140
+    and coalesce(char_length(safety_warnings), 0) <= 2000
+  );
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0051_ledger_duration.sql
+-- ─────────────────────────────────────────────────────────
+-- How long an AI action actually took.
+--
+-- The landing page tells every visitor that Urivo generates a storefront "in
+-- under a minute". Nothing in this codebase measures that, and nothing ever
+-- has — so the claim could not be verified before it was made, and could not
+-- be checked afterwards either. A performance promise on the page a customer
+-- buys from is a statement of fact; it needs a number behind it.
+--
+-- The ledger already records what each action cost in tokens, images and
+-- money. Wall-clock duration belongs in the same row: it is measured at the
+-- same moment, by the same code, about the same action, and it makes the
+-- marketing claim answerable with a query rather than an opinion.
+--
+-- Nullable, because rows written before this migration have no duration and
+-- guessing one would be worse than admitting the gap.
+
+alter table public.ai_usage_ledger
+  add column if not exists duration_ms integer
+    check (duration_ms is null or duration_ms >= 0);
+
+comment on column public.ai_usage_ledger.duration_ms is
+  'Wall-clock milliseconds the action took end to end, including image '
+  'generation. NULL for rows written before migration 0051. This is the column '
+  'that answers whether "in under a minute" is true.';
+
+-- Answering the question is one query, so it lives here rather than in a
+-- README where it would go stale:
+--
+--   select
+--     percentile_cont(0.5) within group (order by duration_ms) / 1000.0 as p50_s,
+--     percentile_cont(0.95) within group (order by duration_ms) / 1000.0 as p95_s,
+--     count(*)
+--   from public.ai_usage_ledger
+--   where feature = 'storeGeneration' and duration_ms is not null;
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0052_public_store_columns.sql
+-- ─────────────────────────────────────────────────────────
+-- The public storefront may read a store. It may not read the whole row.
+--
+-- Measured against production with the public anon key before this migration:
+--
+--   select * from stores  →  2 of 3 rows, every column, including
+--   user_id, stripe_account_id, stripe_charges_enabled, published_at.
+--
+-- The row filter was never the problem — `stores: public storefront read`
+-- correctly limits anon to active stores, and the inactive one stayed hidden.
+-- The problem is that RLS filters ROWS and says nothing about COLUMNS, exactly
+-- as migration 0045 found for writes. 0045 revoked insert and update and
+-- granted the two editable columns back; it left select alone, so the read side
+-- kept handing out the entire record.
+--
+-- Nothing here is a credential: a Stripe Connect account id cannot be used
+-- without the platform's secret key. What it is, is a map — anyone with the
+-- publishable key could enumerate every live store, its owner's user id, and
+-- that owner's Connect account, and join them together. That is competitor
+-- intelligence and a phishing target, and it is visible to the open internet.
+--
+-- Column grants rather than a view, deliberately. A view would mean pointing
+-- the storefront at a new relation, and the RLS policy on `products` contains
+-- `exists (select 1 from stores s where s.id = store_id and s.is_active)` —
+-- a policy subquery still runs its permission checks against the querying role,
+-- so anon must retain select on `stores.id` and `stores.is_active` or every
+-- product on every storefront disappears. The grant below covers both.
+
+revoke select on public.stores from anon;
+
+grant select (
+  id,               -- joined by the products policy and by product routes
+  store_name,
+  subdomain,
+  theme_config,     -- the brand: palette, fonts, copy. Public by definition.
+  currency,
+  is_active,        -- read by the products policy subquery
+  published_at
+) on public.stores to anon;
+
+comment on table public.stores is
+  'Anon holds column-level select (migration 0052): the storefront reads brand '
+  'and identity only. user_id, stripe_account_id and stripe_charges_enabled are '
+  'deliberately excluded — RLS filters rows, grants filter columns, and the '
+  'public storefront needs neither the owner nor their payment account.';
+
+-- ------------------------------------------------------------
+-- Storage: stop the bucket from being enumerable.
+--
+-- `product-images` is a public bucket, so object reads by URL bypass policies
+-- entirely — that is what "public" means and it is why every published store's
+-- imagery keeps working untouched here. The policy below was doing something
+-- else: `for select using (bucket_id = 'product-images')` is what authorises
+-- the LIST api, and listing is how someone walks the bucket and finds the
+-- imagery of stores that have never been published.
+--
+-- Paths are `<subdomain>/<index>-<uuid>.<ext>`, so an individual object is not
+-- guessable. Removing the ability to enumerate therefore removes the only
+-- practical route to an unpublished merchant's assets.
+--
+-- What this does NOT do, stated plainly so nobody assumes otherwise: someone
+-- who already holds the URL of an unpublished image can still fetch it. Closing
+-- that requires a private bucket and signed URLs, which means migrating every
+-- image_url already stored on every published product. That is a separate,
+-- larger change with a real risk of breaking live storefronts, and it is not
+-- being smuggled into a hardening migration.
+-- ------------------------------------------------------------
+drop policy if exists "Public read product images" on storage.objects;
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0053_fix_anon_policy_privileges.sql
+-- ─────────────────────────────────────────────────────────
+-- Repairs the storefront that migration 0052 broke.
+--
+-- WHAT WENT WRONG
+--
+-- 0052 replaced anon's table-level select on `stores` with column-level grants,
+-- on the assumption that a policy subquery only needs privileges on the columns
+-- it touches. That is false. PostgreSQL checks TABLE-level select on every
+-- relation a policy expression references, regardless of which columns the
+-- expression reads. The comment in 0052 predicting otherwise was wrong.
+--
+-- The result, measured against production with the publishable key immediately
+-- after 0052 was applied:
+--
+--   GET /rest/v1/products  →  401  permission denied for table stores
+--
+-- Every anonymous visitor's catalogue was empty. The storefront loads products
+-- through the session client (app/(store)/store/[subdomain]/page.tsx), so this
+-- was live customer-facing breakage, and a worse outcome than the information
+-- disclosure 0052 set out to fix.
+--
+-- Two policies on `products` are evaluated for an anonymous select and BOTH
+-- reference `stores`: the public read, and `products: owner write`, which is
+-- FOR ALL and therefore applies to select as well. Fixing only the first would
+-- have left the 401 in place.
+--
+-- THE FIX
+--
+-- A security-definer helper answers "is this store live?" without the caller
+-- needing any privilege on `stores` at all. The function is owned by the schema
+-- owner, so the privilege check happens against the owner, not against anon.
+-- It is STABLE and pinned to an explicit search_path — a definer function
+-- without a fixed search_path is a privilege-escalation vector.
+--
+-- Owner-scoped policies are additionally restricted TO authenticated. They can
+-- never grant an anonymous visitor anything (auth.uid() is null), so evaluating
+-- them for anon only ever produced an error where the correct answer was "no
+-- rows". Scoping them is both a correctness fix and one less relation anon
+-- needs rights on.
+--
+-- 0052's column grants on `stores` stay exactly as they are: the storefront's
+-- own select of stores works, and user_id, stripe_account_id and
+-- stripe_charges_enabled remain unreadable to anon. That part was correct and
+-- is verified.
+
+-- ------------------------------------------------------------
+-- The helper.
+-- ------------------------------------------------------------
+create or replace function public.store_is_active(p_store_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.stores
+    where id = p_store_id and is_active = true
+  );
+$$;
+
+comment on function public.store_is_active(uuid) is
+  'Is this store published? Security definer so the public storefront policies '
+  'can ask without anon holding select on stores (migration 0053). Reveals one '
+  'boolean about a store id the caller already has.';
+
+revoke all on function public.store_is_active(uuid) from public;
+grant execute on function public.store_is_active(uuid) to anon, authenticated;
+
+-- ------------------------------------------------------------
+-- products — the two policies an anonymous select evaluates.
+-- ------------------------------------------------------------
+drop policy if exists "products: public storefront read" on public.products;
+create policy "products: public storefront read" on public.products
+    for select
+    to anon, authenticated
+    using (public.store_is_active(store_id));
+
+drop policy if exists "products: owner write" on public.products;
+create policy "products: owner write" on public.products
+    for all
+    to authenticated
+    using (
+        exists (select 1 from public.stores s
+                where s.id = store_id and s.user_id = auth.uid())
+    );
+
+-- ------------------------------------------------------------
+-- Owner-scoped policies: never applicable to anon, so never evaluated for anon.
+-- Bodies are unchanged; only the role scope is added.
+-- ------------------------------------------------------------
+drop policy if exists "orders: owner read" on public.orders;
+create policy "orders: owner read" on public.orders
+    for select to authenticated using (
+        exists (select 1 from public.stores s
+                where s.id = store_id and s.user_id = auth.uid())
+    );
+
+drop policy if exists "order_items: owner read" on public.order_items;
+create policy "order_items: owner read" on public.order_items
+    for select to authenticated using (
+        exists (
+            select 1 from public.orders o
+            join public.stores s on s.id = o.store_id
+            where o.id = order_id and s.user_id = auth.uid()
+        )
+    );
+
+drop policy if exists "store_visits: owner read" on public.store_visits;
+create policy "store_visits: owner read" on public.store_visits
+    for select to authenticated using (
+        exists (
+            select 1 from public.stores s
+            where s.id = store_visits.store_id and s.user_id = auth.uid()
+        )
+    );
+
+drop policy if exists "store_subscribers: owner read" on public.store_subscribers;
+create policy "store_subscribers: owner read" on public.store_subscribers
+    for select to authenticated using (
+        exists (
+            select 1 from public.stores s
+            where s.id = store_subscribers.store_id and s.user_id = auth.uid()
+        )
+    );
+
+drop policy if exists "store_subscribers: owner update" on public.store_subscribers;
+create policy "store_subscribers: owner update" on public.store_subscribers
+    for update to authenticated using (
+        exists (
+            select 1 from public.stores s
+            where s.id = store_subscribers.store_id and s.user_id = auth.uid()
+        )
+    );
+
+drop policy if exists "store_subscribers: owner delete" on public.store_subscribers;
+create policy "store_subscribers: owner delete" on public.store_subscribers
+    for delete to authenticated using (
+        exists (
+            select 1 from public.stores s
+            where s.id = store_subscribers.store_id and s.user_id = auth.uid()
+        )
+    );
+
+drop policy if exists "store_domains: owner read" on public.store_domains;
+create policy "store_domains: owner read" on public.store_domains
+    for select to authenticated using (
+        exists (
+            select 1 from public.stores s
+            where s.id = store_domains.store_id and s.user_id = auth.uid()
+        )
+    );
+
+drop policy if exists "ad_creatives: owner read" on public.ad_creatives;
+create policy "ad_creatives: owner read" on public.ad_creatives
+    for select to authenticated using (
+        exists (select 1 from public.stores s
+                where s.id = ad_creatives.store_id and s.user_id = auth.uid())
+    );
+
+drop policy if exists "ad_creatives: owner update" on public.ad_creatives;
+create policy "ad_creatives: owner update" on public.ad_creatives
+    for update to authenticated using (
+        exists (select 1 from public.stores s
+                where s.id = ad_creatives.store_id and s.user_id = auth.uid())
+    );

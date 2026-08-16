@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
 import {
   fontStack,
-  googleFontsUrl,
   mix,
   rgba,
   sectionPadding,
@@ -10,6 +9,7 @@ import {
   type StoreLogo,
   type LogoPosition,
 } from "@/lib/storefront/design-system";
+import { STOREFRONT_FONT_VARS } from "@/lib/storefront/fonts";
 import type {
   NarrativeBlock,
   HeroBlock,
@@ -59,9 +59,11 @@ export interface RenderProduct {
   description: string | null;
   price_eur: number | string;
   image_url?: string | null;
-  show_logo?: boolean;
+  show_logo?: boolean | null;
   /** 'ai' | 'uploaded' | 'supplier' | 'placeholder' | null (unknown). */
   image_source?: string | null;
+  /** null/undefined = not tracked; drives Offer availability in JSON-LD. */
+  inventory_count?: number | null;
 }
 
 /** A navigation entry. Only ever built for a destination that exists. */
@@ -1055,7 +1057,6 @@ export function StorefrontRenderer({
   /** False when the merchant cannot take payment yet — the cart says so plainly. */
   canSell?: boolean;
 }) {
-  const fontsHref = googleFontsUrl(ds);
   // A hero image lifts the split/fullbleed heroes; use the first product photo.
   const heroImage = catalog.find((p) => p.image_url)?.image_url ?? null;
   // Base path for internal store links: on localhost the store lives under
@@ -1113,9 +1114,8 @@ export function StorefrontRenderer({
 
   return (
     <>
-      {fontsHref && <link rel="stylesheet" href={fontsHref} />}
       <style dangerouslySetInnerHTML={{ __html: scopedCss(ds) }} />
-      <div id="uv-store" style={buildVars(ds)}>
+      <div id="uv-store" className={STOREFRONT_FONT_VARS} style={buildVars(ds)}>
         <StoreCartProvider subdomain={subdomain} currency={currency} canSell={canSell}>
           {ds.layout.announcement && <Announcement ds={ds} />}
           <Nav storeName={storeName} ds={ds} links={navLinks} />

@@ -120,11 +120,19 @@ export async function PATCH(
     }
   }
 
-  // RLS ("stores: own all") enforces ownership again at the row level.
-  const { data, error } = await supabase
-    .from("stores")
-    .update(update)
-    .eq("id", id)
+  /*
+   * `is_active` is not writable by a signed-in user any more (migration 0045):
+   * publishing is a paid capability and a capacity decision, so the column
+   * belongs to publish_store alone. Taking a store DOWN is always allowed and
+   * has no cap to check, so it goes through the service role — with the owner
+   * id repeated in the predicate, which keeps the row-level ownership check
+   * that RLS was providing on this statement.
+   */
+  const unpublishing = update.is_active === false;
+  const writer = unpublishing ? supabaseAdmin() : supabase;
+  let q = writer.from("stores").update(update).eq("id", id);
+  if (unpublishing) q = q.eq("user_id", owner.userId);
+  const { data, error } = await q
     .select("id, store_name, subdomain, is_active, theme_config")
     .single();
 

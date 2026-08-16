@@ -1,14 +1,12 @@
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getCreditBalance, getCreditLedger } from "@/lib/credits";
-import { AppShell } from "../_shell/app-shell";
-import { loadRailStore } from "../_shell/rail-data";
 import { ManageSubscriptionButton } from "./upgrade-buttons";
 import { PlanPicker } from "./plan-picker";
 import { CreditPacks } from "./credit-packs";
 import { PayoutSetup } from "./payouts";
 import { getConnectStatus, connectState } from "@/lib/billing/connect";
-import { PLANS, planName, formatPrice, isLaunchWindow, priceForUser } from "@/lib/plans";
+import { PLANS, planName, formatPrice, isLaunchWindow, priceForUser, entitledPlanKey } from "@/lib/plans";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
 import { RevealStagger } from "../../_motion/reveal-stagger";
 
@@ -21,16 +19,33 @@ export default async function BillingPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, balance, ledger, rail, connect] = await Promise.all([
-    supabase.from("profiles").select("plan, price_type, subscription_status, email").eq("id", user.id).single(),
+  const [{ data: profile }, balance, ledger, connect] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("plan, price_type, subscription_status, comped_until, stripe_subscription_id, email")
+      .eq("id", user.id)
+      .single(),
     getCreditBalance(user.id),
     getCreditLedger(user.id),
-    loadRailStore(user.id),
     getConnectStatus(user.id),
   ]);
 
-  const plan = profile?.plan ?? "free";
+  /*
+   * The tier the account may actually USE, not the one its plan column names.
+   * Billing has to agree with the rest of the product: if an incomplete
+   * checkout or a lapsed comp left `plan` on a paid tier, every other screen
+   * now says Free, and this one saying Founder would leave the visitor with no
+   * way to subscribe — the upgrade section is hidden from anyone already on the
+   * tier it offers.
+   */
+  const plan = entitledPlanKey(profile);
   const priceType = profile?.price_type ?? "standard";
+  /*
+   * Stripe's portal needs a Stripe subscription. Comped testers hold a paid
+   * tier without one, so "Manage subscription" is keyed to the subscription
+   * itself rather than to the tier — otherwise the button opens an error.
+   */
+  const hasSubscription = Boolean(profile?.stripe_subscription_id);
   const isFoundingMember = priceType === "founding";
   const launch = isLaunchWindow();
   const planLabel = planName(plan);
@@ -44,7 +59,7 @@ export default async function BillingPage() {
           : "Standard pricing";
 
   return (
-    <AppShell active="billing" email={profile?.email ?? user.email ?? null} store={rail}>
+    <>
       <RevealStagger>
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">Billing</p>
@@ -89,7 +104,7 @@ export default async function BillingPage() {
         </section>
       )}
 
-      {plan !== "free" && (
+      {hasSubscription && (
         <section className="mt-8">
           <h2 className="text-lg font-semibold tracking-tight text-ivory">Manage subscription</h2>
           <div className="u-float mt-4 flex flex-col gap-4 rounded-2xl border border-hair bg-panel/70 p-6 sm:flex-row sm:items-center sm:justify-between">
@@ -97,9 +112,18 @@ export default async function BillingPage() {
               <p className="text-sm text-ivory">
                 Update your payment method, change plan, or cancel anytime.
               </p>
+              {/*
+                * past_due is the one subscription state a merchant needs to act on
+                * and the only one they cannot see anywhere else: Stripe is retrying
+                * a card that failed, access continues meanwhile, and it ends for
+                * real if the retries run out. The branch this replaced compared
+                * against "canceled" — a value this column never holds (it stores
+                * "cancelled") inside a block that only renders for a paid plan, so
+                * it could not be reached from either direction.
+                */}
               <p className="mt-1 text-xs text-mist">
-                {profile?.subscription_status === "canceled"
-                  ? "Your subscription is set to end — you keep access until the period closes."
+                {profile?.subscription_status === "past_due"
+                  ? "Your last payment didn't go through. Update your card to keep your stores live — we'll keep retrying in the meantime."
                   : "You're in control. Cancelling stays effective until the end of your paid period."}
               </p>
             </div>
@@ -159,6 +183,6 @@ export default async function BillingPage() {
         )}
       </section>
       </RevealStagger>
-    </AppShell>
+    </>
   );
 }

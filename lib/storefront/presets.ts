@@ -63,7 +63,11 @@ const VOLT = parseDesignSystem({
     footer: "bold",
     imageTreatment: "duotone",
     motion: "lively",
-    announcement: "Free shipping worldwide · New drop friday",
+    // Was "Free shipping worldwide · New drop friday". This file is destined to
+    // be few-shot input for the generator, and a shipping promise in an exemplar
+    // is a shipping promise the model will write into real merchants' stores —
+    // the one thing the header above says these presets must never contain.
+    announcement: "New drop friday",
     sectionOrder: ["announcement", "hero", "marquee", "collection", "highlights", "footer"],
   },
 });
@@ -76,7 +80,7 @@ const LUME = parseDesignSystem({
   story:
     "Lumè exists because most skincare talks to you as though something is wrong. We make a small number of gentle, well-considered things, and we let your skin take its time.",
   trust: [
-    { title: "Thirty days to decide", detail: "Return it opened and half-used. Skin needs longer than a week to answer." },
+    { title: "Fourteen days to return", detail: "Opened and half-used is fine — skin needs time to answer." },
     { title: "The whole ingredient list", detail: "Everything in the bottle is printed on the bottle, in plain language." },
     { title: "Secure checkout", detail: "Card details are encrypted in transit and never stored by us." },
     { title: "A person, not a bot", detail: "Write to us about your skin and someone here will actually write back." },
@@ -93,7 +97,7 @@ const LUME = parseDesignSystem({
     footer: "editorial",
     imageTreatment: "framed",
     motion: "lively",
-    announcement: "Free samples with every order",
+    announcement: "New: the barrier serum",
     sectionOrder: ["announcement", "hero", "trust", "collection", "story", "newsletter", "footer"],
   },
 });

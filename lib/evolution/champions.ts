@@ -88,10 +88,20 @@ function pickUnique(start: number, len: number, used: Set<number>): number {
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
 /*
- * Seven trustworthy signals. Conversion / premium / trust come straight from
- * the engine's fitness scores; demand / margin / supplier / shipping are derived
- * deterministically and correlate with overall fitness, so a stronger storefront
- * genuinely earns stronger reasons.
+ * The reasons a champion won — each one a thing the fitness model actually
+ * scores about the STOREFRONT.
+ *
+ * Two signals used to sit here that scored nothing of the kind: "Excellent
+ * supplier reliability" was `trust * 0.6 + overall * 0.4 + (layout % 3) * 3`,
+ * and "Fast EU shipping" was the same shape over the purchase score. Neither
+ * had any connection to a supplier or a delivery route — Urivo has no supplier
+ * data at all (that layer is dormant) and has never seen the merchant's
+ * fulfilment. A beginner reading "Excellent supplier reliability — 87" as a
+ * reason their store won could reasonably conclude sourcing had been checked.
+ *
+ * The simulation label covers scores being modelled rather than measured. It
+ * does not make up for a signal that is about a subject the model cannot see.
+ * Five honest reasons are worth more than seven with two invented.
  */
 function signalsFor(v: Variant): Signal[] {
   const s = v.scores;
@@ -99,10 +109,8 @@ function signalsFor(v: Variant): Signal[] {
   const d = (base: number, lift: number) => clamp(base * 0.6 + o * 0.4 + lift);
   const raw: Signal[] = [
     { key: "conversion", label: "Highest predicted conversion rate", value: clamp(s.conversion) },
-    { key: "demand", label: "High-demand niche", value: d(s.brand, (v.traits.hero % 3) * 4) },
-    { key: "margin", label: "Strong projected margins", value: d(s.premium, (v.traits.palette % 3) * 3) },
-    { key: "supplier", label: "Excellent supplier reliability", value: d(s.trust, (v.traits.layout % 3) * 3) },
-    { key: "shipping", label: "Fast EU shipping", value: d(s.purchase, (v.traits.cta % 3) * 4) },
+    { key: "demand", label: "Strong category fit", value: d(s.brand, (v.traits.hero % 3) * 4) },
+    { key: "margin", label: "Supports a premium price", value: d(s.premium, (v.traits.palette % 3) * 3) },
     { key: "premium", label: "Premium brand positioning", value: clamp(s.premium) },
     { key: "trust", label: "High customer-trust signals", value: clamp(s.trust) },
   ];

@@ -6,10 +6,13 @@
  */
 
 export interface SeoProduct {
+  id?: string;
   title: string;
   description: string | null;
   price_eur: number | string;
   image_url?: string | null;
+  /** null/undefined = not tracked, which the storefront treats as available. */
+  inventory_count?: number | null;
 }
 
 export interface SeoStore {
@@ -17,7 +20,42 @@ export interface SeoStore {
   tagline: string;
   subdomain: string;
   url: string; // absolute storefront URL
+  /** ISO-4217, from the store's own column. Not every store prices in EUR. */
+  currency?: string | null;
   products: SeoProduct[];
+}
+
+/*
+ * Availability and currency are FACTS, not defaults.
+ *
+ * Both were hardcoded here — every product declared `InStock` and `EUR`
+ * regardless of its inventory or the store's currency. That was survivable while
+ * structured data was only read by search engines, which treat it as a hint.
+ * It stops being survivable now that shopping agents read these exact fields to
+ * decide what to put in front of a buyer: an agent that is told "in stock" and
+ * finds a sold-out product does not blame the agent, and a price in the wrong
+ * currency is a wrong price, not a formatting detail.
+ *
+ * The mapping matches what the product page itself renders — `(count ?? 1) > 0`
+ * — so the page and its structured data can never contradict each other.
+ */
+function availabilityOf(inventory: number | null | undefined): string {
+  return (inventory ?? 1) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock";
+}
+
+function currencyOf(currency: string | null | undefined): string {
+  const code = (currency ?? "").trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(code) ? code : "EUR";
+}
+
+function offerOf(p: SeoProduct, currency: string | null | undefined, url?: string) {
+  return {
+    "@type": "Offer",
+    price: Number(p.price_eur).toFixed(2),
+    priceCurrency: currencyOf(currency),
+    availability: availabilityOf(p.inventory_count),
+    ...(url ? { url } : {}),
+  };
 }
 
 /**
@@ -56,17 +94,66 @@ export function storeJsonLd(store: SeoStore): Record<string, unknown> {
       name: p.title,
       ...(p.description ? { description: p.description } : {}),
       ...(p.image_url ? { image: p.image_url } : {}),
-      offers: {
-        "@type": "Offer",
-        price: Number(p.price_eur).toFixed(2),
-        priceCurrency: "EUR",
-        availability: "https://schema.org/InStock",
-      },
+      ...(p.id ? { url: `${store.url}/product/${p.id}` } : {}),
+      offers: offerOf(p, store.currency, p.id ? `${store.url}/product/${p.id}` : undefined),
     },
   }));
   return {
     "@context": "https://schema.org",
     "@graph": [org, { "@type": "ItemList", itemListElement: items }],
+  };
+}
+
+/**
+ * The canonical public URL of a storefront.
+ *
+ * Structured data is the one place a relative URL is worthless — a crawler or a
+ * shopping agent reads the JSON on its own and has no page to resolve it
+ * against. This mirrors the storefront route's own helper so the canonical URL
+ * has a single definition rather than one per surface that needs it.
+ */
+export function storefrontUrl(subdomain: string): string {
+  const root = (process.env.ROOT_DOMAIN ?? "localhost:3000").toLowerCase();
+  return root.startsWith("localhost")
+    ? `http://localhost:3000/store/${subdomain}`
+    : `https://${subdomain}.${root}`;
+}
+
+/**
+ * JSON-LD for a single product page.
+ *
+ * The store page's ItemList tells a crawler that a product exists; this tells it
+ * — and an AI shopping agent — everything needed to evaluate and transact:
+ * stable identifier, canonical URL, price, currency, live availability, and the
+ * brand it belongs to. That set is the entry ticket to agent-mediated discovery
+ * (ACP, UCP), where a product with no structured offer is simply not a candidate.
+ *
+ * Deliberately absent: `aggregateRating` and `review`. A generated store has no
+ * customers on day one, and inventing ratings would be the single most damaging
+ * false claim the storefront could make — it is fraud, it is what search engines
+ * issue manual actions for, and it is the reason the trust section renders
+ * nothing the merchant did not author.
+ */
+export function productJsonLd(input: {
+  product: SeoProduct;
+  storeName: string;
+  storeUrl: string;
+  productUrl: string;
+  currency?: string | null;
+}): Record<string, unknown> {
+  const { product: p, storeName, storeUrl, productUrl, currency } = input;
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: p.title,
+    ...(p.description ? { description: p.description } : {}),
+    ...(p.image_url ? { image: p.image_url } : {}),
+    ...(p.id ? { sku: p.id } : {}),
+    brand: { "@type": "Brand", name: storeName },
+    offers: {
+      ...offerOf(p, currency, productUrl),
+      seller: { "@type": "Organization", name: storeName, url: storeUrl },
+    },
   };
 }
 

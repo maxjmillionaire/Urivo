@@ -3,7 +3,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { parseDesignSystem, themeToDesignSystem } from "@/lib/storefront/design-system";
 import { parseTheme } from "@/lib/storefront";
 import { getCreditBalance } from "@/lib/credits";
-import { planName } from "@/lib/plans";
+import { planName, entitledPlanKey } from "@/lib/plans";
 
 /*
  * The business snapshot Ask Urivo reasons over.
@@ -112,7 +112,7 @@ export async function loadAssistantContext(userId: string): Promise<AssistantCon
     getCreditBalance(userId).catch(() => 0),
     supabase
       .from("profiles")
-      .select("plan, stripe_charges_enabled")
+      .select("plan, subscription_status, comped_until, stripe_charges_enabled")
       .eq("id", userId)
       .maybeSingle(),
   ]);
@@ -129,7 +129,7 @@ export async function loadAssistantContext(userId: string): Promise<AssistantCon
   const stores = (storesResult.data ?? null) as StoreRow[] | null;
 
   const account: AssistantAccount = {
-    plan: planName(profile?.plan ?? null),
+    plan: planName(entitledPlanKey(profile)),
     credits,
     storeCount: stores?.length ?? 0,
     canTakePayments: Boolean(profile?.stripe_charges_enabled),
@@ -162,6 +162,11 @@ export async function loadAssistantContext(userId: string): Promise<AssistantCon
         .from("store_visits")
         .select("session_hash")
         .eq("store_id", top.id)
+        // Humans only, matching the dashboard (0047) and the attribution
+        // subsystem. Counting crawlers here would understate the conversion
+        // rate the assistant then reasons out loud about — a wrong number is
+        // worse in advice than on a tile, because it comes with a conclusion.
+        .eq("is_bot", false)
         .gte("created_at", since)
         .limit(5000);
       return data ?? [];

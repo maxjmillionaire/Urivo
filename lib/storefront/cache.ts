@@ -79,6 +79,8 @@ export interface CachedProduct {
   show_logo: boolean | null;
   /** Where the photo came from — drives the AI disclosure (EU AI Act Art. 50). */
   image_source: string | null;
+  /** null = not tracked, which the storefront renders as available. */
+  inventory_count: number | null;
 }
 
 export interface CachedStorefront {
@@ -113,7 +115,10 @@ export function getPublishedStorefront(subdomain: string) {
        * optional column, so the full select falls back to the columns that have
        * existed since 0001.
        */
-      const CORE = "id, title, description, price_eur, image_url, show_logo";
+      // inventory_count feeds the Offer availability in the storefront's JSON-LD.
+      // Left out here, the cached path would tell every shopping agent that a
+      // sold-out product is in stock — while the uncached path told the truth.
+      const CORE = "id, title, description, price_eur, image_url, show_logo, inventory_count";
       const full = await admin
         .from("products")
         .select(`${CORE}, image_source`)

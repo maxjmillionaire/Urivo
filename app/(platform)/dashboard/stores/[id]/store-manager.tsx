@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LOGO_POSITIONS, type StoreLogo, type LogoPosition } from "@/lib/storefront/design-system";
+import { gpsrFormFrom, gpsrFormOf, type GpsrForm } from "@/lib/commerce/gpsr";
 import { BrandNameStudio } from "./brand-name-studio";
 
 /*
@@ -19,7 +20,27 @@ type Product = {
   inventoryCount: number;
   imageUrl: string | null;
   showLogo: boolean;
-};
+} & GpsrForm;
+
+/*
+ * GPSR Art. 19 (migration 0050) — the manufacturer block, the EU responsible
+ * person, the product identifier and any warnings, which an EU listing has to
+ * show before the sale. Empty string means "not supplied"; the API stores that
+ * as NULL so there is one representation of missing across the stack. The shape
+ * and the column mapping live in lib/commerce/gpsr.ts alongside the rule.
+ */
+const GPSR_FIELDS: [keyof GpsrForm, string, string][] = [
+  ["manufacturerName", "Manufacturer", "Registered name or trademark"],
+  ["manufacturerAddress", "Manufacturer address", "Street, postcode, city, country"],
+  ["manufacturerEmail", "Manufacturer contact", "Email or web address"],
+  ["euResponsibleName", "EU responsible person", "Required if the manufacturer is outside the EU"],
+  ["euResponsibleAddress", "EU responsible address", "Street, postcode, city, country"],
+  ["euResponsibleEmail", "EU responsible contact", "Email or web address"],
+  ["productIdentifier", "Product identifier", "Type, batch or serial number"],
+  ["safetyWarnings", "Safety information", "Warnings a buyer must read first"],
+];
+
+const EMPTY_GPSR: GpsrForm = gpsrFormFrom(null);
 
 const POSITION_LABELS: Record<LogoPosition, string> = {
   "top-left": "Top left",
@@ -173,6 +194,10 @@ export function StoreManager({
       inventoryCount: data.product.inventory_count,
       imageUrl: id ? (products.find((p) => p.id === id)?.imageUrl ?? null) : null,
       showLogo: id ? (products.find((p) => p.id === id)?.showLogo ?? true) : true,
+      // From the submitted form rather than the response: the create route does
+      // not echo these columns back, and re-reading them is a round trip for
+      // values we just sent.
+      ...gpsrFormOf(form),
     };
     setProducts((prev) => (id ? prev.map((p) => (p.id === id ? saved : p)) : [...prev, saved]));
     setEditing(null);
@@ -481,6 +506,19 @@ function ProductModal({
   const [description, setDescription] = useState(product?.description ?? "");
   const [price, setPrice] = useState(product ? String(product.priceEUR) : "");
   const [stock, setStock] = useState(product ? String(product.inventoryCount) : "100");
+  const [gpsr, setGpsr] = useState<GpsrForm>(() => ({
+    ...EMPTY_GPSR,
+    ...Object.fromEntries(GPSR_FIELDS.map(([key]) => [key, product?.[key] ?? ""])),
+  }));
+  /*
+   * Collapsed by default, and opened automatically when the product already
+   * carries safety information. The eight fields are legally required for EU
+   * sales and irrelevant to a founder mid-flow adding their fourth product —
+   * putting them in the main body would bury Price and Stock behind compliance.
+   */
+  const [showSafety, setShowSafety] = useState(() =>
+    GPSR_FIELDS.some(([key]) => (product?.[key] ?? "").trim().length > 0),
+  );
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -490,7 +528,13 @@ function ProductModal({
     if (!title.trim() || !(priceNum > 0) || !Number.isInteger(stockNum) || stockNum < 0) return;
     setBusy(true);
     await onSave(
-      { title: title.trim(), description: description.trim(), priceEUR: priceNum, inventoryCount: stockNum },
+      {
+        title: title.trim(),
+        description: description.trim(),
+        priceEUR: priceNum,
+        inventoryCount: stockNum,
+        ...gpsrFormOf(gpsr),
+      },
       product?.id,
     );
     setBusy(false);
@@ -520,6 +564,47 @@ function ProductModal({
               <input type="number" min="0" step="1" required value={stock} onChange={(e) => setStock(e.target.value)} className={inputClass} />
             </Field>
           </div>
+          <div className="border-t border-hair pt-4">
+            <button
+              type="button"
+              onClick={() => setShowSafety((v) => !v)}
+              className="flex w-full items-center justify-between text-left"
+            >
+              <span className="text-[13px] font-medium text-ivory">Product &amp; safety information</span>
+              <span className="text-[11px] text-mist-dim">{showSafety ? "Hide" : "Add"}</span>
+            </button>
+            <p className="mt-1 text-[11px] leading-relaxed text-mist-dim">
+              Required for EU sales (GPSR). Shown on the product page. Leave blank
+              if you don&apos;t have it yet — we will never fill it in for you.
+            </p>
+            {showSafety && (
+              <div className="mt-4 space-y-3">
+                {GPSR_FIELDS.map(([key, label, hint]) => (
+                  <Field key={key} label={label}>
+                    {key === "safetyWarnings" ? (
+                      <textarea
+                        rows={2}
+                        maxLength={2000}
+                        placeholder={hint}
+                        value={gpsr[key]}
+                        onChange={(e) => setGpsr((g) => ({ ...g, [key]: e.target.value }))}
+                        className={`${inputClass} resize-none`}
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder={hint}
+                        value={gpsr[key]}
+                        onChange={(e) => setGpsr((g) => ({ ...g, [key]: e.target.value }))}
+                        className={inputClass}
+                      />
+                    )}
+                  </Field>
+                ))}
+              </div>
+            )}
+          </div>
+
           <button type="submit" disabled={busy} className="u-gold u-lift w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-60">
             {busy ? "Saving…" : "Save product"}
           </button>

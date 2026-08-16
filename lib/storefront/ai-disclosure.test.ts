@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   needsAiDisclosure,
   aiDisclosureFor,
@@ -89,5 +92,92 @@ describe("the wording", () => {
     for (const v of [null, undefined, "", "   "]) {
       expect(aiDisclosureFor(v)).toBe(AI_DISCLOSURE);
     }
+  });
+});
+
+/*
+ * The rule above was correct from the day it was written, and the product page
+ * still shipped without it for months — because being correct and being APPLIED
+ * are different properties, and only the first one had a test.
+ *
+ * This is the second time this exact shape of gap has appeared in the
+ * storefront: honest-claims.test.ts exists because the homepage was cleaned of
+ * its invented commercial claims while the product page went on printing them.
+ * The lesson generalises, so this guard is structural rather than a list: walk
+ * every shopper-facing file, and require that any surface rendering product
+ * imagery also applies the disclosure rule. A new surface is covered the day it
+ * is added, without anyone remembering to come back here.
+ */
+const STORE_DIR = fileURLToPath(new URL("../../app/(store)", import.meta.url));
+
+function shopperFacingFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) out.push(...shopperFacingFiles(full));
+    else if (entry.endsWith(".tsx")) out.push(full);
+  }
+  return out;
+}
+
+function code(path: string): string {
+  return readFileSync(path, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+}
+
+describe("every shopper-facing surface that shows imagery applies the rule", () => {
+  const files = shopperFacingFiles(STORE_DIR);
+
+  it("is actually looking at the storefront (a broken walk would pass everything)", () => {
+    expect(files.length).toBeGreaterThan(3);
+    expect(files.some((f) => f.endsWith("storefront-renderer.tsx"))).toBe(true);
+    expect(files.some((f) => f.endsWith("product-view.tsx"))).toBe(true);
+  });
+
+  it("renders no product image without disclosing its provenance", () => {
+    /*
+     * "Renders imagery" is read as: the file contains an <img> whose src is a
+     * product image. Cart and checkout surfaces show a thumbnail of something
+     * the shopper already chose from a disclosed surface, so they are exempt —
+     * the disclosure belongs where the buying decision is made.
+     */
+    const EXEMPT = /store-cart|checkout/i;
+    const offenders = files
+      .filter((f) => !EXEMPT.test(f))
+      .filter((f) => {
+        const src = code(f);
+        const showsProductImage = /<img[^>]*src=\{[^}]*\bimage_url\b/.test(src);
+        const applies = src.includes("needsAiDisclosure");
+        return showsProductImage && !applies;
+      })
+      .map((f) => f.slice(STORE_DIR.length + 1));
+
+    expect(
+      offenders,
+      "these storefront surfaces show product photography without applying the " +
+        "AI Act Art. 50 disclosure rule — the merchant publishes synthetic " +
+        `imagery with no label on the screen the shopper buys from: ${offenders.join(", ")}`,
+    ).toEqual([]);
+  });
+
+  it("reads provenance out of the database wherever it renders it", () => {
+    /*
+     * The rule treats missing provenance as "unknown" and discloses. That is the
+     * safe direction for the merchant's exposure but the WRONG one for their
+     * credibility: a query that forgets `image_source` makes every store label
+     * its photographs as AI, including the merchant who shot their own. So any
+     * route feeding a disclosed surface must select the column.
+     */
+    const routes = files.filter((f) => /\/page\.tsx$/.test(f) && code(f).includes("image_url"));
+    const missing = routes
+      .filter((f) => !code(f).includes("image_source"))
+      .map((f) => f.slice(STORE_DIR.length + 1));
+
+    expect(
+      missing,
+      `these routes select image_url without image_source, which makes the ` +
+        `disclosure fire on real photography: ${missing.join(", ")}`,
+    ).toEqual([]);
   });
 });

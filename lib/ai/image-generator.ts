@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { StoreDesignSystem } from "@/lib/storefront/design-system";
+import { markAiGenerated } from "./provenance";
 
 /*
  * Product imagery generation (spec 6.9: providers isolated behind a clean
@@ -194,7 +195,16 @@ async function uploadImage(subdomain: string, index: number, img: GeneratedImage
     const admin = supabaseAdmin();
     const ext = img.mimeType.includes("jpeg") || img.mimeType.includes("jpg") ? "jpg" : "png";
     const path = `${subdomain}/${index}-${randomUUID()}.${ext}`;
-    const { error } = await admin.storage.from(STORAGE_BUCKET).upload(path, img.bytes, {
+    /*
+     * EU AI Act Art. 50(2): the output has to be machine-readably detectable as
+     * generated. Marked here, at the single point where every generated image
+     * becomes a stored file, so a new caller cannot route around it. Returns the
+     * bytes unchanged for anything it cannot mark safely — a store with
+     * unmarked photography is a compliance gap, a store with corrupted
+     * photography is broken.
+     */
+    const bytes = markAiGenerated(img.bytes, img.mimeType, { generator: "Urivo" });
+    const { error } = await admin.storage.from(STORAGE_BUCKET).upload(path, bytes, {
       contentType: img.mimeType,
       upsert: false,
     });

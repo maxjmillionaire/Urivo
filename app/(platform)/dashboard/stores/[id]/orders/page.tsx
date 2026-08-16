@@ -1,8 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
-import { AppShell } from "../../../_shell/app-shell";
-import { loadRailStore } from "../../../_shell/rail-data";
 import { listStoreOrders } from "@/lib/commerce/orders";
 import { formatMoney } from "@/lib/commerce/types";
 
@@ -31,9 +29,8 @@ export default async function StoreOrdersPage({ params }: { params: Promise<{ id
     .maybeSingle();
   if (!store || store.user_id !== user.id) notFound();
 
-  const [{ data: profile }, rail, orders] = await Promise.all([
+  const [{ data: profile }, orders] = await Promise.all([
     supabase.from("profiles").select("email").eq("id", user.id).single(),
-    loadRailStore(user.id),
     listStoreOrders(supabase, id),
   ]);
 
@@ -41,7 +38,7 @@ export default async function StoreOrdersPage({ params }: { params: Promise<{ id
   const revenue = orders.filter((o) => o.status === "paid" || o.status === "fulfilled").reduce((s, o) => s + o.amountTotal, 0);
 
   return (
-    <AppShell active="stores" email={profile?.email ?? user.email ?? null} store={rail}>
+    <>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">{store.store_name}</p>
@@ -126,6 +123,6 @@ export default async function StoreOrdersPage({ params }: { params: Promise<{ id
           </div>
         )}
       </section>
-    </AppShell>
+    </>
   );
 }

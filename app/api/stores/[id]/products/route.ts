@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { requireStoreOwner } from "@/lib/tenant";
 import { ProductCreateSchema } from "@/lib/validation";
+import { GPSR_COLUMNS } from "@/lib/commerce/gpsr";
 import { revalidateStoreById } from "@/lib/storefront/cache";
 
 export const runtime = "nodejs";
@@ -53,6 +54,11 @@ export async function POST(
       price_eur: body.priceEUR,
       inventory_count: body.inventoryCount,
       position: count ?? 0,
+      // GPSR Art. 19 (0050). Blank stores as NULL so "not supplied" has one
+      // representation across database, dashboard and storefront.
+      ...Object.fromEntries(
+        GPSR_COLUMNS.map(([field, column]) => [column, (body[field] ?? "").trim() || null]),
+      ),
     })
     .select("id, title, description, price_eur, inventory_count")
     .single();

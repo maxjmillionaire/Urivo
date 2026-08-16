@@ -253,7 +253,7 @@ function AskBar({ hasStore }: { hasStore: boolean }) {
   return (
     <section className="u-float rounded-2xl border border-hair bg-panel/70 p-4 sm:p-5">
       <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-gold/25 bg-gold/[0.07] text-gold">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-hair bg-panel/60 text-cloud">
           <IconSpark width={14} height={14} />
         </span>
         <div>
@@ -278,7 +278,7 @@ function AskBar({ hasStore }: { hasStore: boolean }) {
         <button
           type="submit"
           disabled={!text.trim()}
-          className="u-gold flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-transform active:scale-[0.92] disabled:cursor-not-allowed disabled:opacity-40"
+          className="u-press flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-hair bg-panel text-ivory transition-transform hover:border-hair-strong active:scale-[0.92] disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Ask"
         >
           <IconArrow width={15} height={15} />
@@ -456,7 +456,7 @@ function CreditsInfo({ expiry }: { expiry: DashboardOverview["creditsExpiry"] })
               ))}
             </ul>
             {expiry && (
-              <p className="mt-3 rounded-lg border border-gold/20 bg-gold/[0.05] px-2.5 py-2 text-[11px] leading-relaxed text-cloud">
+              <p className="mt-3 rounded-lg border border-hair bg-night/60 px-2.5 py-2 text-[11px] leading-relaxed text-cloud">
                 {expiry.amount} plan credit{expiry.amount === 1 ? "" : "s"} expire on{" "}
                 {new Date(expiry.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}.
               </p>
@@ -477,7 +477,7 @@ function HealthCard({ score, band, signals }: { score: number; band: string; sig
   return (
     <section className="u-float rounded-2xl border border-hair bg-panel/70 p-5">
       <div className="flex items-center gap-1.5">
-        <IconBolt className="text-gold" width={13} height={13} />
+        <IconBolt className="text-mist-dim" width={13} height={13} />
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">Business Health</h2>
       </div>
       <div className="mt-4 flex items-center gap-5">
@@ -518,7 +518,7 @@ function HealthCard({ score, band, signals }: { score: number; band: string; sig
 
 function bandColor(band: string): string {
   if (band === "Excellent") return "text-live";
-  if (band === "Strong") return "u-gold-text";
+  if (band === "Strong") return "text-ivory";
   if (band === "Needs attention") return "text-alert";
   return "text-mist";
 }
@@ -587,7 +587,7 @@ function AiStatusCard({ items }: { items: DashboardOverview["aiStatus"] }) {
   return (
     <section className="u-float rounded-2xl border border-hair bg-panel/70 p-5">
       <div className="flex items-center gap-1.5">
-        <IconSpark className="text-gold" width={13} height={13} />
+        <IconSpark className="text-mist-dim" width={13} height={13} />
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">Urivo AI</h2>
       </div>
       <ul className="mt-4 space-y-2.5">
@@ -595,7 +595,7 @@ function AiStatusCard({ items }: { items: DashboardOverview["aiStatus"] }) {
           <li key={i} className="flex items-start gap-2.5">
             {it.live ? (
               <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
-                <span className="h-2 w-2 rounded-full bg-gold" style={{ animation: "urivo-live 1.6s ease-in-out infinite" }} />
+                <span className="h-2 w-2 rounded-full bg-live" style={{ animation: "urivo-live 1.6s ease-in-out infinite" }} />
               </span>
             ) : (
               <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-live/15 text-live">
@@ -616,7 +616,7 @@ function AiStatusCard({ items }: { items: DashboardOverview["aiStatus"] }) {
 /* ── Opportunities ────────────────────────────────────────────────────── */
 const TONE_STYLE: Record<string, { dot: string; chip: string }> = {
   growth: { dot: "bg-live", chip: "text-live" },
-  setup: { dot: "bg-gold", chip: "u-gold-text" },
+  setup: { dot: "bg-mist", chip: "text-mist" },
   risk: { dot: "bg-alert", chip: "text-alert" },
   soon: { dot: "bg-mist-dim", chip: "text-mist-dim" },
 };
@@ -625,7 +625,7 @@ function OpportunitiesCard({ opportunities, canGenerate }: { opportunities: Oppo
   return (
     <section className="u-float rounded-2xl border border-hair bg-panel/70 p-5">
       <div className="flex items-center gap-1.5">
-        <IconTrendUp className="text-gold" width={14} height={14} />
+        <IconTrendUp className="text-mist-dim" width={14} height={14} />
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">Today&apos;s Opportunities</h2>
       </div>
       <div className="mt-4 space-y-2.5">
@@ -657,12 +657,12 @@ function OpportunityRow({ o, canGenerate }: { o: Opportunity; canGenerate: boole
             <GenerateStorePanel
               canGenerate={canGenerate}
               triggerLabel={o.cta}
-              triggerClassName="u-gold u-press rounded-lg px-3 py-1.5 text-[11px] font-semibold"
+              triggerClassName="u-press rounded-lg border border-hair-strong bg-panel px-3 py-1.5 text-[11px] font-semibold text-ivory transition-colors hover:border-gold/40"
             />
           ) : (
             <Link
               href={o.href}
-              className="u-gold u-press inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-[11px] font-semibold"
+              className="u-press inline-flex items-center gap-1 rounded-lg border border-hair-strong bg-panel px-3 py-1.5 text-[11px] font-semibold text-ivory transition-colors hover:border-gold/40"
             >
               {o.cta}
             </Link>
@@ -678,7 +678,7 @@ function TimelineCard({ events }: { events: TimelineEvent[] }) {
   return (
     <section className="u-float rounded-2xl border border-hair bg-panel/70 p-5">
       <div className="flex items-center gap-1.5">
-        <IconClock className="text-gold" width={13} height={13} />
+        <IconClock className="text-mist-dim" width={13} height={13} />
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">Activity</h2>
       </div>
       {events.length === 0 ? (
@@ -706,8 +706,8 @@ function TimelineCard({ events }: { events: TimelineEvent[] }) {
 
 function eventDot(kind: TimelineEvent["kind"]): string {
   if (kind === "order") return "bg-live";
-  if (kind === "ai") return "bg-gold";
-  if (kind === "import") return "bg-gold-soft";
+  if (kind === "ai") return "bg-mist";
+  if (kind === "import") return "bg-mist-dim";
   return "bg-mist";
 }
 
@@ -792,7 +792,7 @@ function StoreMiniCard({ store, canPublish }: { store: StoreCard; canPublish: bo
       </div>
 
       <div className="mt-4 grid grid-cols-4 gap-2">
-        <MiniStat label="Revenue" value={store.revenueTodayCents > 0 ? euros(store.revenueTodayCents) : "—"} gold />
+        <MiniStat label="Revenue" value={store.revenueTodayCents > 0 ? euros(store.revenueTodayCents) : "—"} />
         <MiniStat label="Orders" value={store.ordersToday > 0 ? String(store.ordersToday) : "—"} />
         <MiniStat label="Visitors" value={store.visitorsToday > 0 ? String(store.visitorsToday) : "—"} />
         <MiniStat label="Conv." value={conv != null ? `${conv.toFixed(1)}%` : "—"} />
@@ -805,12 +805,12 @@ function StoreMiniCard({ store, canPublish }: { store: StoreCard; canPublish: bo
           {/* Before the first sale, the list IS the result. Shown as soon as
               there is one, never as an empty "0 subscribers". */}
           {store.subscribers > 0 && (
-            <span className="text-[11px] text-gold-soft">
+            <span className="text-[11px] text-mist">
               · {store.subscribers} subscriber{store.subscribers === 1 ? "" : "s"}
             </span>
           )}
         </div>
-        <span className="flex items-center gap-1 text-[11px] font-semibold text-gold-soft transition-colors group-hover:text-gold">
+        <span className="flex items-center gap-1 text-[11px] font-semibold text-cloud transition-colors group-hover:text-ivory">
           Manage <IconArrow width={12} height={12} />
         </span>
       </div>
@@ -824,11 +824,11 @@ function StoreMiniCard({ store, canPublish }: { store: StoreCard; canPublish: bo
   );
 }
 
-function MiniStat({ label, value, gold }: { label: string; value: string; gold?: boolean }) {
+function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-[9.5px] font-medium uppercase tracking-wide text-mist-dim">{label}</p>
-      <p className={`mt-0.5 text-[15px] font-semibold tabular-nums tracking-tight ${gold && value !== "—" ? "u-gold-text" : "text-ivory"}`}>
+      <p className="mt-0.5 text-[15px] font-semibold tabular-nums tracking-tight text-ivory">
         {value}
       </p>
     </div>

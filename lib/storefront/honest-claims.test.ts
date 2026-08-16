@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseDesignSystem } from "./design-system";
 
@@ -18,9 +19,29 @@ import { parseDesignSystem } from "./design-system";
  * brand authored nothing.
  */
 
-const RENDERER = fileURLToPath(
-  new URL("../../app/(store)/store/[subdomain]/storefront-renderer.tsx", import.meta.url),
-);
+/*
+ * Every surface a shopper sees, not just the homepage.
+ *
+ * This suite originally guarded one file, and the gap did exactly what a
+ * single-file guard does: the homepage was cleaned of its fixed claim list
+ * while the PRODUCT page — the screen where a promise actually converts a sale
+ * — went on printing "Tracked delivery · Fast, insured shipping" and "30-day
+ * returns · No questions asked" on every store Urivo had ever generated.
+ *
+ * The list is derived from the storefront directory rather than typed, so a new
+ * shopper-facing surface is covered the day it is added.
+ */
+const STORE_DIR = fileURLToPath(new URL("../../app/(store)", import.meta.url));
+
+function shopperFacingFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) out.push(...shopperFacingFiles(full));
+    else if (entry.endsWith(".tsx")) out.push(full);
+  }
+  return out;
+}
 
 /** Comments are allowed to *describe* the retired claims — code may not ship them. */
 function code(path: string): string {
@@ -57,22 +78,38 @@ const INVENTED_NAV = [
   "Materials",
 ];
 
-describe("the storefront renderer authors no commercial claims", () => {
-  const source = code(RENDERER);
+describe("no storefront surface authors a commercial claim", () => {
+  const files = shopperFacingFiles(STORE_DIR);
+
+  it("is actually looking at the storefront (a broken walk would pass everything)", () => {
+    expect(files.length).toBeGreaterThan(3);
+    expect(files.some((f) => f.endsWith("storefront-renderer.tsx"))).toBe(true);
+    expect(files.some((f) => f.endsWith("product-view.tsx"))).toBe(true);
+  });
 
   for (const [label, pattern] of FORBIDDEN) {
     it(`ships no hardcoded ${label}`, () => {
-      const hit = source.match(pattern);
+      const offenders = files
+        .map((f) => ({ f, hit: code(f).match(pattern) }))
+        .filter((x) => x.hit)
+        .map((x) => `${x.f.slice(STORE_DIR.length + 1)}: "${x.hit![0]}"`);
       expect(
-        hit,
-        hit ? `renderer hardcodes ${label}: "${hit[0]}" — this becomes the merchant's promise` : "",
-      ).toBeNull();
+        offenders,
+        `these storefront files hardcode ${label}, which becomes the merchant's ` +
+          `promise to their customer: ${offenders.join(", ")}`,
+      ).toEqual([]);
     });
   }
 
   it("links only to destinations that exist", () => {
-    const found = INVENTED_NAV.filter((label) => source.includes(`"${label}"`));
-    expect(found, `renderer links to pages no store has: ${found.join(", ")}`).toEqual([]);
+    const found: string[] = [];
+    for (const f of files) {
+      const src = code(f);
+      for (const label of INVENTED_NAV) {
+        if (src.includes(`"${label}"`)) found.push(`${f.slice(STORE_DIR.length + 1)}: ${label}`);
+      }
+    }
+    expect(found, `storefront links to pages no store has: ${found.join(", ")}`).toEqual([]);
   });
 });
 

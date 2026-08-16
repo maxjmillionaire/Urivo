@@ -168,6 +168,59 @@ export function getPlan(key: string | null | undefined): PlanConfig {
   return PLANS.free;
 }
 
+/*
+ * ENTITLEMENT — what a tier is allowed to do is decided HERE, from authoritative
+ * payment state, never from the plan column alone.
+ *
+ * `profiles.plan` records which tier a subscription is FOR. It does not, on its
+ * own, mean the tier was paid for: Stripe writes a subscription the moment
+ * Checkout completes, and a card that fails authentication leaves that
+ * subscription `incomplete` — real row, real plan, no money. Reading `plan` and
+ * stopping there hands out Founder to anyone who reaches the Checkout form with
+ * a card that declines.
+ *
+ * A paid tier is therefore entitled only when one of two things is true:
+ *
+ *   ACTIVE — Stripe says the subscription is live. `past_due` counts: the
+ *   subscription still exists and Stripe is retrying the card. Revoking a
+ *   merchant's storefront the hour a renewal blips is hostile, and dunning is
+ *   exactly the window in which they might pay. Stripe cancels for real when
+ *   retries run out, which arrives as subscription.deleted and drops to Free.
+ *
+ *   COMPED — access was granted rather than bought (migration 0035), and the
+ *   grant has not expired yet. Reading the expiry here means a comp ends the
+ *   moment it says it does, instead of whenever the opportunistic sweep runs.
+ *
+ * Anything else — `none` (incomplete checkout), `cancelled`, an expired comp —
+ * is Free, whatever the plan column happens to say.
+ */
+export type EntitlementInput = {
+  plan: string | null | undefined;
+  subscription_status?: string | null;
+  comped_until?: string | Date | null;
+};
+
+export function entitledPlanKey(profile: EntitlementInput | null | undefined, now: Date = new Date()): PlanKey {
+  const key = getPlan(profile?.plan).key;
+  if (key === "free") return "free";
+
+  const status = profile?.subscription_status;
+  if (status === "active" || status === "past_due") return key;
+
+  const comped = profile?.comped_until;
+  if (comped) {
+    const until = comped instanceof Date ? comped : new Date(comped);
+    if (!Number.isNaN(until.getTime()) && until > now) return key;
+  }
+
+  return "free";
+}
+
+/** The plan a profile may actually USE — the entitlement rule above, as a config. */
+export function entitledPlan(profile: EntitlementInput | null | undefined, now: Date = new Date()): PlanConfig {
+  return getPlan(entitledPlanKey(profile, now));
+}
+
 /** Launch pricing window — founder pricing is live between these dates. */
 const LAUNCH_START = new Date("2026-07-23T00:00:00Z");
 const LAUNCH_END = new Date("2026-08-15T23:59:59Z");

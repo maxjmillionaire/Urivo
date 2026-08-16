@@ -152,12 +152,12 @@ export function ChampionReveal({ run, tier = "standard" }: { run: EvolutionRun; 
         )}
       </div>
 
-      {/* Advanced (Pro) — the crowned store's full seven-signal fitness breakdown */}
+      {/* Advanced (Pro) — the crowned store's full fitness-signal breakdown */}
       {tier === "advanced" && stage === "revealed" && (
         <div className="relative z-10 mt-6 rounded-xl border border-hair bg-panel/60 p-5" style={{ animation: "urivo-fade-up 600ms var(--ease-urivo) 400ms both" }}>
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-gold" />
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-mist">Advanced Evolution · seven-signal breakdown</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-mist">Advanced Evolution · full signal breakdown</p>
           </div>
           <div className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
             {winner.signals.map((s) => (
