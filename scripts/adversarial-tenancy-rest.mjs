@@ -447,8 +447,27 @@ async function readProbes() {
    */
   console.log(`\n${C.d}── Public by design (not tenancy) ──────────────────────────────────────${C.x}`);
   {
-    const s = await count(asMerchantA, "stores", `id=eq.${ids.bActiveStore}`);
-    record("BY-DESIGN", "public", "A reads B's PUBLISHED store row", `A saw ${s.n} — a live storefront is public`);
+    /*
+     * Post-0054 these two answers must DIFFER, and that difference is the
+     * whole architecture in one pair of lines: merchant B's live shop is
+     * readable through the public projection and unreadable on the base
+     * table. Before 0054 both returned the row, which is how the owner and
+     * the payout account walked out.
+     */
+    const viaView = await count(asMerchantA, "storefronts", `id=eq.${ids.bActiveStore}`);
+    if (viaView.n === 1) {
+      record("BY-DESIGN", "public", "A browses B's live shop (storefronts)", "A saw 1 — a live storefront is public");
+    } else {
+      record("FAIL", "public", "A browses B's live shop (storefronts)", `A saw ${viaView.n}, expected 1 — the storefront is broken for signed-in visitors`);
+    }
+
+    const viaTable = await count(asMerchantA, "stores", `id=eq.${ids.bActiveStore}`);
+    if (viaTable.n === 0 || viaTable.refused) {
+      record("PASS", "isolation", "A reads B's live store on the base table", `A saw ${viaTable.refused ? "refused" : 0} — private record, not the shop window`);
+    } else {
+      record("FAIL", "isolation", "A reads B's live store on the base table", `A saw ${viaTable.n} — 0054 is not in effect`);
+    }
+
     const p = await count(asMerchantA, "products", `store_id=eq.${ids.bActiveStore}`);
     record("BY-DESIGN", "public", "A reads B's PUBLISHED products", `A saw ${p.n} — a live catalogue is public`);
   }
@@ -605,9 +624,15 @@ async function regressionAudit() {
    * fully invisible, and each line prints the population it was measured
    * against so a zero can never be mistaken for an empty table.
    */
+  /*
+   * `stores` is NOT a public surface any more. Before 0054 anon held column
+   * grants on it and this list marked it public; the base table is now
+   * owner-only and anon must be refused outright, so it is checked like any
+   * other private table. The shop window moved to `storefronts`, below.
+   */
   const surfaces = [
-    { table: "stores", public: true },
     { table: "products", public: true },
+    { table: "stores", public: false },
     { table: "orders", public: false },
     { table: "store_visits", public: false },
     { table: "credit_ledger", public: false },
@@ -641,19 +666,47 @@ async function regressionAudit() {
   }
 
   /*
-   * And the storefront itself must still work. This is the exact column set
-   * app/(store)/store/[subdomain]/page.tsx selects — 0052 broke precisely this
-   * and 0053 repaired it, so it is the one query worth pinning verbatim.
+   * And the shop must still open. These are the exact column sets the three
+   * storefront routes select, pinned verbatim, because this is the assertion
+   * that would have caught 0052 before it shipped — and 0054 moves the same
+   * reads onto a new relation, so it is worth pinning twice as hard.
    */
-  {
-    const res = await call(asAnon, "/stores?select=id,store_name,theme_config,currency,is_active&is_active=eq.true&limit=1");
-    if (res.status === 200) record("PASS", "regression", "storefront store query (anon)", "HTTP 200 — 0053 holding");
-    else record("FAIL", "regression", "storefront store query (anon)", `HTTP ${res.status} ${res.text.slice(0, 160)}`);
+  const storefrontQueries = [
+    ["homepage / cached path", "id,store_name,theme_config,currency,is_active"],
+    ["product page", "id,store_name,theme_config,currency"],
+    ["order success", "store_name,theme_config"],
+  ];
+  for (const [label, cols] of storefrontQueries) {
+    const res = await call(asAnon, `/storefronts?select=${cols}&limit=1`);
+    if (res.status === 200) record("PASS", "regression", `storefront view — ${label}`, "HTTP 200");
+    else record("FAIL", "regression", `storefront view — ${label}`, `HTTP ${res.status} ${res.text.slice(0, 160)}`);
   }
   {
     const res = await call(asAnon, "/products?select=id,title,description,price_eur,image_url&limit=1");
     if (res.status === 200) record("PASS", "regression", "storefront products query (anon)", "HTTP 200 — 0053 holding");
     else record("FAIL", "regression", "storefront products query (anon)", `HTTP ${res.status} ${res.text.slice(0, 160)}`);
+  }
+
+  /*
+   * The view must not have grown a private column. A `select *` refactor or a
+   * careless `create or replace` is all it would take, and nothing else in
+   * this suite would notice: every isolation probe would still pass, because
+   * the leak would be on the surface anon is *supposed* to read.
+   */
+  for (const col of ["user_id", "stripe_account_id", "stripe_charges_enabled"]) {
+    const res = await call(asAnon, `/storefronts?select=${col}&limit=1`);
+    if (res.status === 200) {
+      record("FAIL", "regression", `storefronts.${col} absent`, `the view EXPOSES ${col} to anon`);
+    } else {
+      record("PASS", "regression", `storefronts.${col} absent`, `column does not exist (HTTP ${res.status})`);
+    }
+  }
+
+  /* 0054's own self-report, asked of the database rather than inferred. */
+  {
+    const res = await call(asService, "/rpc/storefront_isolation_intact", { method: "POST", body: {} });
+    if (res.json === true) record("PASS", "regression", "storefront_isolation_intact()", "true — 0054 applied and holding");
+    else record("FAIL", "regression", "storefront_isolation_intact()", `HTTP ${res.status} returned ${JSON.stringify(res.json)} — 0054 missing or partially applied`);
   }
 }
 
