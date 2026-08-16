@@ -19,8 +19,16 @@ interface Props {
 const load = cache(async (subdomain: string, id: string) => {
   if (!SUBDOMAIN_PATTERN.test(subdomain) || !UUID.test(id)) return null;
   const supabase = await supabaseServer();
+  /*
+   * `storefronts`, not `stores` (migration 0054). This read runs as whoever is
+   * looking — an anonymous shopper, or a signed-in one who happens to hold a
+   * Urivo account — and `stores` is now the merchant's private record, visible
+   * only to its owner. The view is the public projection: live stores, public
+   * columns. It filters is_active itself, so the predicate below is redundant
+   * and kept deliberately, as a statement of what this page will serve.
+   */
   const { data: store } = await supabase
-    .from("stores")
+    .from("storefronts")
     .select("id, store_name, theme_config, currency")
     .eq("subdomain", subdomain)
     .eq("is_active", true)

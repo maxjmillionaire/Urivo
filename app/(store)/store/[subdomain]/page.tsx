@@ -48,6 +48,22 @@ const loadStorefront = cache(async (slug: string) => {
   const published = await getPublishedStorefront(subdomain).catch(() => null);
   if (published) return { ...published, isPreview: false };
 
+  /*
+   * Deliberately `stores` and not `storefronts` (migration 0054), and
+   * deliberately without an is_active filter — this is the OWNER PREVIEW path
+   * and the only one that must see an unpublished store. The line above has
+   * already tried the public route: getPublishedStorefront reads live stores
+   * with the service role, so every published storefront, for every visitor,
+   * was served before execution reached here.
+   *
+   * What lands here is a subdomain that is not live. Under 0054 `stores` is
+   * owner-scoped, so the answer is a row for the merchant who owns it and null
+   * for everyone else — anonymous visitors included, who now hold no privilege
+   * on the table at all. Both outcomes are the ones this page already wanted.
+   *
+   * Pointing this at the view would compile, pass every anonymous test, and
+   * silently remove owner preview: the view only contains live stores.
+   */
   const supabase = await supabaseServer();
   const { data: store } = await supabase
     .from("stores")

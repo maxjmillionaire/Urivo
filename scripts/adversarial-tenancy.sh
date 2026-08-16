@@ -50,8 +50,9 @@ set -uo pipefail
 if [[ -n "${PGURL:-}" ]]; then PSQL=(psql "$PGURL" -tAc)
 else PSQL=(psql -h "${PGHOST:-/tmp}" -p "${PGPORT:-5433}" -U "${PGUSER:-postgres}" -d "${PGDATABASE:-urivo}" -tAc); fi
 
-sql()   { "${PSQL[@]}" "$1" 2>&1; }
-as_a()  { "${PSQL[@]}" "set role authenticated; select set_config('request.jwt.claim.sub','$A',true); $1" 2>&1; }
+sql()     { "${PSQL[@]}" "$1" 2>&1; }
+as_a()    { "${PSQL[@]}" "set role authenticated; select set_config('request.jwt.claim.sub','$A',true); $1" 2>&1; }
+as_anon() { "${PSQL[@]}" "set role anon; $1" 2>&1; }
 
 pass=0; fail=0; inconc=0
 ok()     { printf "  \033[32mPASS\033[0m          %-46s (owner saw %s, merchant A saw %s)\n" "$1" "$2" "$3"; pass=$((pass+1)); }
@@ -204,15 +205,29 @@ echo "── Cross-tenant reads (each requires victim rows to exist) ───�
 # nothing and reporting it as a breach is a false alarm. What must never cross
 # the tenant boundary are the OWNER and the PAYOUT ACCOUNT — the exact columns
 # migration 0052 removed from anon. This asks for those by name.
+#
+# The query is written as a SCALAR SUBQUERY with a sentinel, and that detail is
+# the whole reason this helper is trustworthy. `as_a` prefixes every statement
+# with `set role` and a `set_config(...)` that echoes merchant A's own uuid, so
+# the transcript is three lines when a row comes back and two when it does not.
+# Reading the last line of a bare `select … where id = <B>` therefore returns
+# merchant A's uuid on a successful denial — a non-empty value, different from
+# the victim's, which the naive comparison below would report as a breach.
+#
+# This suite shipped with exactly that bug and it produced two confident red
+# lines against a database that was correctly withholding the data. Wrapping
+# the read in `coalesce((select …), '<none>')` makes the result exactly one row
+# in both cases, so "denied" and "leaked" stay distinguishable.
+#
 secret_column() {
   local label="$1" col="$2"
   local real seen
-  real=$(sql "select coalesce($col::text,'') from public.stores where id='$SB'")
+  real=$(sql "select coalesce((select $col::text from public.stores where id='$SB'), '')")
   if [[ -z "$real" ]]; then unknown "$label" "victim had no $col to protect"; return; fi
-  seen=$(as_a "select coalesce($col::text,'') from public.stores where id='$SB'" | tail -1)
+  seen=$(as_a "select coalesce((select $col::text from public.stores where id='$SB'), '<none>')" | tail -1)
   if grep -qiE 'permission denied' <<<"$seen"; then ok "$label" "$real" "refused"; return; fi
   if [[ "$seen" == "$real" ]]; then bad "$label" "merchant A read $col = '$seen'"; return; fi
-  if [[ -z "$seen" ]]; then ok "$label" "$real" "empty"; else bad "$label" "merchant A read '$seen'"; fi
+  if [[ "$seen" == "<none>" ]]; then ok "$label" "$real" "no row"; else bad "$label" "merchant A read '$seen'"; fi
 }
 
 secret_column "victim's owner (stores.user_id)"        "user_id"
@@ -240,6 +255,42 @@ echo "── ID manipulation: the victim's id supplied directly ─────�
 # is the only thing standing between merchant A and it.
 hidden "victim draft store by primary key" "from public.stores where id='$SD'"
 hidden "victim order by primary key"       "from public.orders where store_id='$SB'"
+
+echo
+echo "── The public projection (0054): shop window open, record closed ──────"
+#
+# Isolation that breaks the storefront is not a fix, so these run in the same
+# suite as the attacks. Every one of them asserts something the shop needs.
+#
+n=$(as_anon "select count(*) from public.storefronts where id='$SB'" | tail -1)
+if [[ "$n" == "1" ]]; then ok "anon browses the live storefront" "1" "1"
+else bad "anon browses the live storefront" "expected 1, got '$n' — the public shop is broken"; fi
+
+n=$(as_anon "select count(*) from public.products where store_id='$SB'" | tail -1)
+if [[ "$n" == "1" ]]; then ok "anon reads the live catalogue" "1" "1"
+else bad "anon reads the live catalogue" "expected 1, got '$n' — the catalogue is broken"; fi
+
+n=$(as_anon "select count(*) from public.storefronts where id='$SD'" | tail -1)
+if [[ "$n" == "0" ]]; then ok "anon cannot see an unpublished store" "1" "0"
+else bad "anon cannot see an unpublished store" "expected 0, got '$n' — drafts are public"; fi
+
+# A signed-in stranger is still a shopper. If 0054 hid live stores from
+# `authenticated`, every merchant would 404 on every shop but their own.
+n=$(as_a "select count(*) from public.storefronts where id='$SB'" | tail -1)
+if [[ "$n" == "1" ]]; then ok "signed-in stranger browses the live shop" "1" "1"
+else bad "signed-in stranger browses the live shop" "expected 1, got '$n' — storefront broken when logged in"; fi
+
+# anon must hold nothing on the base table — not a row, not a column.
+out=$(as_anon "select count(*) from public.stores")
+if grep -qiE 'permission denied' <<<"$out"; then ok "anon refused on the stores table" "privilege" "refused"
+else bad "anon refused on the stores table" "anon reached stores: $(tail -1 <<<"$out")"; fi
+
+# The projection must not carry a private column in the first place.
+leak=$(sql "select coalesce(string_agg(column_name,','),'') from information_schema.columns
+            where table_schema='public' and table_name='storefronts'
+              and column_name in ('user_id','stripe_account_id','stripe_charges_enabled')")
+if [[ -z "$leak" ]]; then ok "storefronts carries no private column" "0" "0"
+else bad "storefronts carries no private column" "it exposes: $leak"; fi
 
 echo
 echo "── The owner's own data must still work ───────────────────────────────"

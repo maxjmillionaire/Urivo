@@ -25,8 +25,13 @@ export default async function OrderSuccessPage({
   if (!SUBDOMAIN_PATTERN.test(subdomain)) notFound();
 
   const supabase = await supabaseServer();
+  /*
+   * `storefronts`, not `stores` (migration 0054) — the buyer landing here is
+   * usually anonymous and is never the merchant, and `stores` is now readable
+   * only by its owner. Only the brand is needed to render the receipt.
+   */
   const { data: store } = await supabase
-    .from("stores")
+    .from("storefronts")
     .select("store_name, theme_config")
     .eq("subdomain", subdomain)
     .eq("is_active", true)
