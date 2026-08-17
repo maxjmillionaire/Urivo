@@ -1,7 +1,7 @@
 -- ============================================================
 -- URIVO — Complete database setup (one-shot).
 -- Paste this whole file into Supabase → SQL Editor → New query → Run.
--- It applies migrations 0001–0055 in order. Safe to run once on a fresh project.
+-- It applies migrations 0001–0056 in order. Safe to run once on a fresh project.
 --
 -- GENERATED FILE — do not edit by hand.
 -- Regenerate with: npm run db:build
@@ -5960,6 +5960,15 @@ grant execute on function public.storefront_isolation_intact() to service_role;
 -- stores out for as long as the deploy lagged, which is the failure this
 -- migration exists to prevent. Fail closed on the side of the rule.
 --
+-- ^ CORRECTION (0056). The first sentence of that paragraph is FALSE, and it is
+-- left standing here rather than rewritten because the record matters. Adding a
+-- parameter does not replace a function, it creates a second one, and a
+-- six-argument call then matches both candidates: PostgreSQL raises
+-- "function ... is not unique" (SQLSTATE 42725) instead of filling in the
+-- default. The choice of `false` was right; the claim about resolvability was
+-- never executed against PostgreSQL. 0056 drops the six-argument form and makes
+-- the sentence true. Read 0056 before relying on anything in this paragraph.
+--
 -- Existing live stores are NOT touched. Taking a merchant's shop offline is a
 -- customer decision, not a migration's, and `publish_store` returns ALREADY_LIVE
 -- before it reaches the capacity check — so a store that is live stays live
@@ -6080,3 +6089,90 @@ comment on function public.free_tier_live_stores() is
 
 revoke execute on function public.free_tier_live_stores() from public, anon, authenticated;
 grant execute on function public.free_tier_live_stores() to service_role;
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0056_drop_legacy_generate_store_signature.sql
+-- ─────────────────────────────────────────────────────────
+-- Remove the six-argument `generate_store_atomic`, because two signatures make
+-- the call ambiguous — and 0055 asserted the opposite.
+--
+-- WHAT 0055 CLAIMED
+--
+-- 0055 added `p_is_active boolean default false` and reasoned, in its own
+-- header: "A defaulted parameter keeps the old six-argument call resolvable, so
+-- an application that has not deployed yet still works."
+--
+-- That is wrong, and it is wrong in the worst possible direction: 0055 used
+-- `create or replace function` with an extra parameter, which does not replace
+-- anything. It creates a SECOND function. The six-argument form from 0003 is
+-- still there beside it, and PostgreSQL then has two applicable candidates for
+-- a six-argument call — the exact one, and the seven-argument one with its
+-- default filled in. It refuses to choose:
+--
+--   ERROR:  function generate_store_atomic(uuid, text, text, jsonb, jsonb,
+--           integer) is not unique                       (SQLSTATE 42725)
+--
+-- Verified against a real PostgreSQL, not reasoned about: two functions of the
+-- same name, the second differing only by a defaulted trailing parameter, and
+-- the narrower call raises 42725 both positionally and with named arguments.
+-- Dropping the narrow signature makes the same call resolve to the wide
+-- function with its default, which is what 0055 believed was happening.
+--
+-- WHY THIS IS URGENT RATHER THAN TIDY
+--
+-- 0055 is applied. The application deployed against it still calls the RPC with
+-- six named arguments, so store generation — the product's first action — is
+-- resolving against an ambiguity. This migration repairs it on its own, with no
+-- deploy: afterwards the six-argument call lands on the seven-argument function
+-- and creates the store unpublished, and a paid merchant publishes with one
+-- click. Then the application deploy passes the seventh argument and the
+-- publish decision is carried explicitly again.
+--
+-- Safe in both directions, which is the property that was missing:
+--   • old application (6 named args) → wide function, p_is_active := false
+--   • new application (7 named args) → wide function, p_is_active := the plan
+--
+-- THE LESSON, WRITTEN DOWN WHERE THE NEXT PERSON WILL LOOK
+--
+-- `create or replace function` replaces a function only when the argument types
+-- match exactly. Adding a parameter — defaulted or not — is a new function and
+-- an overload set. This is the second time a migration in this repository has
+-- shipped a premise about PostgreSQL's behaviour that was never executed
+-- against PostgreSQL (0052 asserted that policy subqueries need only column
+-- privileges; 0053 repaired it). lib/sql-overloads.test.ts now fails the build
+-- if any function in this directory is left with more than one live signature,
+-- so the class of mistake cannot ship a third time.
+
+drop function if exists public.generate_store_atomic(uuid, text, text, jsonb, jsonb, integer);
+
+-- Re-state the grants on the surviving signature. Dropping a sibling does not
+-- touch them; this is here so a reader of this file can see, without opening
+-- 0055, exactly who may execute the only remaining form.
+revoke execute on function public.generate_store_atomic(uuid, text, text, jsonb, jsonb, integer, boolean) from public, anon, authenticated;
+grant execute on function public.generate_store_atomic(uuid, text, text, jsonb, jsonb, integer, boolean) to service_role;
+
+-- Proof, executable: exactly one signature must remain, and it must be the one
+-- that takes the publish entitlement. This raises rather than returning, so
+-- applying the migration is itself the assertion.
+do $$
+declare
+    v_count integer;
+    v_args  text;
+begin
+    select count(*), string_agg(pg_get_function_identity_arguments(p.oid), ' | ')
+      into v_count, v_args
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'generate_store_atomic';
+
+    if v_count <> 1 then
+        raise exception 'generate_store_atomic must have exactly one signature, found %: %',
+            v_count, v_args;
+    end if;
+
+    if v_args not like '%p_is_active boolean%' then
+        raise exception 'the surviving generate_store_atomic does not take p_is_active: %', v_args;
+    end if;
+end $$;

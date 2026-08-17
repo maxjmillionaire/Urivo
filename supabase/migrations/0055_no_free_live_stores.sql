@@ -31,6 +31,15 @@
 -- stores out for as long as the deploy lagged, which is the failure this
 -- migration exists to prevent. Fail closed on the side of the rule.
 --
+-- ^ CORRECTION (0056). The first sentence of that paragraph is FALSE, and it is
+-- left standing here rather than rewritten because the record matters. Adding a
+-- parameter does not replace a function, it creates a second one, and a
+-- six-argument call then matches both candidates: PostgreSQL raises
+-- "function ... is not unique" (SQLSTATE 42725) instead of filling in the
+-- default. The choice of `false` was right; the claim about resolvability was
+-- never executed against PostgreSQL. 0056 drops the six-argument form and makes
+-- the sentence true. Read 0056 before relying on anything in this paragraph.
+--
 -- Existing live stores are NOT touched. Taking a merchant's shop offline is a
 -- customer decision, not a migration's, and `publish_store` returns ALREADY_LIVE
 -- before it reaches the capacity check — so a store that is live stays live
