@@ -90,10 +90,21 @@ describe("the landing page's public claims match the plans", () => {
    * anything does not pay to keep it. Copy that says otherwise sends the free
    * tier's whole purpose backwards, and it survived on the page for months.
    */
-  it("never tells free users they must upgrade to publish", () => {
-    expect(PLANS.free.features.publish).toBe(true);
-    expect(PLANS.free.maxLiveStores).toBe(1);
-    expect(landing).not.toMatch(/upgrade to go live/i);
+  it("tells free users the truth: publishing needs a paid plan", () => {
+    /*
+     * This test asserted the opposite until the rule changed — that Free could
+     * publish and that the landing page must never say otherwise. It is
+     * inverted rather than deleted, because the property being guarded is the
+     * same one either way: the page and the plans must agree.
+     *
+     * The FAQ answer now opens with "No", so a future edit that quietly
+     * re-promises free publishing fails here instead of shipping a page that
+     * contradicts the product.
+     */
+    expect(PLANS.free.features.publish).toBe(false);
+    expect(PLANS.free.maxLiveStores).toBe(0);
+    expect(landing).toMatch(/Can I publish for free\?/);
+    expect(landing).not.toMatch(/Free runs one live store/i);
   });
 
   it("does not restrict custom domains to Pro — Founder has them too", () => {

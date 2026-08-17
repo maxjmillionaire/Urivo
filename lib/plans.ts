@@ -89,20 +89,49 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
     priority: "standard",
     generationsPerMinute: 3,
     askPerMinute: 5,
-    maxLiveStores: 1,
+    /*
+     * Zero, and it is load-bearing.
+     *
+     * `publish_store` refuses when `live_count >= p_max_live`, so a capacity of
+     * 0 means the first publish is already at the cap. Combined with
+     * `features.publish: false` below, a Free merchant is refused twice: once by
+     * the route before the call, once by the database inside it. Either alone
+     * would do; both is deliberate, because this is the line between the free
+     * tier and revenue.
+     */
+    maxLiveStores: 0,
     maxMonthlyOrders: 25,
     features: {
-      // A free user must reach "my store is LIVE". Showing them a preview
-      // behind a paywall means they never own anything, and people do not pay
-      // to keep something they have never had.
-      publish: true,
+      /*
+       * Free builds, previews and refines. It does not go live.
+       *
+       * This reverses the original decision, which was argued in this file as
+       * "a free user must reach 'my store is LIVE' — people do not pay to keep
+       * something they have never had". That reasoning is not wrong about human
+       * beings; it was overruled as a business decision, and the reversal is
+       * recorded here rather than silently applied so the next person reads an
+       * argument and its outcome instead of a bare `false`.
+       *
+       * Enforced in four places, because a paywall that exists in one is not a
+       * paywall: this flag (checked by the store settings route and the Ask
+       * Urivo apply route), the capacity above (checked inside publish_store),
+       * and `generate_store_atomic`, which no longer creates a live store for a
+       * merchant who may not have one — see migration 0055. A generated store
+       * used to be born with is_active defaulting to true, which meant Free
+       * never needed the publish path at all.
+       */
+      publish: false,
       askUrivo: true,
       evolution: "none",
       premiumSupport: false,
       earlyAccess: false,
     },
     price: { currency: "EUR", launch: 0, regular: 0, annual: 0 },
-    highlights: ["25 welcome AI credits", "One live store, on a urivo.ai address", "A taste of the AI Store Assistant"],
+    highlights: [
+      "25 welcome AI credits",
+      "Build and preview a full store",
+      "A taste of the AI Store Assistant",
+    ],
   },
   core: {
     key: "core",
@@ -301,7 +330,14 @@ export function maxLiveStores(key: string | null | undefined): number | null {
 /** Capacity as the merchant should read it — capacity, never restriction. */
 export function capacityLabel(key: string | null | undefined): string {
   const max = maxLiveStores(key);
-  return max === null ? "Unlimited live stores" : `Run up to ${max} live store${max === 1 ? "" : "s"}`;
+  if (max === null) return "Unlimited live stores";
+  /*
+   * Zero capacity is not "run up to 0 live stores". A tier that cannot publish
+   * has a capability to describe, not a number — and the house rule for this
+   * label holds: say what the merchant gets, never what they are denied.
+   */
+  if (max === 0) return `Build and preview — publishing starts on ${PLANS.core.name}`;
+  return `Run up to ${max} live store${max === 1 ? "" : "s"}`;
 }
 
 export type BillingInterval = "month" | "year";
