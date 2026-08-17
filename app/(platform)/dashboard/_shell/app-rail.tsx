@@ -91,8 +91,18 @@ export function AppRail({
         </div>
       </div>
 
-      {/* Ask Urivo — interactive, grounded conversation + live editing */}
-      <AskUrivo hasStore={!!store} storeId={store?.id ?? null} canAsk={canAsk} credits={credits} plan={plan} />
+      {/* Ask Urivo — interactive, grounded conversation + live editing. The
+          desktop rail is the host that expands into the fullscreen workspace on
+          a substantive turn; the mobile bottom sheet keeps its own layout. */}
+      <AskUrivo
+        hasStore={!!store}
+        storeId={store?.id ?? null}
+        canAsk={canAsk}
+        credits={credits}
+        plan={plan}
+        enableFullscreen
+        storeContext={store ? { name: store.name, subdomain: store.subdomain, isLive: store.isLive } : null}
+      />
     </aside>
   );
 }

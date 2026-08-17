@@ -22,14 +22,26 @@ import { prefersReducedMotion } from "../../_motion/motion";
 
 type Stage = "analyzing" | "eliminating" | "finaltwo" | "crowning" | "revealed";
 
+/*
+ * What the fitness model actually computes, said plainly.
+ *
+ * These lines used to promise analysis the engine does not do — "Analyzing
+ * supplier reliability", "Calculating margins", "Evaluating shipping",
+ * "Predicting customer demand". Urivo has no supplier data, no cost inputs, no
+ * carrier and no demand signal at this stage, so every one of those was a claim
+ * about a subject the model cannot see — the same drift champions.ts already
+ * removed from the winning reasons. Each line now names a real dimension of the
+ * deterministic design-fitness score (layout, palette, typography, hero, CTA,
+ * copy → conversion, trust, readability, balance, premium, brand, purchase).
+ */
 const THINKING = [
-  "Comparing branding…",
-  "Checking product quality…",
-  "Analyzing supplier reliability…",
-  "Estimating conversion potential…",
-  "Calculating margins…",
-  "Evaluating shipping…",
-  "Predicting customer demand…",
+  "Comparing layouts…",
+  "Scoring typography…",
+  "Weighing colour palettes…",
+  "Testing hero variants…",
+  "Rating conversion signals…",
+  "Measuring visual balance…",
+  "Ranking by Urivo Score…",
 ];
 
 export function ChampionReveal({ run, tier = "standard" }: { run: EvolutionRun; tier?: "standard" | "advanced" }) {

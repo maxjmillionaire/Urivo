@@ -4,11 +4,12 @@ import { AttachButton } from "./attach";
 import type { Attachment } from "@/lib/ai/attachments";
 import { AI_ASSISTANT_LABEL, AI_ASSISTANT_NOTICE } from "@/lib/ai/assistant-disclosure";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { nextPlan } from "@/lib/plans";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
-import { IconSpark, IconArrow } from "./icons";
+import { IconSpark, IconArrow, IconClose } from "./icons";
 import { Markdown } from "./markdown";
 
 /* Widened from the literal type so the pluralisation below survives a
@@ -69,16 +70,35 @@ export function AskUrivo({
   canAsk = true,
   credits = 0,
   plan,
+  /*
+   * When set, a substantive turn expands the conversation into a focused
+   * fullscreen workspace. Only the desktop rail opts in — the mobile host is
+   * already a near-fullscreen bottom sheet, so a second overlay there would be
+   * redundant and could fight the sheet for the viewport.
+   */
+  enableFullscreen = false,
+  /* Store identity for the fullscreen top bar (name + address + live state). */
+  storeContext = null,
 }: {
   hasStore: boolean;
   storeId: string | null;
   canAsk?: boolean;
   credits?: number;
   plan?: string | null;
+  enableFullscreen?: boolean;
+  storeContext?: { name: string; subdomain: string; isLive: boolean } | null;
 }) {
   const router = useRouter();
   const [creditNudge, setCreditNudge] = useState(true);
   const [creditsLeft, setCreditsLeft] = useState(credits);
+  /*
+   * Fullscreen is a RENDER LOCATION, not a second component. The same instance
+   * portals its body to a full-viewport overlay when true and back into the
+   * rail slot when false, so the transcript, the in-flight stream and every
+   * piece of state survive the transition untouched — there is nothing to
+   * persist because nothing unmounts.
+   */
+  const [fullscreen, setFullscreen] = useState(false);
 
   // Keep the local balance in sync when the server value changes (navigation).
   useEffect(() => setCreditsLeft(credits), [credits]);
@@ -101,6 +121,26 @@ export function AskUrivo({
   }, [messages]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  /*
+   * While fullscreen: lock the page behind the overlay and let Escape return to
+   * the dashboard. Exiting does NOT abort a running turn — the component stays
+   * mounted, so the stream keeps writing and the answer is waiting back in the
+   * rail. Mirrors the mobile sheet's scroll-lock so the two hosts behave alike.
+   */
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullscreen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [fullscreen]);
 
   /*
    * The transcript survives navigation and reload. Losing a long, carefully
@@ -230,6 +270,10 @@ export function AskUrivo({
         setCreditNudge(true);
         return;
       }
+      // The first substantive turn is the moment the conversation stops being a
+      // sidebar aside and becomes the workspace. Same trigger whether the
+      // message came from the composer or the dashboard command bar.
+      if (enableFullscreen) setFullscreen(true);
       setError(null);
       /*
        * Detach before sending. The files belong to this message; leaving them
@@ -278,7 +322,7 @@ export function AskUrivo({
         taRef.current?.focus();
       }
     },
-    [messages, busy, runTurn, creditsLeft],
+    [messages, busy, runTurn, creditsLeft, enableFullscreen],
   );
 
   /** Re-ask the question that produced a failed turn, in place. */
@@ -388,107 +432,96 @@ export function AskUrivo({
   const nudgePlan = nextPlan(plan);
   const showCreditNudge = canAsk && outOfCredits && creditNudge;
 
-  return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
-      {/* Out-of-credits nudge — Lovable-style: upgrade, or top up, in one tap */}
-      {showCreditNudge && (
-        <div className="absolute inset-x-3 top-11 z-30 u-float rounded-xl border border-gold/25 bg-[#0f1a2e] p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.7)]">
-          <button
-            type="button"
-            onClick={() => setCreditNudge(false)}
-            aria-label="Dismiss"
-            className="absolute right-2.5 top-2.5 text-mist-dim transition-colors hover:text-ivory"
+  /*
+   * The three pieces below are built once and placed into whichever chrome is
+   * active — the compact rail or the fullscreen overlay. Rendering them from
+   * the same closures is what lets one instance serve both hosts: the refs,
+   * handlers and state are identical no matter where the nodes land.
+   */
+  const creditNudgeEl = showCreditNudge ? (
+    <div className="absolute inset-x-3 top-11 z-30 u-float rounded-xl border border-gold/25 bg-[#0f1a2e] p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.7)]">
+      <button
+        type="button"
+        onClick={() => setCreditNudge(false)}
+        aria-label="Dismiss"
+        className="absolute right-2.5 top-2.5 text-mist-dim transition-colors hover:text-ivory"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M18 6 6 18M6 6l12 12" /></svg>
+      </button>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-soft">Out of credits</p>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-ivory">
+        You&apos;re out of credits. Keep building — pick one:
+      </p>
+      <div className="mt-3 space-y-2">
+        {nudgePlan && (
+          <Link
+            href="/dashboard/billing"
+            className="u-gold u-lift block rounded-lg px-3 py-2 text-center text-xs font-semibold"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M18 6 6 18M6 6l12 12" /></svg>
-          </button>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-soft">Out of credits</p>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-ivory">
-            You&apos;re out of credits. Keep building — pick one:
+            Upgrade to {nudgePlan.name}
+          </Link>
+        )}
+        <Link
+          href="/dashboard/billing"
+          className="u-lift block rounded-lg border border-hair bg-panel px-3 py-2 text-center text-xs font-semibold text-ivory hover:border-hair-strong hover:bg-panel-2"
+        >
+          Buy more credits
+        </Link>
+      </div>
+    </div>
+  ) : null;
+
+  const scrollBody = (
+    <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5">
+      {hasTranscript ? (
+        <div className="mx-auto w-full max-w-3xl space-y-3 pb-2">
+          {messages.map((m) => (
+            <div key={m.id} className="u-msg-in">
+              <MessageBubble msg={m} onRetry={() => retry(m.id)} canRetry={!busy} />
+              {m.role === "assistant" && m.edit && (
+                <EditCard
+                  edit={m.edit}
+                  applied={!!m.applied}
+                  applying={applyingId === m.id}
+                  canApply={!!(m.editStoreId ?? storeId)}
+                  onApply={() => applyEdit(m)}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mx-auto w-full max-w-3xl pb-2">
+          {/*
+            * The Art. 50(1) notice proper — before the first message, in its
+            * own line rather than folded into the pitch, so it reads as a
+            * statement of fact and not as marketing.
+            */}
+          <p className="text-[11px] font-medium text-mist-dim">{AI_ASSISTANT_NOTICE}</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-mist">
+            {hasStore
+              ? "Ask for a change and I'll propose it — copy, palette, fonts, layout, products. You approve before it goes live."
+              : "Tell me your idea and I'll help you shape a brand worth launching."}
           </p>
-          <div className="mt-3 space-y-2">
-            {nudgePlan && (
-              <Link
-                href="/dashboard/billing"
-                className="u-gold u-lift block rounded-lg px-3 py-2 text-center text-xs font-semibold"
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                onClick={() => void send(s)}
+                className="u-lift rounded-full border border-hair bg-panel/60 px-2.5 py-1 text-[11px] text-cloud transition-colors hover:border-gold/40 hover:text-ivory active:scale-[0.97]"
               >
-                Upgrade to {nudgePlan.name}
-              </Link>
-            )}
-            <Link
-              href="/dashboard/billing"
-              className="u-lift block rounded-lg border border-hair bg-panel px-3 py-2 text-center text-xs font-semibold text-ivory hover:border-hair-strong hover:bg-panel-2"
-            >
-              Buy more credits
-            </Link>
+                {s}
+              </button>
+            ))}
           </div>
         </div>
       )}
+    </div>
+  );
 
-      <div className="flex items-center justify-between px-5 pb-2 pt-4">
-        <div className="flex items-center gap-1.5">
-          <IconSpark className="text-gold" width={13} height={13} />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mist">Ask Urivo</span>
-          {/*
-            * AI Act Art. 50(1). Persistent rather than first-message-only: the
-            * duty attaches to the person, and someone returning to yesterday's
-            * conversation never sees a first-exchange notice.
-            */}
-          <span className="text-[10px] font-medium tracking-[0.06em] text-mist-dim">· {AI_ASSISTANT_LABEL}</span>
-        </div>
-        {hasTranscript && (
-          <button onClick={reset} className="rounded-md px-1.5 py-0.5 text-[10px] font-medium text-mist-dim transition-colors hover:text-mist active:scale-[0.96]">
-            New chat
-          </button>
-        )}
-      </div>
-
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5">
-        {hasTranscript ? (
-          <div className="space-y-3 pb-2">
-            {messages.map((m) => (
-              <div key={m.id} className="u-msg-in">
-                <MessageBubble msg={m} onRetry={() => retry(m.id)} canRetry={!busy} />
-                {m.role === "assistant" && m.edit && (
-                  <EditCard
-                    edit={m.edit}
-                    applied={!!m.applied}
-                    applying={applyingId === m.id}
-                    canApply={!!(m.editStoreId ?? storeId)}
-                    onApply={() => applyEdit(m)}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="pb-2">
-            {/*
-              * The Art. 50(1) notice proper — before the first message, in its
-              * own line rather than folded into the pitch, so it reads as a
-              * statement of fact and not as marketing.
-              */}
-            <p className="text-[11px] font-medium text-mist-dim">{AI_ASSISTANT_NOTICE}</p>
-            <p className="mt-1.5 text-xs leading-relaxed text-mist">
-              {hasStore
-                ? "Ask for a change and I'll propose it — copy, palette, fonts, layout, products. You approve before it goes live."
-                : "Tell me your idea and I'll help you shape a brand worth launching."}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {suggestions.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => void send(s)}
-                  className="u-lift rounded-full border border-hair bg-panel/60 px-2.5 py-1 text-[11px] text-cloud transition-colors hover:border-gold/40 hover:text-ivory active:scale-[0.97]"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="border-t border-hair p-4">
+  const composer = (
+    <div className="border-t border-hair p-4">
+      <div className="mx-auto w-full max-w-3xl">
         {error && (
           <p className="mb-2 px-1 text-[11px] text-alert" role="alert">
             {error}
@@ -551,6 +584,101 @@ export function AskUrivo({
           Urivo is an AI and can make mistakes. Check important information.
         </p>
       </div>
+    </div>
+  );
+
+  // Fullscreen: the same body, portalled to a full-viewport workspace. The AI
+  // becomes the surface instead of a column beside the dashboard, and the
+  // dashboard underneath is untouched — no route change, no unmount, so route,
+  // selected store, scroll position and every other piece of state are exactly
+  // as they were on return.
+  if (fullscreen && enableFullscreen && typeof document !== "undefined") {
+    return createPortal(
+      <div className="fixed inset-0 z-50 flex flex-col bg-night text-ivory">
+        {/* ambient depth, matching the dashboard shell */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(90% 60% at 22% 0%, rgba(36,50,76,0.45), rgba(11,18,32,0) 60%), radial-gradient(70% 50% at 100% 100%, rgba(232,205,128,0.05), rgba(11,18,32,0) 55%)",
+          }}
+        />
+        <header className="relative flex items-center justify-between border-b border-hair px-5 py-3.5 sm:px-8">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <IconSpark className="text-gold" width={16} height={16} />
+            <span className="text-sm font-semibold tracking-tight text-ivory">Ask Urivo</span>
+            <span className="hidden text-[10px] font-medium tracking-[0.06em] text-mist-dim sm:inline">· {AI_ASSISTANT_LABEL}</span>
+            {storeContext && (
+              <span className="ml-1 hidden items-center gap-1.5 rounded-full border border-hair bg-panel/60 px-2.5 py-1 sm:inline-flex">
+                {storeContext.isLive && <span className="h-1.5 w-1.5 rounded-full bg-live" />}
+                <span className="max-w-[160px] truncate text-[11px] font-medium text-ivory">{storeContext.name}</span>
+                <span className="font-mono text-[10px] text-mist-dim">{storeContext.subdomain}.urivo.ai</span>
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {hasTranscript && (
+              <button
+                onClick={reset}
+                className="rounded-md px-2 py-1 text-[11px] font-medium text-mist-dim transition-colors hover:text-mist active:scale-[0.96]"
+              >
+                New chat
+              </button>
+            )}
+            <button
+              onClick={() => setFullscreen(false)}
+              className="u-lift flex items-center gap-1.5 rounded-lg border border-hair bg-panel px-3 py-1.5 text-xs font-semibold text-ivory transition-colors hover:border-hair-strong hover:bg-panel-2 active:scale-[0.97]"
+            >
+              <IconClose width={14} height={14} />
+              Back to dashboard
+            </button>
+          </div>
+        </header>
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          {creditNudgeEl}
+          {scrollBody}
+          {composer}
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
+  return (
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      {creditNudgeEl}
+
+      <div className="flex items-center justify-between px-5 pb-2 pt-4">
+        <div className="flex items-center gap-1.5">
+          <IconSpark className="text-gold" width={13} height={13} />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mist">Ask Urivo</span>
+          {/*
+            * AI Act Art. 50(1). Persistent rather than first-message-only: the
+            * duty attaches to the person, and someone returning to yesterday's
+            * conversation never sees a first-exchange notice.
+            */}
+          <span className="text-[10px] font-medium tracking-[0.06em] text-mist-dim">· {AI_ASSISTANT_LABEL}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          {enableFullscreen && hasTranscript && (
+            <button
+              onClick={() => setFullscreen(true)}
+              className="rounded-md px-1.5 py-0.5 text-[10px] font-medium text-mist-dim transition-colors hover:text-mist active:scale-[0.96]"
+            >
+              Expand
+            </button>
+          )}
+          {hasTranscript && (
+            <button onClick={reset} className="rounded-md px-1.5 py-0.5 text-[10px] font-medium text-mist-dim transition-colors hover:text-mist active:scale-[0.96]">
+              New chat
+            </button>
+          )}
+        </div>
+      </div>
+
+      {scrollBody}
+      {composer}
     </div>
   );
 }
