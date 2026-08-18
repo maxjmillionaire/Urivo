@@ -26,11 +26,12 @@ import {
 /** Share of a user's monthly credits spent on each feature. Replace with the
  *  measured mix from the ledger once real data exists. Must sum to 1. */
 export const DEFAULT_USAGE_MIX: Record<AiFeature, number> = {
-  storeGeneration: 0.4,
+  storeGeneration: 0.37,
   askMessage: 0.35,
   storeEdit: 0.05,
   marketResearch: 0.1,
   adStudio: 0.05,
+  campaignDraft: 0.03,
   productImage: 0.05,
 };
 

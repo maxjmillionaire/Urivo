@@ -10,6 +10,7 @@ import {
   IconStore,
   IconResearch,
   IconMegaphone,
+  IconMail,
   IconEvolution,
   IconCard,
   IconSettings,
@@ -24,13 +25,14 @@ import { AccountMenu, type Account } from "./account-menu";
  * on mobile it collapses behind a top bar and slides in as a drawer.
  */
 
-export type NavKey = "home" | "research" | "stores" | "ads" | "evolution" | "billing" | "settings";
+export type NavKey = "home" | "research" | "stores" | "ads" | "audience" | "evolution" | "billing" | "settings";
 
 const NAV: { key: NavKey; label: string; href: string; Icon: typeof IconHome; hint?: string }[] = [
   { key: "home", label: "Home", href: "/dashboard", Icon: IconHome },
   { key: "research", label: "Research", href: "/dashboard/research", Icon: IconResearch, hint: "Find winning products and read the market" },
   { key: "stores", label: "Stores", href: "/dashboard#stores", Icon: IconStore },
   { key: "ads", label: "Ad Studio", href: "/dashboard/ads", Icon: IconMegaphone, hint: "Generate ad strategy and creative" },
+  { key: "audience", label: "Audience", href: "/dashboard/audience", Icon: IconMail, hint: "Your subscribers — see them, export them, email them" },
   { key: "evolution", label: "Evolution Lab", href: "/dashboard/evolution", Icon: IconEvolution, hint: "Urivo generates a hundred storefronts and evolves the best one" },
   { key: "billing", label: "Billing", href: "/dashboard/billing", Icon: IconCard },
 ];

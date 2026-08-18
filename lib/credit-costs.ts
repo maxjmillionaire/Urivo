@@ -51,6 +51,9 @@ export const CREDIT_COSTS = {
   adStudio: 4,
   /** Regenerating a single product image (Higgsfield — real per-image cost). */
   productImage: 3,
+  /** Drafting a campaign to the store's subscriber list — one structured call,
+   *  priced like an Ask turn. Sending the campaign itself is free (no model). */
+  campaignDraft: 2,
 } as const;
 
 export type CreditAction = keyof typeof CREDIT_COSTS;

@@ -102,6 +102,7 @@ export const REQUIRED_RPCS = [
   "storefront_isolation_intact",
   "submit_feedback",
   "subscribe_to_store",
+  "unsubscribe_by_token",
   "weekly_digest_data",
 ] as const;
 
