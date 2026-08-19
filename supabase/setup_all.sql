@@ -1,7 +1,7 @@
 -- ============================================================
 -- URIVO — Complete database setup (one-shot).
 -- Paste this whole file into Supabase → SQL Editor → New query → Run.
--- It applies migrations 0001–0054 in order. Safe to run once on a fresh project.
+-- It applies migrations 0001–0056 in order. Safe to run once on a fresh project.
 --
 -- GENERATED FILE — do not edit by hand.
 -- Regenerate with: npm run db:build
@@ -5922,3 +5922,257 @@ comment on function public.storefront_isolation_intact() is
 
 revoke execute on function public.storefront_isolation_intact() from public, anon, authenticated;
 grant execute on function public.storefront_isolation_intact() to service_role;
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0055_no_free_live_stores.sql
+-- ─────────────────────────────────────────────────────────
+-- A generated store is no longer born live.
+--
+-- THE HOLE THIS CLOSES
+--
+-- `stores.is_active` is declared `not null default true` (0001), and
+-- `generate_store_atomic` inserts without naming the column. Every generated
+-- store was therefore live the moment it existed, for every plan, and
+-- `publish_store` — which holds the capacity rule and the paid-capability rule
+-- — was never on that path at all.
+--
+-- So the free tier never needed the publish button. It got a live store on a
+-- urivo.ai address as a side effect of the column default. Flipping
+-- `features.publish` to false in lib/plans.ts closes the button and closes
+-- nothing else; without this migration the rule would read as enforced in the
+-- application and be false in production on the very first generation.
+--
+-- THE FIX
+--
+-- `generate_store_atomic` takes the publish decision as a parameter, the same
+-- shape `publish_store` already uses for capacity: the plan lives in the
+-- application, the enforcement lives here. The app passes
+-- `entitledPlan(profile).features.publish`, which resolves from payment state
+-- rather than from the plan column alone, so an unpaid checkout cannot buy it.
+--
+-- DEFAULT false, AND THAT IS THE DEPLOY-SAFE DIRECTION
+--
+-- A defaulted parameter keeps the old six-argument call resolvable, so an
+-- application that has not deployed yet still works. It defaults to FALSE, not
+-- true: an older build then creates stores unpublished, and a paid merchant
+-- publishes with one click. The other default would keep handing free live
+-- stores out for as long as the deploy lagged, which is the failure this
+-- migration exists to prevent. Fail closed on the side of the rule.
+--
+-- ^ CORRECTION (0056). The first sentence of that paragraph is FALSE, and it is
+-- left standing here rather than rewritten because the record matters. Adding a
+-- parameter does not replace a function, it creates a second one, and a
+-- six-argument call then matches both candidates: PostgreSQL raises
+-- "function ... is not unique" (SQLSTATE 42725) instead of filling in the
+-- default. The choice of `false` was right; the claim about resolvability was
+-- never executed against PostgreSQL. 0056 drops the six-argument form and makes
+-- the sentence true. Read 0056 before relying on anything in this paragraph.
+--
+-- Existing live stores are NOT touched. Taking a merchant's shop offline is a
+-- customer decision, not a migration's, and `publish_store` returns ALREADY_LIVE
+-- before it reaches the capacity check — so a store that is live stays live
+-- until someone decides otherwise. The count and the statement to act on it are
+-- in the release notes for this change.
+
+create or replace function public.generate_store_atomic(
+    p_user_id uuid,
+    p_store_name text,
+    p_subdomain text,
+    p_theme_config jsonb,
+    p_products jsonb,
+    p_credit_cost integer,
+    -- Whether this merchant's entitled plan may run a live store. False for
+    -- Free. Defaults to false so an un-deployed application cannot publish.
+    p_is_active boolean default false
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_store_id uuid;
+    v_balance  integer;
+begin
+    if p_credit_cost <= 0 then
+        raise exception 'INVALID_COST';
+    end if;
+
+    if exists (select 1 from public.reserved_subdomains where subdomain = p_subdomain) then
+        raise exception 'SUBDOMAIN_RESERVED';
+    end if;
+
+    perform 1 from public.profiles where id = p_user_id for update;
+
+    v_balance := public.credit_balance(p_user_id);
+    if v_balance < p_credit_cost then
+        raise exception 'INSUFFICIENT_CREDITS';
+    end if;
+
+    insert into public.credit_ledger (user_id, delta, reason, source)
+    values (p_user_id, -p_credit_cost, 'Store generation: ' || p_subdomain, 'generation');
+
+    -- is_active is now named explicitly. This is the whole migration: the column
+    -- default made the decision before, and the default cannot see a plan.
+    insert into public.stores (user_id, store_name, subdomain, theme_config, is_active)
+    values (p_user_id, p_store_name, p_subdomain, p_theme_config, coalesce(p_is_active, false))
+    returning id into v_store_id;
+
+    insert into public.products (store_id, title, description, price_eur, position)
+    select v_store_id,
+           elem->>'title',
+           coalesce(elem->>'description', ''),
+           (elem->>'price_eur')::numeric,
+           ordinality - 1
+    from jsonb_array_elements(p_products) with ordinality as t(elem, ordinality);
+
+    insert into public.audit_logs (user_id, action, entity_type, entity_id, metadata)
+    values (p_user_id, 'store_generation', 'store', v_store_id::text,
+            jsonb_build_object('subdomain', p_subdomain, 'credit_cost', p_credit_cost,
+                               'is_active', coalesce(p_is_active, false)));
+
+    return jsonb_build_object(
+        'store_id', v_store_id,
+        'credits_remaining', v_balance - p_credit_cost
+    );
+end $$;
+
+comment on function public.generate_store_atomic(uuid, text, text, jsonb, jsonb, integer, boolean) is
+    'Generate a store atomically: spend credits, create the store, insert its '
+    'products, write the audit row. p_is_active carries the plan''s publish '
+    'entitlement and defaults to false — a generated store is not live unless '
+    'the caller says the merchant may have a live store (migration 0055).';
+
+-- Same grants as the six-argument form: service role only. The route holds the
+-- session and the entitlement; the function is not reachable from a browser.
+revoke execute on function public.generate_store_atomic(uuid, text, text, jsonb, jsonb, integer, boolean) from public, anon, authenticated;
+grant execute on function public.generate_store_atomic(uuid, text, text, jsonb, jsonb, integer, boolean) to service_role;
+
+-- ------------------------------------------------------------
+-- How many stores the old default published for merchants who may not have one.
+--
+-- Reporting, not acting. Read it, decide, then act by hand if you want to:
+--
+--   select s.id, s.subdomain, p.email, p.plan, s.published_at
+--   from public.stores s
+--   join public.profiles p on p.id = s.user_id
+--   where s.is_active = true
+--     and p.plan = 'free'
+--     and coalesce(p.subscription_status, 'none') not in ('active', 'past_due')
+--     and (p.comped_until is null or p.comped_until < now());
+--
+-- To take them offline (irreversible for the merchant's live URL):
+--
+--   update public.stores set is_active = false, updated_at = now()
+--   where id in ( … ids from the query above … );
+-- ------------------------------------------------------------
+create or replace function public.free_tier_live_stores()
+returns integer
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select count(*)::integer
+  from public.stores s
+  join public.profiles p on p.id = s.user_id
+  where s.is_active = true
+    and p.plan = 'free'
+    and coalesce(p.subscription_status, 'none') not in ('active', 'past_due')
+    and (p.comped_until is null or p.comped_until < now());
+$$;
+
+comment on function public.free_tier_live_stores() is
+    'How many live stores belong to merchants with no paid entitlement — the '
+    'population the pre-0055 column default created. Reporting only.';
+
+revoke execute on function public.free_tier_live_stores() from public, anon, authenticated;
+grant execute on function public.free_tier_live_stores() to service_role;
+
+
+-- ─────────────────────────────────────────────────────────
+-- 0056_drop_legacy_generate_store_signature.sql
+-- ─────────────────────────────────────────────────────────
+-- Remove the six-argument `generate_store_atomic`, because two signatures make
+-- the call ambiguous — and 0055 asserted the opposite.
+--
+-- WHAT 0055 CLAIMED
+--
+-- 0055 added `p_is_active boolean default false` and reasoned, in its own
+-- header: "A defaulted parameter keeps the old six-argument call resolvable, so
+-- an application that has not deployed yet still works."
+--
+-- That is wrong, and it is wrong in the worst possible direction: 0055 used
+-- `create or replace function` with an extra parameter, which does not replace
+-- anything. It creates a SECOND function. The six-argument form from 0003 is
+-- still there beside it, and PostgreSQL then has two applicable candidates for
+-- a six-argument call — the exact one, and the seven-argument one with its
+-- default filled in. It refuses to choose:
+--
+--   ERROR:  function generate_store_atomic(uuid, text, text, jsonb, jsonb,
+--           integer) is not unique                       (SQLSTATE 42725)
+--
+-- Verified against a real PostgreSQL, not reasoned about: two functions of the
+-- same name, the second differing only by a defaulted trailing parameter, and
+-- the narrower call raises 42725 both positionally and with named arguments.
+-- Dropping the narrow signature makes the same call resolve to the wide
+-- function with its default, which is what 0055 believed was happening.
+--
+-- WHY THIS IS URGENT RATHER THAN TIDY
+--
+-- 0055 is applied. The application deployed against it still calls the RPC with
+-- six named arguments, so store generation — the product's first action — is
+-- resolving against an ambiguity. This migration repairs it on its own, with no
+-- deploy: afterwards the six-argument call lands on the seven-argument function
+-- and creates the store unpublished, and a paid merchant publishes with one
+-- click. Then the application deploy passes the seventh argument and the
+-- publish decision is carried explicitly again.
+--
+-- Safe in both directions, which is the property that was missing:
+--   • old application (6 named args) → wide function, p_is_active := false
+--   • new application (7 named args) → wide function, p_is_active := the plan
+--
+-- THE LESSON, WRITTEN DOWN WHERE THE NEXT PERSON WILL LOOK
+--
+-- `create or replace function` replaces a function only when the argument types
+-- match exactly. Adding a parameter — defaulted or not — is a new function and
+-- an overload set. This is the second time a migration in this repository has
+-- shipped a premise about PostgreSQL's behaviour that was never executed
+-- against PostgreSQL (0052 asserted that policy subqueries need only column
+-- privileges; 0053 repaired it). lib/sql-overloads.test.ts now fails the build
+-- if any function in this directory is left with more than one live signature,
+-- so the class of mistake cannot ship a third time.
+
+drop function if exists public.generate_store_atomic(uuid, text, text, jsonb, jsonb, integer);
+
+-- Re-state the grants on the surviving signature. Dropping a sibling does not
+-- touch them; this is here so a reader of this file can see, without opening
+-- 0055, exactly who may execute the only remaining form.
+revoke execute on function public.generate_store_atomic(uuid, text, text, jsonb, jsonb, integer, boolean) from public, anon, authenticated;
+grant execute on function public.generate_store_atomic(uuid, text, text, jsonb, jsonb, integer, boolean) to service_role;
+
+-- Proof, executable: exactly one signature must remain, and it must be the one
+-- that takes the publish entitlement. This raises rather than returning, so
+-- applying the migration is itself the assertion.
+do $$
+declare
+    v_count integer;
+    v_args  text;
+begin
+    select count(*), string_agg(pg_get_function_identity_arguments(p.oid), ' | ')
+      into v_count, v_args
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'generate_store_atomic';
+
+    if v_count <> 1 then
+        raise exception 'generate_store_atomic must have exactly one signature, found %: %',
+            v_count, v_args;
+    end if;
+
+    if v_args not like '%p_is_active boolean%' then
+        raise exception 'the surviving generate_store_atomic does not take p_is_active: %', v_args;
+    end if;
+end $$;

@@ -73,9 +73,17 @@ const FAQ = (foundingOpen: boolean): [string, string][] => [
     "How do credits work?",
     `Every account starts with ${PLANS.free.signupCredits} free credits — enough to generate your first store and still have room to refine it. Generating a store costs ${CREDIT_COSTS.storeGeneration} credits; refining it with the AI assistant costs ${CREDIT_COSTS.askMessage} credits a message. Paid plans include a recurring monthly credit allowance, and your credit history is always visible in Billing.`,
   ],
+  /*
+   * This answer used to say "Yes", and it was true: the free tier ran one live
+   * store, because a generated store was born live off the column default. The
+   * rule changed — going live is a paid capability now — and this text changes
+   * in the same commit as lib/plans.ts on purpose. An FAQ promising free
+   * publishing beside a product that refuses it is the drift this whole file is
+   * built to prevent, and it is worse than either position taken honestly.
+   */
   [
     "Can I publish for free?",
-    `Yes. Free runs one live store on a urivo.ai address — not a preview behind a paywall. Founder runs up to ${PLANS.core.maxLiveStores} live stores and Pro runs as many as you like, so you upgrade when you outgrow the plan rather than to escape it.`,
+    `No — publishing is where a paid plan starts. Free generates a complete store and lets you refine it as long as you like; taking it live on a urivo.ai address needs ${PLANS.core.name} or ${PLANS.pro.name}. ${PLANS.core.name} runs up to ${PLANS.core.maxLiveStores} live stores and ${PLANS.pro.name} runs as many as you like.`,
   ],
   [
     "Do I need my own domain?",

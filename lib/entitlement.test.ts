@@ -85,8 +85,12 @@ describe("entitledPlan — the features an unpaid tier actually gets", () => {
   it("hands an incomplete-checkout account the Free feature set", () => {
     const plan = entitledPlan({ plan: "pro", subscription_status: "none" }, now);
     expect(plan.key).toBe("free");
-    // The tier boundaries that cost money: capacity and the Evolution Lab.
-    expect(plan.maxLiveStores).toBe(1);
+    // The tier boundaries that cost money: publishing, capacity, Evolution Lab.
+    // maxLiveStores was 1 here; Free now runs none, so an unpaid Pro checkout
+    // buys no live store either — which is the whole point of resolving the
+    // entitlement from payment state instead of the plan column.
+    expect(plan.maxLiveStores).toBe(0);
+    expect(plan.features.publish).toBe(false);
     expect(plan.features.evolution).toBe("none");
     expect(plan.monthlyCredits).toBe(0);
   });
