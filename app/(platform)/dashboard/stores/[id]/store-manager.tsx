@@ -377,15 +377,26 @@ export function StoreManager({
 
       {/* Products */}
       <section className="mt-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold tracking-tight text-ivory">Products</h2>
-          <button
-            type="button"
-            onClick={() => setEditing("new")}
-            className="u-gold u-lift rounded-xl px-5 py-2.5 text-sm font-semibold"
-          >
-            + Add product
-          </button>
+          <div className="flex items-center gap-2">
+            {products.length > 0 && (
+              <a
+                href={`/api/stores/${storeId}/export/shopify`}
+                className="u-lift rounded-xl border border-hair bg-panel px-4 py-2.5 text-sm font-medium text-ivory transition-colors hover:border-hair-strong hover:bg-panel-2"
+                title="Download your products as a Shopify-import CSV — your data is yours to take anywhere."
+              >
+                Export to Shopify
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => setEditing("new")}
+              className="u-gold u-lift rounded-xl px-5 py-2.5 text-sm font-semibold"
+            >
+              + Add product
+            </button>
+          </div>
         </div>
 
         {products.length === 0 ? (
