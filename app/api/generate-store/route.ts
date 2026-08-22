@@ -193,8 +193,23 @@ export async function POST(request: NextRequest) {
     // Idempotent replay — a prior identical request already built this store.
     return NextResponse.json({ success: true, storeId: decision.storeId, subdomain: body.subdomain, storeUrl: storeUrlFor(body.subdomain), duplicate: true });
   }
-  if (decision.kind === "backpressure" || decision.kind === "fail_closed") {
-    const bp = decision.kind === "backpressure" ? decision.response : GUARD_UNAVAILABLE;
+  if (decision.kind === "fail_closed") {
+    // Fail-closed 503 means "generation is down" — always emit it, whatever the
+    // cause (RPC error, no rows, unusable outcome), so it can be alerted on. The
+    // inline capture above additionally carries the underlying DB error when
+    // there was one; this is the single uniform signal for the 503 itself.
+    captureException(new Error(`generation guard unavailable: ${decision.reason}`), {
+      requestId,
+      userId: user.id,
+      route: "generate-store:guard",
+    });
+    return NextResponse.json(
+      { error: GUARD_UNAVAILABLE.error, message: GUARD_UNAVAILABLE.message },
+      { status: GUARD_UNAVAILABLE.status, headers: { "Retry-After": String(GUARD_UNAVAILABLE.retryAfter) } },
+    );
+  }
+  if (decision.kind === "backpressure") {
+    const bp = decision.response;
     return NextResponse.json(
       { error: bp.error, message: bp.message },
       { status: bp.status, headers: { "Retry-After": String(bp.retryAfter) } },
