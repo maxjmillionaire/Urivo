@@ -18,7 +18,10 @@ import {
   GEN_TTL_SECONDS,
   idempotencyKey,
   maxConcurrentGenerations,
-  backpressureFor,
+  decideClaim,
+  GUARD_UNAVAILABLE,
+  type ClaimRow,
+  type ClaimDecision,
 } from "@/lib/ai/generation-guard";
 import { recordAiUsage } from "@/lib/finance/ledger";
 import { getPlatformSettings } from "@/lib/platform/settings";
@@ -157,14 +160,18 @@ export async function POST(request: NextRequest) {
    *
    * The per-user concurrency lock + idempotency + global ceiling from migration
    * 0059 (Postgres, not a queue). A refused claim is controlled backpressure
-   * (429 + Retry-After), never a 500. The lock is best-effort protection, not a
-   * dependency: if the jobs table itself errors, generation still proceeds —
-   * subdomain uniqueness and deduct-on-success independently prevent a duplicate
-   * store or a double charge.
+   * (429/409 + Retry-After), never a 500.
+   *
+   * FAILS CLOSED. The guard is a hard prerequisite, not best-effort: if the
+   * claim RPC errors, returns nothing, or gives an outcome we can't act on, we
+   * do NOT enter the expensive Anthropic/Higgsfield/Gemini pipeline — we return a
+   * retryable 503 with Retry-After. The expensive path is never run without a
+   * verified lock.
    */
   const idemKey = idempotencyKey(request.headers.get("Idempotency-Key"), body.subdomain);
   const maxGlobal = maxConcurrentGenerations(process.env.URIVO_MAX_CONCURRENT_GENERATIONS);
-  let jobId: string | null = null;
+
+  let decision: ClaimDecision;
   try {
     const { data: claimRows, error: claimErr } = await admin.rpc("claim_generation_job", {
       p_user_id: user.id,
@@ -173,28 +180,28 @@ export async function POST(request: NextRequest) {
       p_ttl_seconds: GEN_TTL_SECONDS,
       p_max_global: maxGlobal,
     });
-    const claim = (claimRows?.[0] ?? null) as
-      | { outcome: string; job_id: string | null; store_id: string | null }
-      | null;
     if (claimErr) {
       captureException(new Error(claimErr.message), { requestId, userId: user.id, route: "generate-store:claim" });
-    } else if (claim?.outcome === "duplicate_succeeded" && claim.store_id) {
-      // Idempotent replay — a prior identical request already built this store.
-      return NextResponse.json({ success: true, storeId: claim.store_id, subdomain: body.subdomain, storeUrl: storeUrlFor(body.subdomain), duplicate: true });
-    } else if (claim) {
-      const bp = backpressureFor(claim.outcome);
-      if (bp) {
-        return NextResponse.json(
-          { error: bp.error, message: bp.message },
-          { status: bp.status, headers: { "Retry-After": String(bp.retryAfter) } },
-        );
-      }
-      if (claim.outcome === "claimed") jobId = claim.job_id;
     }
+    decision = decideClaim(!!claimErr, (claimRows as ClaimRow[] | null) ?? null);
   } catch (err) {
-    // Claim infra failure → proceed unprotected rather than block all generation.
     captureException(err, { requestId, userId: user.id, route: "generate-store:claim" });
+    decision = { kind: "fail_closed", reason: "claim_exception" };
   }
+
+  if (decision.kind === "replay") {
+    // Idempotent replay — a prior identical request already built this store.
+    return NextResponse.json({ success: true, storeId: decision.storeId, subdomain: body.subdomain, storeUrl: storeUrlFor(body.subdomain), duplicate: true });
+  }
+  if (decision.kind === "backpressure" || decision.kind === "fail_closed") {
+    const bp = decision.kind === "backpressure" ? decision.response : GUARD_UNAVAILABLE;
+    return NextResponse.json(
+      { error: bp.error, message: bp.message },
+      { status: bp.status, headers: { "Retry-After": String(bp.retryAfter) } },
+    );
+  }
+  // decision.kind === "proceed" — the only path into the expensive pipeline.
+  const jobId: string = decision.jobId;
 
   // Everything expensive runs inside this block; the finally releases the job
   // lock exactly once — 'succeeded' with the new store, or 'failed' on any exit

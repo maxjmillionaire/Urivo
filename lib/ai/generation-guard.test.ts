@@ -3,8 +3,11 @@ import {
   idempotencyKey,
   maxConcurrentGenerations,
   backpressureFor,
+  decideClaim,
+  GUARD_UNAVAILABLE,
   GEN_TTL_SECONDS,
   MAX_GLOBAL_DEFAULT,
+  type ClaimRow,
 } from "./generation-guard";
 
 /*
@@ -64,5 +67,45 @@ describe("backpressureFor", () => {
 describe("lock TTL", () => {
   it("outlives the route's 300s maxDuration so a live run is never stolen", () => {
     expect(GEN_TTL_SECONDS).toBeGreaterThan(300);
+  });
+});
+
+describe("decideClaim — FAILS CLOSED", () => {
+  const row = (o: string, over: Partial<ClaimRow> = {}): ClaimRow[] => [
+    { outcome: o, job_id: null, store_id: null, ...over },
+  ];
+
+  it("proceeds ONLY on a 'claimed' outcome carrying a job id", () => {
+    expect(decideClaim(false, row("claimed", { job_id: "job-1" }))).toEqual({ kind: "proceed", jobId: "job-1" });
+  });
+
+  it("fails closed on a database/infra error — never enters the pipeline", () => {
+    expect(decideClaim(true, row("claimed", { job_id: "job-1" }))).toEqual({ kind: "fail_closed", reason: "claim_rpc_error" });
+  });
+
+  it("fails closed when the RPC returns no rows (null / empty)", () => {
+    expect(decideClaim(false, null)).toEqual({ kind: "fail_closed", reason: "no_outcome" });
+    expect(decideClaim(false, [])).toEqual({ kind: "fail_closed", reason: "no_outcome" });
+    expect(decideClaim(false, undefined)).toEqual({ kind: "fail_closed", reason: "no_outcome" });
+  });
+
+  it("fails closed on 'claimed' with no job id (guard could not be proven)", () => {
+    expect(decideClaim(false, row("claimed", { job_id: null }))).toEqual({ kind: "fail_closed", reason: "unexpected:claimed" });
+  });
+
+  it("fails closed on an unrecognised outcome", () => {
+    expect(decideClaim(false, row("weird_new_state"))).toMatchObject({ kind: "fail_closed" });
+  });
+
+  it("still replays an idempotent success and still applies backpressure", () => {
+    expect(decideClaim(false, row("duplicate_succeeded", { store_id: "store-9" }))).toEqual({ kind: "replay", storeId: "store-9" });
+    expect(decideClaim(false, row("busy_user"))).toMatchObject({ kind: "backpressure" });
+    expect(decideClaim(false, row("busy_global"))).toMatchObject({ kind: "backpressure" });
+    expect(decideClaim(false, row("in_progress"))).toMatchObject({ kind: "backpressure" });
+  });
+
+  it("the fail-closed response is a retryable 503 with Retry-After", () => {
+    expect(GUARD_UNAVAILABLE.status).toBe(503);
+    expect(GUARD_UNAVAILABLE.retryAfter).toBeGreaterThan(0);
   });
 });

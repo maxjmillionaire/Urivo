@@ -39,6 +39,49 @@ export interface Backpressure {
   retryAfter: number;
 }
 
+/** A row returned by claim_generation_job. */
+export interface ClaimRow {
+  outcome: string;
+  job_id: string | null;
+  store_id: string | null;
+}
+
+/**
+ * What the route should do with a claim result. FAILS CLOSED: any inability to
+ * confirm the guard — an RPC error, a missing/empty result, a 'claimed' without
+ * a job id, or an unrecognised outcome — resolves to `fail_closed`, so the
+ * expensive pipeline is NEVER entered without a verified lock.
+ */
+export type ClaimDecision =
+  | { kind: "proceed"; jobId: string }
+  | { kind: "replay"; storeId: string }
+  | { kind: "backpressure"; response: Backpressure }
+  | { kind: "fail_closed"; reason: string };
+
+export function decideClaim(hasError: boolean, rows: ClaimRow[] | null | undefined): ClaimDecision {
+  if (hasError) return { kind: "fail_closed", reason: "claim_rpc_error" };
+  const claim = rows?.[0] ?? null;
+  if (!claim) return { kind: "fail_closed", reason: "no_outcome" };
+  if (claim.outcome === "duplicate_succeeded" && claim.store_id) {
+    return { kind: "replay", storeId: claim.store_id };
+  }
+  const bp = backpressureFor(claim.outcome);
+  if (bp) return { kind: "backpressure", response: bp };
+  if (claim.outcome === "claimed" && claim.job_id) {
+    return { kind: "proceed", jobId: claim.job_id };
+  }
+  // 'claimed' with no job id, or any unknown outcome: we cannot prove the lock.
+  return { kind: "fail_closed", reason: `unexpected:${claim.outcome}` };
+}
+
+/** The retryable 503 returned when the guard could not be acquired (fail closed). */
+export const GUARD_UNAVAILABLE: Backpressure = {
+  status: 503,
+  error: "GENERATION_UNAVAILABLE",
+  message: "Generation is briefly unavailable. Please try again in a moment.",
+  retryAfter: 15,
+};
+
 /**
  * Map a refused claim outcome to a controlled backpressure response — never a
  * 500, and never a fake "queued" (there is no queue). Returns null for outcomes
