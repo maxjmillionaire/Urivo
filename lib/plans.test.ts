@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  PLANS,
   getPlan,
   maxMonthlyOrders,
   volumeStanding,
@@ -45,10 +46,33 @@ describe("plans — tier + price logic (money-critical)", () => {
     expect(isPaid("free")).toBe(false);
     expect(isPaid("core")).toBe(true);
     expect(isPaid("pro")).toBe(true);
-    // Free publishes too now — one store. A merchant who has never had a live
-    // store has nothing to keep, and people do not pay to keep nothing.
-    expect(canPublish("free")).toBe(true);
+    // Going live is where a paid plan begins. This assertion previously read
+    // `true`, with a comment arguing that a merchant who has never had a live
+    // store has nothing to keep — overruled as a business decision.
+    expect(canPublish("free")).toBe(false);
     expect(canPublish("core")).toBe(true);
+    expect(canPublish("pro")).toBe(true);
+  });
+
+  it("Free has no live-store capacity, so publish_store refuses at zero", () => {
+    /*
+     * publish_store refuses when live_count >= p_max_live, and the route passes
+     * maxLiveStores straight through. Zero therefore means the FIRST publish is
+     * already at the cap — the database refuses even if the feature flag above
+     * is ever flipped back by accident. That redundancy is the point.
+     */
+    expect(maxLiveStores("free")).toBe(0);
+    expect(maxLiveStores("core")).toBe(3);
+    expect(maxLiveStores("pro")).toBeNull();
+  });
+
+  it("promises no live store in the Free highlights", () => {
+    // The pricing card and the FAQ are the same promise as the feature flag.
+    // A card offering "one live store" beside a product that refuses to publish
+    // is the drift lib/plans.ts exists to make impossible.
+    const free = PLANS.free.highlights.join(" ").toLowerCase();
+    expect(free).not.toMatch(/live store/);
+    expect(free).not.toMatch(/urivo\.ai/);
   });
 
   it("nextPlan walks free → Founder → Pro → top", () => {
@@ -77,8 +101,10 @@ describe("plans — tier + price logic (money-critical)", () => {
 });
 
 describe("live-store capacity", () => {
-  it("gives Free exactly one live store — the magic moment, not a portfolio", () => {
-    expect(maxLiveStores("free")).toBe(1);
+  it("gives Free no live store at all — going live is where a paid plan starts", () => {
+    // Was 1, argued as "the magic moment, not a portfolio". Overruled: the free
+    // tier builds and previews, and publishing requires an upgrade.
+    expect(maxLiveStores("free")).toBe(0);
   });
 
   it("gives Founder room to run a few brands without ever feeling capped", () => {
@@ -97,7 +123,9 @@ describe("live-store capacity", () => {
 
   it("speaks capacity, never restriction", () => {
     expect(capacityLabel("core")).toBe("Run up to 3 live stores");
-    expect(capacityLabel("free")).toBe("Run up to 1 live store");
+    // Zero capacity describes the capability, not the number — "run up to 0
+    // live stores" would be both absurd and a restriction stated as a feature.
+    expect(capacityLabel("free")).toBe("Build and preview — publishing starts on Founder");
     expect(capacityLabel("pro")).toBe("Unlimited live stores");
     for (const k of ["free", "core", "pro"]) {
       expect(capacityLabel(k).toLowerCase()).not.toMatch(/limited to|only|restrict|max\b/);

@@ -286,6 +286,20 @@ export async function POST(request: NextRequest) {
       p_theme_config: themeConfig,
       p_products: products,
       p_credit_cost: STORE_GENERATION_COST,
+      /*
+       * Whether this store is born live (migration 0055).
+       *
+       * `stores.is_active` defaults to true, so until 0055 every generated store
+       * was live on creation for every plan — the free tier got a live store on
+       * a urivo.ai address without ever touching the publish button, and
+       * publish_store, which holds both the capacity rule and the paid-capability
+       * rule, was never on this path.
+       *
+       * `plan` here is the ENTITLED plan from getPlanForUser, resolved from
+       * payment state rather than the plan column, so a checkout that never paid
+       * cannot buy a live store.
+       */
+      p_is_active: plan.features.publish,
     },
   );
 
