@@ -99,6 +99,9 @@ export const REQUIRED_RPCS = [
   // 0054. Reports whether `stores` is still owner-only and `storefronts` is
   // still free of private columns. A database provisioned before 0054 answers
   // every other check green while leaking every merchant's payout account.
+  "claim_generation_job",
+  "finish_generation_job",
+  "store_is_paused",
   "storefront_isolation_intact",
   "submit_feedback",
   "subscribe_to_store",

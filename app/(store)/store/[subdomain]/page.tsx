@@ -141,6 +141,22 @@ export default async function StorefrontPage({ params }: Props) {
   const { store, products, isPreview } = sf;
 
   /*
+   * PAUSED: a published store whose owner's subscription lapsed. The public sees
+   * a maintenance page — never the shop, never any private data — and checkout is
+   * refused (here by not rendering the shop, and independently in the checkout
+   * route). The owner reactivates from their dashboard; the store returns to live
+   * the moment entitlement is restored. The owner-preview path (a draft,
+   * isPreview) is not paused and is skipped.
+   */
+  if (!isPreview) {
+    const { data: paused } = await supabaseAdmin().rpc("store_is_paused", { p_store_id: store.id });
+    if (paused === true) {
+      const t = parseTheme(store.theme_config);
+      return <StorePaused storeName={store.store_name} background={t.background} ink={t.structure} />;
+    }
+  }
+
+  /*
    * Can this store take money? A shopper used to find out only after browsing,
    * choosing, adding to the cart and pressing Checkout — the point of maximum
    * invested effort and zero recovery. They are told up front instead, and the
@@ -241,5 +257,58 @@ export default async function StorefrontPage({ params }: Props) {
         canSell={readiness.canSell}
       />
     </>
+  );
+}
+
+/*
+ * Maintenance page for a paused store. In the merchant's own canvas colours (to
+ * the shopper this is that brand's site), it says only that the store is
+ * temporarily unavailable — no products, no prices, no owner or billing detail.
+ * A calm dead-simple page that can't leak anything.
+ */
+function StorePaused({
+  storeName,
+  background,
+  ink,
+}: {
+  storeName: string;
+  background: string;
+  ink: string;
+}) {
+  return (
+    <main
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "2rem",
+        background,
+        color: ink,
+        fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+        textAlign: "center",
+      }}
+    >
+      <div style={{ maxWidth: "28rem" }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: "0.72rem",
+            fontWeight: 600,
+            letterSpacing: "0.16em",
+            textTransform: "uppercase",
+            opacity: 0.6,
+          }}
+        >
+          {storeName}
+        </p>
+        <h1 style={{ margin: "1rem 0 0.6rem", fontSize: "1.6rem", fontWeight: 700, letterSpacing: "-0.01em" }}>
+          Temporarily unavailable
+        </h1>
+        <p style={{ margin: 0, fontSize: "0.95rem", lineHeight: 1.6, opacity: 0.75 }}>
+          This store is paused for now. Please check back soon.
+        </p>
+      </div>
+    </main>
   );
 }

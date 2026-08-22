@@ -98,6 +98,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!store) return fail(404, "NOT_FOUND", "Store not found.");
 
   /*
+   * Paused check first: a store whose owner's subscription lapsed cannot take
+   * money even if its Stripe account is perfectly healthy. The storefront
+   * already serves a maintenance page, so a paused store never renders a cart —
+   * this refuses a direct POST to the route anyway (defence in depth, same
+   * definer helper the storefront used).
+   */
+  const { data: paused } = await admin.rpc("store_is_paused", { p_store_id: store.id });
+  if (paused === true) {
+    return fail(503, "CHECKOUT_UNAVAILABLE", "This store is temporarily unavailable. Please check back soon.");
+  }
+
+  /*
    * Commerce readiness, from the same helper the storefront uses to warn the
    * shopper BEFORE they fill a cart. This is the last line of defence rather
    * than the first thing the customer learns.

@@ -14,6 +14,12 @@ import {
   STORE_GENERATOR_PROMPT_VERSION,
 } from "@/lib/ai/store-generator";
 import { generateStoreImagery } from "@/lib/ai/image-generator";
+import {
+  GEN_TTL_SECONDS,
+  idempotencyKey,
+  maxConcurrentGenerations,
+  backpressureFor,
+} from "@/lib/ai/generation-guard";
 import { recordAiUsage } from "@/lib/finance/ledger";
 import { getPlatformSettings } from "@/lib/platform/settings";
 import { maybeAlertSpend } from "@/lib/platform/spend-alert";
@@ -53,6 +59,15 @@ const BodySchema = z.object({
 
 function fail(status: number, error: string, message: string) {
   return NextResponse.json({ error, message }, { status });
+}
+
+/** The public URL for a generated store — same shape for the normal and the
+ *  idempotent-replay responses. */
+function storeUrlFor(subdomain: string): string {
+  const rootDomain = process.env.ROOT_DOMAIN ?? "localhost:3000";
+  return rootDomain.startsWith("localhost")
+    ? `/store/${subdomain}`
+    : `https://${subdomain}.${rootDomain}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -138,20 +153,67 @@ export async function POST(request: NextRequest) {
   const requestId = newRequestId();
 
   /*
-   * Start of the clock the landing page is making a promise about.
+   * Task 3 — claim a durable generation slot BEFORE any expensive work.
    *
-   * Taken here rather than at the top of the handler on purpose: auth, plan
-   * lookup, rate limiting and credit reservation are Urivo's own overhead and
-   * are not what "generated in under a minute" refers to. This measures the
-   * generation itself — the model call plus the imagery — which is the part a
-   * merchant experiences as waiting.
+   * The per-user concurrency lock + idempotency + global ceiling from migration
+   * 0059 (Postgres, not a queue). A refused claim is controlled backpressure
+   * (429 + Retry-After), never a 500. The lock is best-effort protection, not a
+   * dependency: if the jobs table itself errors, generation still proceeds —
+   * subdomain uniqueness and deduct-on-success independently prevent a duplicate
+   * store or a double charge.
    */
-  const startedAt = Date.now();
-
-  // 5. Generate (AI)
-  let generated;
+  const idemKey = idempotencyKey(request.headers.get("Idempotency-Key"), body.subdomain);
+  const maxGlobal = maxConcurrentGenerations(process.env.URIVO_MAX_CONCURRENT_GENERATIONS);
+  let jobId: string | null = null;
   try {
-    generated = await generateStore({
+    const { data: claimRows, error: claimErr } = await admin.rpc("claim_generation_job", {
+      p_user_id: user.id,
+      p_key: idemKey,
+      p_subdomain: body.subdomain,
+      p_ttl_seconds: GEN_TTL_SECONDS,
+      p_max_global: maxGlobal,
+    });
+    const claim = (claimRows?.[0] ?? null) as
+      | { outcome: string; job_id: string | null; store_id: string | null }
+      | null;
+    if (claimErr) {
+      captureException(new Error(claimErr.message), { requestId, userId: user.id, route: "generate-store:claim" });
+    } else if (claim?.outcome === "duplicate_succeeded" && claim.store_id) {
+      // Idempotent replay — a prior identical request already built this store.
+      return NextResponse.json({ success: true, storeId: claim.store_id, subdomain: body.subdomain, storeUrl: storeUrlFor(body.subdomain), duplicate: true });
+    } else if (claim) {
+      const bp = backpressureFor(claim.outcome);
+      if (bp) {
+        return NextResponse.json(
+          { error: bp.error, message: bp.message },
+          { status: bp.status, headers: { "Retry-After": String(bp.retryAfter) } },
+        );
+      }
+      if (claim.outcome === "claimed") jobId = claim.job_id;
+    }
+  } catch (err) {
+    // Claim infra failure → proceed unprotected rather than block all generation.
+    captureException(err, { requestId, userId: user.id, route: "generate-store:claim" });
+  }
+
+  // Everything expensive runs inside this block; the finally releases the job
+  // lock exactly once — 'succeeded' with the new store, or 'failed' on any exit
+  // (error return or throw). A failed generation charged nothing (credits are
+  // deducted only inside generate_store_atomic on success), so there is nothing
+  // to refund — releasing the lock is the whole cleanup.
+  let jobSucceeded = false;
+  let jobStoreId: string | null = null;
+  try {
+    /*
+     * Start of the clock the landing page is making a promise about — the
+     * generation itself (model + imagery), not Urivo's auth/plan/lock overhead.
+     */
+    const startedAt = Date.now();
+
+    // 5. Generate (AI)
+    let generated;
+    try {
+      generated = await generateStore({
       prompt: body.prompt,
       attachments: acceptAttachments(body.attachments).attachments,
     });
@@ -276,25 +338,40 @@ export async function POST(request: NextRequest) {
     await admin.from("stores").update({ is_active: false }).eq("id", result.store_id);
   }
 
-  const rootDomain = process.env.ROOT_DOMAIN ?? "localhost:3000";
-  const storeUrl = rootDomain.startsWith("localhost")
-    ? `/store/${body.subdomain}`
-    : `https://${body.subdomain}.${rootDomain}`;
+    // Mark the job succeeded before returning — the finally then records it with
+    // the store id so a later identical request replays this store rather than
+    // building another.
+    jobSucceeded = true;
+    jobStoreId = result.store_id;
 
-  return NextResponse.json({
-    success: true,
-    storeId: result.store_id,
-    subdomain: body.subdomain,
-    storeUrl,
-    published,
-    storeName: generated.brand.name,
-    tagline: generated.brand.tagline,
-    palette: {
-      background: ds.palette.background,
-      structure: ds.palette.ink,
-      accent: ds.palette.accent,
-    },
-    products: generated.products.map((p) => ({ title: p.title, priceEUR: p.priceEUR })),
-    creditsRemaining: result.credits_remaining,
-  });
+    return NextResponse.json({
+      success: true,
+      storeId: result.store_id,
+      subdomain: body.subdomain,
+      storeUrl: storeUrlFor(body.subdomain),
+      published,
+      storeName: generated.brand.name,
+      tagline: generated.brand.tagline,
+      palette: {
+        background: ds.palette.background,
+        structure: ds.palette.ink,
+        accent: ds.palette.accent,
+      },
+      products: generated.products.map((p) => ({ title: p.title, priceEUR: p.priceEUR })),
+      creditsRemaining: result.credits_remaining,
+    });
+  } finally {
+    // Release the generation lock exactly once, whichever way the block exited.
+    if (jobId) {
+      try {
+        await admin.rpc("finish_generation_job", {
+          p_job_id: jobId,
+          p_status: jobSucceeded ? "succeeded" : "failed",
+          p_store_id: jobStoreId,
+        });
+      } catch {
+        /* releasing the lock is best-effort; a stale job self-expires anyway */
+      }
+    }
+  }
 }
