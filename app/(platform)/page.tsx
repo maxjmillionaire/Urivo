@@ -87,7 +87,7 @@ const FAQ = (foundingOpen: boolean): [string, string][] => [
   ],
   [
     "Do I need my own domain?",
-    `Yes. To run a store under your own brand, you'll need to connect a domain you own. ${PLANS.core.name} and ${PLANS.pro.name} let you connect your custom domain to your Urivo store.`,
+    "No. You can publish with a Urivo address, or connect a domain you own if you want your store to run on your own brand.",
   ],
   /*
    * Only asked while the offer is open.
