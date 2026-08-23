@@ -60,6 +60,11 @@ export const REQUIRED_RPCS = [
   "expire_click_events",
   "attribute_store_outcome",
   "comped_accounts",
+  // 0059. The durable generation guard: without both, the generate-store route
+  // fails closed (503) on every attempt, so a database missing them must be
+  // caught by preflight rather than discovered by every merchant at once.
+  "claim_generation_job",
+  "finish_generation_job",
   "creator_payout_summary",
   "credit_balance",
   "credit_expiry_summary",
