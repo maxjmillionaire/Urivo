@@ -74,6 +74,7 @@ export type AiFeature =
   | "storeEdit"
   | "marketResearch"
   | "adStudio"
+  | "campaignDraft"
   | "productImage";
 
 export interface TokenUsage {
@@ -124,6 +125,8 @@ export const ACTION_PROFILES: Record<AiFeature, ActionProfile> = {
   marketResearch: { credits: CREDIT_COSTS.marketResearch, inTypical: 900, outTypical: 2500, inMax: 900, outMax: 4000, imagesTypical: 0, imagesMax: 0 },
   // System ~750t + store context ~800t. Output cap 4000.
   adStudio: { credits: CREDIT_COSTS.adStudio, inTypical: 1550, outTypical: 2800, inMax: 1550, outMax: 4000, imagesTypical: 0, imagesMax: 0 },
+  // System ~500t + store context ~800t. Output cap 1200 (a subject + short body).
+  campaignDraft: { credits: CREDIT_COSTS.campaignDraft, inTypical: 1300, outTypical: 500, inMax: 1600, outMax: 1200, imagesTypical: 0, imagesMax: 0 },
   // Pure image action (no LLM tokens).
   productImage: { credits: CREDIT_COSTS.productImage, inTypical: 0, outTypical: 0, inMax: 0, outMax: 0, imagesTypical: 1, imagesMax: 1 },
 };

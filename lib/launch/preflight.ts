@@ -111,6 +111,10 @@ export const REQUIRED_RPCS = [
   "storefront_isolation_intact",
   "submit_feedback",
   "subscribe_to_store",
+  // 0057. One-click campaign unsubscribe. A database missing it turns every
+  // marketing email's unsubscribe link into a 500 — a compliance failure, not
+  // just a broken feature.
+  "unsubscribe_by_token",
   "weekly_digest_data",
 ] as const;
 
