@@ -99,6 +99,10 @@ export const REQUIRED_RPCS = [
   "revoke_comped_access",
   "spend_credits",
   "store_for_domain",
+  // 0058. Derives whether a published store is paused (owner no longer entitled
+  // to publish). The storefront and checkout both gate on it; a database missing
+  // it would serve a lapsed store as live and take money it can't settle.
+  "store_is_paused",
   "store_payout_account",
   "store_subscriber_counts",
   // 0054. Reports whether `stores` is still owner-only and `storefronts` is
