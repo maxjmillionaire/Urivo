@@ -80,6 +80,36 @@ export default async function StoreDetailPage({
         </div>
       </header>
 
+      {/*
+        PAUSED banner — the dashboard side of the same derived rule the public
+        storefront uses (store_is_paused): a published store whose owner has
+        lapsed to free entitlement. Keyed on the ENTITLED plan (plan.key), which
+        matches the definer helper exactly, not on the movable free-publish
+        policy. The merchant keeps full access to the store, products and orders
+        below; only public selling is off. Reactivation is the existing billing
+        flow — no subscription state is mutated from the browser.
+      */}
+      {store.is_active && plan.key === "free" && (
+        <div className="u-float mt-6 rounded-2xl border border-gold/25 bg-gold/[0.05] p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gold-soft">Store paused</p>
+              <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-ivory">
+                Your subscription ended, so this store is paused — visitors see a maintenance page and
+                checkout is off. Your store, products and orders are all safe and still here.
+              </p>
+              <p className="mt-1 text-[13px] text-mist">Reactivate to bring it back live.</p>
+            </div>
+            <Link
+              href="/dashboard/billing"
+              className="u-gold u-lift shrink-0 rounded-xl px-5 py-2.5 text-center text-sm font-semibold"
+            >
+              Reactivate store
+            </Link>
+          </div>
+        </div>
+      )}
+
       <StoreManager
         storeId={store.id}
         canPublish={canPublish}

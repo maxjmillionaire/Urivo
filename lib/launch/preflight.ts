@@ -60,6 +60,11 @@ export const REQUIRED_RPCS = [
   "expire_click_events",
   "attribute_store_outcome",
   "comped_accounts",
+  // 0059. The durable generation guard: without both, the generate-store route
+  // fails closed (503) on every attempt, so a database missing them must be
+  // caught by preflight rather than discovered by every merchant at once.
+  "claim_generation_job",
+  "finish_generation_job",
   "creator_payout_summary",
   "credit_balance",
   "credit_expiry_summary",
@@ -94,6 +99,10 @@ export const REQUIRED_RPCS = [
   "revoke_comped_access",
   "spend_credits",
   "store_for_domain",
+  // 0058. Derives whether a published store is paused (owner no longer entitled
+  // to publish). The storefront and checkout both gate on it; a database missing
+  // it would serve a lapsed store as live and take money it can't settle.
+  "store_is_paused",
   "store_payout_account",
   "store_subscriber_counts",
   // 0054. Reports whether `stores` is still owner-only and `storefronts` is
