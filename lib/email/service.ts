@@ -12,11 +12,20 @@ import type { RenderedEmail } from "./templates";
 export interface SendEmailInput {
   to: string;
   email: RenderedEmail;
+  /**
+   * Sender override. Transactional mail leaves this unset and sends as Urivo.
+   * A merchant's campaign passes "«Store» via Urivo <hello@urivo.ai>" so the
+   * shopper sees the brand they subscribed to — the address stays on Urivo's
+   * verified domain, which is what keeps it deliverable.
+   */
+  from?: string;
+  /** Where a reply goes — the merchant, for a campaign; unset for transactional. */
+  replyTo?: string;
 }
 
-export async function sendEmail({ to, email }: SendEmailInput): Promise<boolean> {
+export async function sendEmail({ to, email, from, replyTo }: SendEmailInput): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Urivo <hello@urivo.ai>";
+  const sender = from ?? process.env.EMAIL_FROM ?? "Urivo <hello@urivo.ai>";
 
   if (!apiKey) {
     logger.info("Email suppressed (RESEND_API_KEY unset)", {
@@ -34,8 +43,9 @@ export async function sendEmail({ to, email }: SendEmailInput): Promise<boolean>
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from,
+        from: sender,
         to,
+        ...(replyTo ? { reply_to: replyTo } : {}),
         subject: email.subject,
         html: email.html,
         text: email.text,
