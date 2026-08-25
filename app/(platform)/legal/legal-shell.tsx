@@ -33,12 +33,3 @@ export function LegalShell({
     </main>
   );
 }
-
-/** Marker for content the founder / legal counsel must supply before launch. */
-export function Placeholder({ note }: { note: string }) {
-  return (
-    <p className="rounded-xl border border-gold/25 bg-gold/[0.06] px-4 py-3 text-gold-soft">
-      To be completed before launch: {note}
-    </p>
-  );
-}
