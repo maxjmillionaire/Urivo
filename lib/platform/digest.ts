@@ -23,6 +23,7 @@ export interface DigestRow {
   user_id: string;
   email: string;
   full_name: string | null;
+  marketing_unsub_token: string;
   credit_balance: number;
   credits_expiring_amount: number;
   credits_expiring_at: string | null;
@@ -196,7 +197,10 @@ export async function sendWeeklyDigests(weekKey?: string): Promise<DigestRunSumm
           summary.notified += 1;
 
           if (r.email) {
-            const ok = await sendEmail({ to: r.email, email: weeklyDigestEmail(content) });
+            // The digest is marketing, so it carries a working one-click
+            // unsubscribe keyed to this user's token.
+            const email = weeklyDigestEmail({ ...content, unsubToken: r.marketing_unsub_token });
+            const ok = await sendEmail({ to: r.email, email });
             if (ok) summary.emailed += 1;
           }
         } catch (err) {
