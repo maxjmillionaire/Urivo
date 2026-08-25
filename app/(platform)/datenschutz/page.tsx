@@ -89,8 +89,8 @@ export default function Privacy() {
 
       <h2>Processors and recipients</h2>
       <p>
-        We use the following service providers, each under a data-processing agreement,
-        and share with each only the data needed for its purpose:
+        We use the following service providers, each acting as a processor on our
+        behalf, and share with each only the data needed for its purpose:
       </p>
       <p>
         <strong>Supabase</strong> — authentication and database (your account, store and
@@ -121,11 +121,11 @@ export default function Privacy() {
       <p>
         Some of these providers are based outside the European Economic Area (for
         example in the United States). Where personal data is transferred to a third
-        country, the transfer is safeguarded under Chapter V GDPR — by an adequacy
-        decision of the European Commission (including the EU–US Data Privacy Framework
-        where the provider is certified) or by the European Commission&rsquo;s Standard
-        Contractual Clauses. You can request more detail on the safeguards for a specific
-        provider using the contact details above.
+        country, we require an appropriate safeguard under Chapter V GDPR to be in place
+        — an adequacy decision of the European Commission (including the EU–US Data
+        Privacy Framework where the provider is certified) or the European
+        Commission&rsquo;s Standard Contractual Clauses. You can request details of the
+        safeguard that applies to a specific provider using the contact details above.
       </p>
 
       <h2>How long we keep data</h2>
