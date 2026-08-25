@@ -47,7 +47,7 @@ export interface TierInput {
   utilization?: number;
   /** Credit spend mix. Default DEFAULT_USAGE_MIX. */
   usageMix?: Record<AiFeature, number>;
-  /** Investor revenue share, fraction of gross (e.g. 0.05). Default 0.05. */
+  /** Investor revenue share, fraction of gross. Default 0.03 — the agreed 3%. */
   investorShare?: number;
   /** Stripe fee: percentage of charge + fixed EUR. Default 2.5% + €0.25. */
   stripePct?: number;
@@ -75,6 +75,10 @@ export interface TierEconomics {
   profitWorstEur: number;
   marginRealisticPct: number; // net margin incl. fixed
   marginWorstPct: number;
+  // Month-2 contribution margin (excl. fixed AND the one-time creator commission)
+  // and its status against the 70% internal floor. Reporting only.
+  contributionMarginRealisticPct: number;
+  month2Floor: Month2FloorStatus;
 }
 
 /** Blended realistic €/credit from a usage mix at typical cost. */
@@ -96,6 +100,46 @@ export function worstCostPerCredit(model: ModelId = ACTIVE_MODEL): number {
   );
 }
 
+/*
+ * Month-2 contribution-margin floor — an internal economic guardrail, not a
+ * customer-facing restriction. The business rule is that the recurring
+ * (Month-2+) contribution margin must stay at or above 70%. "Contribution" here
+ * is price − Stripe − investor − AI (the simulator's contributionRealisticEur),
+ * which already excludes fixed cost AND the one-time creator commission — so it
+ * is exactly the steady-state Month-2 economics. This only reports; it never
+ * blocks billing, generation, or any product behaviour.
+ */
+export const MONTH2_MARGIN_FLOOR_PCT = 70;
+
+export interface Month2FloorStatus {
+  /** The modelled Month-2 contribution margin, %. */
+  marginPct: number;
+  /** The floor it is measured against (70). */
+  floorPct: number;
+  /** Percentage points of headroom above the floor; negative when breached. */
+  headroomPp: number;
+  /** True when the margin is below the 70% floor. */
+  belowFloor: boolean;
+  /** Human-readable status; the flag string when breached. */
+  label: string;
+}
+
+/** Assess a Month-2 contribution margin (%) against the 70% floor. Pure. */
+export function assessMonth2MarginFloor(
+  contributionMarginPct: number,
+  floorPct: number = MONTH2_MARGIN_FLOOR_PCT,
+): Month2FloorStatus {
+  const headroomPp = contributionMarginPct - floorPct;
+  const belowFloor = headroomPp < 0;
+  return {
+    marginPct: contributionMarginPct,
+    floorPct,
+    headroomPp,
+    belowFloor,
+    label: belowFloor ? "BELOW M2 MARGIN FLOOR" : "OK",
+  };
+}
+
 /** Full economics for one tier. The core of the simulator. */
 export function simulateTier(input: TierInput): TierEconomics {
   const {
@@ -103,7 +147,7 @@ export function simulateTier(input: TierInput): TierEconomics {
     monthlyCredits,
     utilization = DEFAULT_UTILIZATION,
     usageMix = DEFAULT_USAGE_MIX,
-    investorShare = 0.05,
+    investorShare = 0.03,
     stripePct = 0.025,
     stripeFixedEur = 0.25,
     fixedPerUserEur = 0,
@@ -126,6 +170,11 @@ export function simulateTier(input: TierInput): TierEconomics {
   const marginRealisticPct = priceEur > 0 ? (profitRealisticEur / priceEur) * 100 : 0;
   const marginWorstPct = priceEur > 0 ? (profitWorstEur / priceEur) * 100 : 0;
 
+  // Month-2 contribution margin: the recurring economics the 70% floor guards.
+  const contributionMarginRealisticPct =
+    priceEur > 0 ? (contributionRealisticEur / priceEur) * 100 : 0;
+  const month2Floor = assessMonth2MarginFloor(contributionMarginRealisticPct);
+
   return {
     priceEur,
     monthlyCredits,
@@ -141,6 +190,8 @@ export function simulateTier(input: TierInput): TierEconomics {
     profitWorstEur,
     marginRealisticPct,
     marginWorstPct,
+    contributionMarginRealisticPct,
+    month2Floor,
   };
 }
 
