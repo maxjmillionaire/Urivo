@@ -7,6 +7,7 @@ import { GenerateStorePanel } from "../generate-store-panel";
 import { AnimatedNumber } from "./animated-number";
 import { Reveal } from "../../_motion/reveal";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
+import type { NextAction } from "@/lib/dashboard/next-action";
 import type {
   DashboardOverview,
   Kpi,
@@ -54,6 +55,7 @@ export function DashboardHome({ overview }: { overview: DashboardOverview }) {
   const {
     briefing,
     moment,
+    nextAction,
     kpis,
     health,
     aiStatus,
@@ -106,6 +108,9 @@ export function DashboardHome({ overview }: { overview: DashboardOverview }) {
         </div>
         <GenerateStorePanel canGenerate={canGenerate} />
       </header>
+
+      {/* ── Next Action — the single "what should I do next?" move ──────── */}
+      <NextActionCard action={nextAction} />
 
       {/* ── Signature Ask Urivo command bar ────────────────────────────── */}
       <AskBar hasStore={storeCount > 0} />
@@ -233,6 +238,42 @@ function MomentRibbon({ emoji, text }: { emoji: string; text: string }) {
         </svg>
       </button>
     </div>
+  );
+}
+
+/* ── Next Action — one calm, specific move ────────────────────────────── */
+function NextActionCard({ action }: { action: NextAction }) {
+  return (
+    <section
+      aria-label="Your next move"
+      className="u-float rounded-2xl border border-gold/25 bg-gradient-to-br from-gold/[0.06] to-panel/70 p-5 sm:p-6"
+      style={{ animation: "urivo-fade-up 520ms var(--ease-urivo) both" }}
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-soft">Your next move</p>
+          <h2 className="mt-2 text-[19px] font-semibold tracking-tight text-ivory sm:text-[21px]">{action.title}</h2>
+          <p className="mt-1.5 max-w-xl text-[13.5px] leading-relaxed text-mist">{action.reason}</p>
+        </div>
+        <Link
+          href={action.action.href}
+          className="u-gold u-lift shrink-0 rounded-xl px-5 py-2.5 text-[13px] font-semibold"
+        >
+          {action.action.label}
+        </Link>
+      </div>
+
+      {action.watching.length > 0 && (
+        <ul className="mt-4 space-y-2 border-t border-hair pt-4">
+          {action.watching.map((w, i) => (
+            <li key={i} className="text-[12.5px] leading-relaxed text-mist">
+              <span className="mr-2 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-mist-dim">Worth watching</span>
+              <span className="font-medium text-ivory">{w.title}.</span> {w.detail}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
