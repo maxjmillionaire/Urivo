@@ -187,7 +187,7 @@ function performanceAction(f: NextActionFacts): NextAction | null {
     tone: "performance",
     title: "Fix mobile conversion",
     reason: `${short.mobileSharePct}% of your traffic is mobile, and it converts ${relGapPct}% below desktop.`,
-    action: { label: "Review", href: storeHref(f.primaryStoreId) },
+    action: { label: "Review store", href: storeHref(f.primaryStoreId) },
     watching: buildWatching(f, "fix_mobile_conversion"),
   };
 }
@@ -209,7 +209,7 @@ export function pickNextAction(f: NextActionFacts): NextAction {
       kind: "create_store",
       tone: "activation",
       title: "Create your first store",
-      reason: "Describe your idea and Urivo generates a complete, branded store in under a minute.",
+      reason: "Describe your idea and Urivo generates a complete, branded store for you.",
       action: { label: "Create a store", href: "/dashboard" },
     });
   }
@@ -275,8 +275,8 @@ export function pickNextAction(f: NextActionFacts): NextAction {
   return withWatching({
     kind: "keep_growing",
     tone: "growth",
-    title: "Keep the momentum",
-    reason: "Your store is selling — keep driving quality traffic and Urivo will surface what to optimise next.",
+    title: "Nothing needs you right now",
+    reason: "Your store is selling and running cleanly — keep driving quality traffic.",
     action: { label: "Open Marketing", href: "/dashboard/ads" },
   });
 }

@@ -83,7 +83,7 @@ describe("performance lane — gated, never fabricated", () => {
     expect(a.kind).toBe("fix_mobile_conversion");
     expect(a.reason).toContain("50%"); // mobile share (500/1000)
     expect(a.reason).toContain("80%"); // relative gap
-    expect(a.action.label).toBe("Review");
+    expect(a.action.label).toBe("Review store");
   });
 
   it("does NOT fire below the sample gate → keep growing + honest early signal", () => {
