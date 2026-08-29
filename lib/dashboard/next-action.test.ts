@@ -126,6 +126,47 @@ describe("performance lane — gated, never fabricated", () => {
   });
 });
 
+describe("opportunities folded into Worth Watching (single recommendation surface)", () => {
+  const opp = (title: string, activation = false) => ({ title, detail: `${title} detail`, activation });
+
+  it("folds the top non-activation optimisation into a watching note", () => {
+    const a = pickNextAction({ ...base, ordersTotal: 60, opportunities: [opp("Improve low-margin products")] });
+    expect(a.watching.some((w) => w.title === "Improve low-margin products")).toBe(true);
+  });
+
+  it("suppresses an activation-ladder-duplicate opportunity (the ladder already says it)", () => {
+    const a = pickNextAction({ ...base, ordersTotal: 60, opportunities: [opp("Publish your store", true)] });
+    expect(a.watching.some((w) => w.title === "Publish your store")).toBe(false);
+  });
+
+  it("folds only the single most relevant (first) non-activation opportunity", () => {
+    const a = pickNextAction({
+      ...base,
+      ordersTotal: 60,
+      opportunities: [opp("Connect payments", true), opp("Top opportunity"), opp("Second opportunity")],
+    });
+    expect(a.watching.some((w) => w.title === "Top opportunity")).toBe(true);
+    expect(a.watching.some((w) => w.title === "Second opportunity")).toBe(false);
+  });
+
+  it("keeps the <=2 cap when an opportunity and other notes all apply", () => {
+    const a = pickNextAction({
+      ...base,
+      ordersTotal: 40,
+      lowCredits: true,
+      device: device({ mobileSessions: 50, desktopSessions: 50, mobileOrders: 0, desktopOrders: 3 }),
+      opportunities: [opp("An optimisation")],
+    });
+    expect(a.watching.length).toBeLessThanOrEqual(2);
+  });
+
+  it("no opportunities supplied → behaves exactly as before", () => {
+    const a = pickNextAction({ ...base, ordersTotal: 200 });
+    expect(a.kind).toBe("keep_growing");
+    expect(a.watching.every((w) => w.title !== undefined)).toBe(true);
+  });
+});
+
 describe("safety", () => {
   it("no activation/growth message asserts a percentage it didn't measure", () => {
     for (const a of [

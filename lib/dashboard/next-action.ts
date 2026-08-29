@@ -53,6 +53,18 @@ export interface NextAction {
   watching: WatchItem[];
 }
 
+/*
+ * An existing dashboard opportunity, reduced to what Next Action needs. The
+ * caller flags the ones that merely repeat an activation-ladder step (create /
+ * publish / connect / convert / credits) as `activation`, so they are never
+ * folded back in as a "worth watching" note — the ladder already says them.
+ */
+export interface OpportunityHint {
+  title: string;
+  detail: string;
+  activation: boolean;
+}
+
 /** Device-split conversion signal, measured from real store_visits + orders. */
 export interface DeviceConversion {
   mobileSessions: number;
@@ -84,6 +96,10 @@ export interface NextActionFacts {
   lowCredits: boolean;
   /** Measured device conversion, or null when not computed / no data. */
   device: DeviceConversion | null;
+  /** Existing dashboard opportunities (already ranked). The top non-activation
+   *  one is folded into "worth watching" so Home has a single recommendation
+   *  surface. Defaults to none. */
+  opportunities?: OpportunityHint[];
 }
 
 /*
@@ -132,6 +148,15 @@ function buildWatching(f: NextActionFacts, primaryKind: NextActionKind): WatchIt
       title: "A live store can't take payments",
       detail: `${n} of your live ${n === 1 ? "stores has" : "stores have"} no active payout account — those visitors can't check out.`,
     });
+  }
+
+  // The single most relevant optimisation opportunity — the useful half of the
+  // old Opportunities card, folded into the one recommendation surface. The
+  // list is already ranked; take the first that isn't an activation-ladder
+  // repeat. The final slice(0, 2) keeps the cap.
+  const topOpportunity = f.opportunities?.find((o) => !o.activation);
+  if (topOpportunity) {
+    items.push({ title: topOpportunity.title, detail: topOpportunity.detail });
   }
 
   // Honest early signal: mobile looks weaker, but the sample is too small to act.
