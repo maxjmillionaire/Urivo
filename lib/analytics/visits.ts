@@ -223,3 +223,80 @@ export function sumStats(stats: Iterable<StoreStats>): StoreStats {
   }
   return t;
 }
+
+/*
+ * Measured device-split conversion for the Next Action performance lane.
+ *
+ * Bounded and best-effort: the caller only invokes it once a merchant has real
+ * orders (see lib/dashboard/overview), so this rarely runs and never for a
+ * fresh account. Reads are capped and aggregated in TS — no new table, RPC or
+ * migration. Returns null when there is nothing to compare.
+ *
+ * Coverage = the share of paid orders whose session's device we actually know;
+ * the selector refuses to compare below a coverage threshold so a partial
+ * picture is never presented as fact.
+ */
+const DEVICE_READ_CAP = 20_000;
+
+export async function deviceConversionFor(
+  storeIds: string[],
+  sinceDays = 30,
+): Promise<import("@/lib/dashboard/next-action").DeviceConversion | null> {
+  if (storeIds.length === 0) return null;
+  const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
+  const admin = supabaseAdmin();
+
+  const { data: visits } = await admin
+    .from("store_visits")
+    .select("session_hash, device")
+    .in("store_id", storeIds)
+    .eq("is_bot", false)
+    .gte("created_at", since)
+    .limit(DEVICE_READ_CAP);
+  if (!visits || visits.length === 0) return null;
+
+  // One device per session (stable within a session; last write wins).
+  const deviceBySession = new Map<string, string>();
+  for (const v of visits) {
+    const sh = (v as { session_hash?: string | null }).session_hash;
+    const dev = (v as { device?: string | null }).device;
+    if (sh && dev) deviceBySession.set(sh, dev);
+  }
+  let mobileSessions = 0;
+  let desktopSessions = 0;
+  for (const dev of deviceBySession.values()) {
+    if (dev === "mobile") mobileSessions++;
+    else if (dev === "desktop") desktopSessions++;
+  }
+
+  const { data: orders } = await admin
+    .from("orders")
+    .select("session_hash")
+    .in("store_id", storeIds)
+    .in("status", ["paid", "fulfilled"])
+    .gte("created_at", since)
+    .limit(DEVICE_READ_CAP);
+
+  let mobileOrders = 0;
+  let desktopOrders = 0;
+  let matched = 0;
+  let totalOrders = 0;
+  for (const o of orders ?? []) {
+    totalOrders++;
+    const sh = (o as { session_hash?: string | null }).session_hash;
+    const dev = sh ? deviceBySession.get(sh) : undefined;
+    if (dev) {
+      matched++;
+      if (dev === "mobile") mobileOrders++;
+      else if (dev === "desktop") desktopOrders++;
+    }
+  }
+
+  return {
+    mobileSessions,
+    mobileOrders,
+    desktopSessions,
+    desktopOrders,
+    coveragePct: totalOrders > 0 ? Math.round((matched / totalOrders) * 100) : 0,
+  };
+}
