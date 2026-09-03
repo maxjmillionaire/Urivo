@@ -144,32 +144,15 @@ export interface FoundingOffer {
 
 export async function getFoundingOffer(): Promise<FoundingOffer> {
   /*
-   * Fail CLOSED, for BOTH ways this can go wrong.
-   *
-   * If the counter cannot be read we do not know whether spots remain, and
-   * advertising a price we cannot honour is worse than showing the standard
-   * one — the standard price is always true.
-   *
-   * The try/catch matters as much as the error check: supabaseAdmin() THROWS
-   * when the service-role key is absent, before any query runs. Without this,
-   * a missing or rotated key takes down the whole marketing page with a 500
-   * instead of quietly showing standard pricing. app/sitemap.ts already guards
-   * its admin read the same way, for the same reason.
+   * The Founding 50 offer has ENDED. Urivo launches at standard pricing —
+   * Founder €49 / Pro €199 for everyone — so the offer is permanently closed
+   * and no page ever advertises a founding discount again. The public pricing
+   * page and FAQ are already gated on `open`, so returning closed here reverts
+   * them to standard pricing with no further changes. The founding price is
+   * also unset in lib/plans, so even a legacy `price_type = "founding"` profile
+   * resolves to the standard price at checkout.
    */
-  try {
-    const { data, error } = await supabaseAdmin()
-      .from("platform_settings")
-      .select("founding_cap, founding_claimed")
-      .eq("id", true)
-      .maybeSingle();
-
-    if (error || !data) return { open: false, remaining: 0 };
-
-    const remaining = Math.max(0, (data.founding_cap ?? 0) - (data.founding_claimed ?? 0));
-    return { open: remaining > 0, remaining };
-  } catch {
-    return { open: false, remaining: 0 };
-  }
+  return { open: false, remaining: 0 };
 }
 
 export interface FoundingMember {

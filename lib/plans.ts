@@ -65,7 +65,12 @@ export interface PlanConfig {
     launch: number;
     /** Monthly price after the launch window. */
     regular: number;
-    /** Lifetime price for founding members (first 50). Undefined = no discount. */
+    /**
+     * Lifetime founding-member price. The Founding 50 offer has ENDED — Urivo
+     * launches at standard pricing (Founder €49 / Pro €199), so this is unset on
+     * every plan. Kept optional only so historical resolvers stay type-safe; a
+     * value here would re-open the discount, so leave it undefined.
+     */
     founding?: number;
     /**
      * Annual price — the year paid up front. Set to ten months of the monthly
@@ -151,7 +156,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
       premiumSupport: false,
       earlyAccess: false,
     },
-    price: { currency: "EUR", launch: 49, regular: 49, founding: 29, annual: 490 },
+    price: { currency: "EUR", launch: 49, regular: 49, annual: 490 },
     highlights: [
       "150 AI credits every month",
       "Run up to 3 live stores",
@@ -179,7 +184,7 @@ export const PLANS: Record<PlanKey, PlanConfig> = {
       premiumSupport: true,
       earlyAccess: true,
     },
-    price: { currency: "EUR", launch: 199, regular: 199, founding: 149, annual: 1990 },
+    price: { currency: "EUR", launch: 199, regular: 199, annual: 1990 },
     highlights: [
       "800 AI credits every month",
       "Unlimited live stores",

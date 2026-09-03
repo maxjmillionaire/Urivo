@@ -81,13 +81,13 @@ describe("plans — tier + price logic (money-critical)", () => {
     expect(nextPlan("pro")).toBeNull();
   });
 
-  it("founding members get the lifetime price; everyone else pays standard", () => {
+  it("the Founding 50 is over — a founding price_type now pays standard", () => {
+    // The label may still exist on a legacy profile, but the discount is gone.
     expect(isFounding("founding")).toBe(true);
     expect(isFounding("standard")).toBe(false);
-    // Founding lifetime prices.
-    expect(priceForUser("core", "founding")).toBe(29);
-    expect(priceForUser("pro", "founding")).toBe(149);
-    // Non-founding pays the standard €49 / €199.
+    // Founding now resolves to the standard €49 / €199 — never €29/€149.
+    expect(priceForUser("core", "founding")).toBe(49);
+    expect(priceForUser("pro", "founding")).toBe(199);
     expect(priceForUser("core", "standard")).toBe(49);
     expect(priceForUser("pro", null)).toBe(199);
   });
@@ -151,12 +151,11 @@ describe("annual billing", () => {
     expect(annualSavingEur("pro")).toBe(199 * 12 - 1990);
   });
 
-  it("never compounds the founding lock with the annual price", () => {
-    // Founding is a MONTHLY lifetime rate. Stacking it onto a year paid up
-    // front would hand over the tier for a fraction of its price.
-    const founding = priceForInterval("core", "year", "founding");
-    expect(founding).toBe(getPlan("core").price.annual);
-    expect(founding).toBeGreaterThan(getPlan("core").price.founding! * 10);
+  it("a founding price_type does not discount the annual price either", () => {
+    // Even a legacy founding stamp pays the standard annual price — no
+    // €29-based annual lock survives the end of the Founding 50.
+    expect(priceForInterval("core", "year", "founding")).toBe(getPlan("core").price.annual);
+    expect(priceForInterval("core", "year", "founding")).toBe(490);
   });
 
   it("leaves monthly pricing exactly as it was", () => {

@@ -42,25 +42,23 @@ describe("the launch prices are what we agreed", () => {
     expect(PLANS.free.price.launch).toBe(0);
   });
 
-  it("Founder is €49 standard, €29 for the founding 50", () => {
+  it("Founder is €49 for everyone — the Founding 50 is over", () => {
     expect(PLANS.core.price.regular).toBe(49);
     expect(PLANS.core.price.launch).toBe(49);
-    expect(PLANS.core.price.founding).toBe(29);
+    expect(PLANS.core.price.founding).toBeUndefined();
   });
 
-  it("Pro is €199 standard, €149 for the founding 50", () => {
+  it("Pro is €199 for everyone — the Founding 50 is over", () => {
     expect(PLANS.pro.price.regular).toBe(199);
     expect(PLANS.pro.price.launch).toBe(199);
-    expect(PLANS.pro.price.founding).toBe(149);
+    expect(PLANS.pro.price.founding).toBeUndefined();
   });
 
-  it("the founding price is always a discount, never above standard", () => {
-    // A founding price that exceeded the standard one would silently overcharge
-    // the very customers the discount is meant to reward.
+  it("no plan carries a founding discount any more (launch pricing is standard)", () => {
+    // The Founding 50 offer has ended. A founding price reappearing here would
+    // re-open a €29/€149 discount that the product no longer intends to sell.
     for (const plan of Object.values(PLANS)) {
-      if (typeof plan.price.founding === "number") {
-        expect(plan.price.founding).toBeLessThan(plan.price.regular);
-      }
+      expect(plan.price.founding).toBeUndefined();
     }
   });
 
@@ -132,24 +130,26 @@ describe("no price is written anywhere but the source of truth", () => {
     expect(code, "price.launch must not drive the public discount").not.toMatch(/price\.launch/);
   });
 
-  it("the founding prices shown publicly are the ones checkout charges", () => {
-    // The invariant in one line: what the visitor reads is what the card pays.
+  it("a legacy 'founding' price_type now resolves to the standard price (Founding 50 is over)", () => {
+    // The Founding 50 discount is gone, so even a profile still stamped
+    // price_type = "founding" is charged the standard price — never €29/€149.
     for (const key of ["core", "pro"] as const) {
-      expect(priceForUser(key, "founding")).toBe(PLANS[key].price.founding);
+      expect(priceForUser(key, "founding")).toBe(PLANS[key].price.regular);
       expect(priceForUser(key, "standard")).toBe(PLANS[key].price.regular);
     }
   });
 
-  it("the admin founding line is derived, not typed", () => {
-    // The exact regression this suite was written for.
+  it("the admin founding line is derived from PLANS, not typed", () => {
+    // The Founding 50 is over, so the admin line now shows STANDARD pricing —
+    // still derived from PLANS, never a typed literal, and never €29/€149.
     const admin = readFileSync(join(ROOT, "app", "(platform)", "admin", "finance", "page.tsx"), "utf8");
-    expect(admin).toMatch(/foundingPrices\(\)/);
+    expect(admin).toMatch(/PLANS\.core\.price\.regular/);
     /*
-     * Judge the code, not the prose about it. The comment above the fix quotes
-     * the old literal to explain what regressed, and forbidding that would push
-     * authors toward leaving no explanation at all.
+     * Judge the code, not the prose about it — comments may quote an old literal
+     * to explain history, and forbidding that would push authors toward leaving
+     * no explanation at all.
      */
     const code = admin.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-    expect(code).not.toMatch(/Founder €29 \/ Pro €149/);
+    expect(code).not.toMatch(/€29|€149/);
   });
 });
