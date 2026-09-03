@@ -2,8 +2,9 @@ import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCreditBalance, getCreditExpiry, STORE_GENERATION_COST, type CreditExpiry } from "@/lib/credits";
 import { planName, canPublish as planCanPublish, volumeMessage, entitledPlanKey } from "@/lib/plans";
-import { storeStatsFor, sumStats, type StoreStats } from "@/lib/analytics/visits";
+import { storeStatsFor, sumStats, deviceConversionFor, type StoreStats } from "@/lib/analytics/visits";
 import { marginAfterDuty } from "@/lib/finance/import-duty";
+import { pickNextAction, NEXT_ACTION_GATES, type NextAction, type DeviceConversion, type OpportunityHint } from "@/lib/dashboard/next-action";
 
 /*
  * The Executive Command Center data layer.
@@ -107,7 +108,6 @@ export interface DashboardOverview {
   kpis: Kpi[];
   health: BusinessHealth;
   aiStatus: AiActivity[];
-  opportunities: Opportunity[];
   timeline: TimelineEvent[];
   storeCards: StoreCard[];
   planLabel: string;
@@ -122,6 +122,8 @@ export interface DashboardOverview {
   /** Paid orders this calendar month, against the tier's allowance. */
   ordersThisMonth: number;
   volumeNotice: { title: string; detail: string } | null;
+  /** The single "what should I do next?" move for Home (V1). */
+  nextAction: NextAction;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -496,13 +498,60 @@ export async function buildDashboardOverview(
     opportunities: opportunities.length,
   });
 
+  /*
+   * Next Action (V1) — the single next move for Home. Deterministic over the
+   * real state assembled above. The device-conversion read is BEST-EFFORT and
+   * only runs once the merchant has cleared the orders pre-gate, so a fresh
+   * account never pays for it and the performance lane can't fire without data.
+   */
+  const primaryStore = stores.find((s) => s.is_active) ?? stores[0] ?? null;
+  let deviceSignal: DeviceConversion | null = null;
+  if (total.ordersTotal >= NEXT_ACTION_GATES.minOrdersForPerformance && liveStores > 0) {
+    const liveStoreIds = stores.filter((s) => s.is_active).map((s) => s.id);
+    try {
+      deviceSignal = await deviceConversionFor(liveStoreIds);
+    } catch {
+      deviceSignal = null; // never let an analytics read break Home
+    }
+  }
+  /*
+   * Fold Opportunities into Next Action so Home has ONE recommendation surface.
+   * Opportunities that merely repeat an activation-ladder step (the ladder
+   * already says them) are marked `activation` and never folded; "soon"
+   * placeholders are dropped. The list is already ranked, so the selector takes
+   * the top non-activation optimisation as a single "worth watching" note.
+   */
+  const isLadderDuplicate = (id: string): boolean =>
+    id === "first-store" ||
+    id === "payments" ||
+    id === "upgrade-publish" ||
+    id === "credits" ||
+    id.startsWith("publish-") ||
+    id.startsWith("convert-");
+  const opportunityHints: OpportunityHint[] = opportunities
+    .filter((o) => !o.soon)
+    .map((o) => ({ title: o.title, detail: o.detail, activation: isLadderDuplicate(o.id) }));
+
+  const nextAction = pickNextAction({
+    storeCount: stores.length,
+    publishedCount: liveStores,
+    canPublish,
+    paymentsConnected,
+    liveWithoutPayments: paymentsConnected ? 0 : liveStores,
+    primaryStoreId: primaryStore?.id ?? null,
+    visitors7d: total.visitors7d,
+    ordersTotal: total.ordersTotal,
+    lowCredits: credits < STORE_GENERATION_COST,
+    device: deviceSignal,
+    opportunities: opportunityHints,
+  });
+
   return {
     briefing,
     moment,
     kpis,
     health,
     aiStatus,
-    opportunities: opportunities.slice(0, 4),
     timeline: timeline.slice(0, 8),
     storeCards,
     planLabel,
@@ -515,6 +564,7 @@ export async function buildDashboardOverview(
     liveWithoutPayments: paymentsConnected ? 0 : liveStores,
     ordersThisMonth,
     volumeNotice: volumeMessage(plan, ordersThisMonth),
+    nextAction,
   };
 }
 

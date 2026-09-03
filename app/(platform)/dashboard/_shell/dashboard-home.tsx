@@ -7,10 +7,10 @@ import { GenerateStorePanel } from "../generate-store-panel";
 import { AnimatedNumber } from "./animated-number";
 import { Reveal } from "../../_motion/reveal";
 import { CREDIT_COSTS } from "@/lib/credit-costs";
+import type { NextAction } from "@/lib/dashboard/next-action";
 import type {
   DashboardOverview,
   Kpi,
-  Opportunity,
   TimelineEvent,
   StoreCard,
   HealthSignal,
@@ -54,10 +54,10 @@ export function DashboardHome({ overview }: { overview: DashboardOverview }) {
   const {
     briefing,
     moment,
+    nextAction,
     kpis,
     health,
     aiStatus,
-    opportunities,
     timeline,
     storeCards,
     planLabel,
@@ -86,26 +86,16 @@ export function DashboardHome({ overview }: { overview: DashboardOverview }) {
 
       {moment && <MomentRibbon emoji={moment.emoji} text={moment.text} />}
 
-      {/* ── Daily briefing ─────────────────────────────────────────────── */}
+      {/* ── Greeting — just a greeting; the next move lives in Next Action ── */}
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-xl">
-          <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ivory sm:text-[30px]">
-            {briefing.greeting}
-          </h1>
-          <div className="mt-2 space-y-1">
-            {briefing.lines.map((line, i) => (
-              <p
-                key={i}
-                className="text-[13.5px] leading-relaxed text-mist"
-                style={{ animation: `urivo-fade-up 520ms var(--ease-urivo) ${i * 90}ms both` }}
-              >
-                {line}
-              </p>
-            ))}
-          </div>
-        </div>
+        <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ivory sm:text-[30px]">
+          {briefing.greeting}
+        </h1>
         <GenerateStorePanel canGenerate={canGenerate} />
       </header>
+
+      {/* ── Next Action — the single "what should I do next?" move ──────── */}
+      <NextActionCard action={nextAction} />
 
       {/* ── Signature Ask Urivo command bar ────────────────────────────── */}
       <AskBar hasStore={storeCount > 0} />
@@ -131,15 +121,10 @@ export function DashboardHome({ overview }: { overview: DashboardOverview }) {
         </Reveal>
       </div>
 
-      {/* ── Opportunities + Timeline ───────────────────────────────────── */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-        <Reveal>
-          <OpportunitiesCard opportunities={opportunities} canGenerate={canGenerate} />
-        </Reveal>
-        <Reveal delay={0.08}>
-          <TimelineCard events={timeline} />
-        </Reveal>
-      </div>
+      {/* ── Activity timeline (Opportunities folded into Next Action) ────── */}
+      <Reveal>
+        <TimelineCard events={timeline} />
+      </Reveal>
 
       {/* ── Stores ─────────────────────────────────────────────────────── */}
       <StoresSection
@@ -236,6 +221,42 @@ function MomentRibbon({ emoji, text }: { emoji: string; text: string }) {
   );
 }
 
+/* ── Next Action — one calm, specific move ────────────────────────────── */
+function NextActionCard({ action }: { action: NextAction }) {
+  return (
+    <section
+      aria-label="Your next move"
+      className="u-float rounded-2xl border border-gold/25 bg-gradient-to-br from-gold/[0.06] to-panel/70 p-5 sm:p-6"
+      style={{ animation: "urivo-fade-up 520ms var(--ease-urivo) both" }}
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-soft">Your next move</p>
+          <h2 className="mt-2 text-[19px] font-semibold tracking-tight text-ivory sm:text-[21px]">{action.title}</h2>
+          <p className="mt-1.5 max-w-xl text-[13.5px] leading-relaxed text-mist">{action.reason}</p>
+        </div>
+        <Link
+          href={action.action.href}
+          className="u-gold u-lift shrink-0 rounded-xl px-5 py-2.5 text-[13px] font-semibold"
+        >
+          {action.action.label}
+        </Link>
+      </div>
+
+      {action.watching.length > 0 && (
+        <ul className="mt-4 space-y-2 border-t border-hair pt-4">
+          {action.watching.map((w, i) => (
+            <li key={i} className="text-[12.5px] leading-relaxed text-mist">
+              <span className="mr-2 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-mist-dim">Worth watching</span>
+              <span className="font-medium text-ivory">{w.title}.</span> {w.detail}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 /* ── Ask Urivo signature command bar ──────────────────────────────────── */
 const ASK_SUGGESTIONS = ["How can I increase revenue?", "Find trending products", "Improve my homepage", "Why is conversion low?"];
 
@@ -251,7 +272,7 @@ function AskBar({ hasStore }: { hasStore: boolean }) {
   };
 
   return (
-    <section className="u-float rounded-2xl border border-hair bg-panel/70 p-4 sm:p-5">
+    <section className="rounded-2xl border border-hair/60 bg-panel/40 p-4 sm:p-5">
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-hair bg-panel/60 text-cloud">
           <IconSpark width={14} height={14} />
@@ -610,66 +631,6 @@ function AiStatusCard({ items }: { items: DashboardOverview["aiStatus"] }) {
         ))}
       </ul>
     </section>
-  );
-}
-
-/* ── Opportunities ────────────────────────────────────────────────────── */
-const TONE_STYLE: Record<string, { dot: string; chip: string }> = {
-  growth: { dot: "bg-live", chip: "text-live" },
-  setup: { dot: "bg-mist", chip: "text-mist" },
-  risk: { dot: "bg-alert", chip: "text-alert" },
-  soon: { dot: "bg-mist-dim", chip: "text-mist-dim" },
-};
-
-function OpportunitiesCard({ opportunities, canGenerate }: { opportunities: Opportunity[]; canGenerate: boolean }) {
-  return (
-    <section className="u-float rounded-2xl border border-hair bg-panel/70 p-5">
-      <div className="flex items-center gap-1.5">
-        <IconTrendUp className="text-mist-dim" width={14} height={14} />
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">Today&apos;s Opportunities</h2>
-      </div>
-      <div className="mt-4 space-y-2.5">
-        {opportunities.map((o) => (
-          <OpportunityRow key={o.id} o={o} canGenerate={canGenerate} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function OpportunityRow({ o, canGenerate }: { o: Opportunity; canGenerate: boolean }) {
-  const tone = TONE_STYLE[o.tone] ?? TONE_STYLE.setup;
-  const isGenerate = o.id === "first-store";
-
-  return (
-    <div className="u-lift group rounded-xl border border-hair bg-night p-3.5 transition-colors hover:border-hair-strong hover:bg-night-2">
-      <div className="flex items-start gap-3">
-        <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${tone.dot}`} />
-        <div className="min-w-0 flex-1">
-          <p className="text-[13.5px] font-medium text-ivory">{o.title}</p>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-mist">{o.detail}</p>
-          <p className={`mt-1.5 text-[11px] font-semibold ${tone.chip}`}>{o.impact}</p>
-        </div>
-        <div className="shrink-0 self-center">
-          {o.soon ? (
-            <span className="rounded-lg border border-hair px-3 py-1.5 text-[11px] font-medium text-mist-dim">Soon</span>
-          ) : isGenerate ? (
-            <GenerateStorePanel
-              canGenerate={canGenerate}
-              triggerLabel={o.cta}
-              triggerClassName="u-press rounded-lg border border-hair-strong bg-panel px-3 py-1.5 text-[11px] font-semibold text-ivory transition-colors hover:border-gold/40"
-            />
-          ) : (
-            <Link
-              href={o.href}
-              className="u-press inline-flex items-center gap-1 rounded-lg border border-hair-strong bg-panel px-3 py-1.5 text-[11px] font-semibold text-ivory transition-colors hover:border-gold/40"
-            >
-              {o.cta}
-            </Link>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 
