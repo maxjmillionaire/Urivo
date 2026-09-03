@@ -36,6 +36,8 @@ interface Block {
   footnote?: string;
   /** Optional stat grid (weekly digest) rendered between the lead and body copy. */
   stats?: { label: string; value: string }[];
+  /** Optional one-click unsubscribe link, shown in the footer of marketing email. */
+  unsubscribeUrl?: string;
 }
 
 /** Bulletproof stat grid: one label/value row per stat, hairline-separated. */
@@ -53,7 +55,7 @@ function statsBlock(stats: { label: string; value: string }[]): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 24px;border:1px solid ${LINE};border-radius:14px;overflow:hidden;background:${SURFACE_MUTED};">${rows}</table>`;
 }
 
-function layout({ preheader, heading, paragraphs, cta, footnote, stats }: Block): string {
+function layout({ preheader, heading, paragraphs, cta, footnote, stats, unsubscribeUrl }: Block): string {
   const [lead, ...rest] = paragraphs;
   const leadHtml = lead
     ? `<p style="margin:0 0 20px;font-family:${FONT};font-size:16px;line-height:1.7;color:${INK};font-weight:500;">${lead}</p>`
@@ -126,6 +128,9 @@ function layout({ preheader, heading, paragraphs, cta, footnote, stats }: Block)
             <td style="font-family:${FONT};font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:${MUTED};">The AI Commerce<br>Operating System</td>
             <td align="right" style="font-family:${FONT};font-size:15px;font-weight:600;letter-spacing:-0.2px;color:${SLATE};">Urivo</td>
           </tr></table>
+          ${unsubscribeUrl
+            ? `<p style="margin:16px 0 0;font-family:${FONT};font-size:12px;line-height:1.6;color:${MUTED};">You receive these weekly updates because you opted in. <a href="${unsubscribeUrl}" style="color:${MUTED};text-decoration:underline;">Unsubscribe</a> — or manage email preferences in your Urivo settings.</p>`
+            : ""}
         </td></tr>
       </table>
       <p style="margin:22px 0 0;font-family:${FONT};font-size:11px;letter-spacing:0.2px;color:${MUTED};">Sent with intention · Urivo</p>
@@ -134,10 +139,11 @@ function layout({ preheader, heading, paragraphs, cta, footnote, stats }: Block)
 </body></html>`;
 }
 
-function toText({ heading, paragraphs, cta, footnote }: Block): string {
+function toText({ heading, paragraphs, cta, footnote, unsubscribeUrl }: Block): string {
   const parts = [heading, "", ...paragraphs];
   if (cta) parts.push("", `${cta.label}: ${cta.url}`);
   if (footnote) parts.push("", footnote);
+  if (unsubscribeUrl) parts.push("", `Unsubscribe from these weekly updates: ${unsubscribeUrl}`);
   parts.push("", "— Urivo");
   return parts.join("\n");
 }
@@ -277,6 +283,13 @@ export interface WeeklyDigestContent {
   ctaPath: string;
   /** Optional footnote (e.g. an expiring-credits reminder). */
   footnote?: string;
+  /** Per-user token for the one-click unsubscribe link (the digest is marketing). */
+  unsubToken?: string;
+}
+
+/** Public one-click unsubscribe link for the weekly digest (marketing). */
+export function digestUnsubscribeUrl(token: string): string {
+  return `${APP_URL()}/api/unsubscribe/marketing?t=${encodeURIComponent(token)}`;
 }
 
 export function weeklyDigestEmail(d: WeeklyDigestContent): RenderedEmail {
@@ -288,6 +301,7 @@ export function weeklyDigestEmail(d: WeeklyDigestContent): RenderedEmail {
     stats: d.stats,
     cta: { label: d.ctaLabel, url: `${APP_URL()}${d.ctaPath}` },
     footnote: d.footnote,
+    unsubscribeUrl: d.unsubToken ? digestUnsubscribeUrl(d.unsubToken) : undefined,
   });
 }
 

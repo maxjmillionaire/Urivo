@@ -11,6 +11,7 @@ const base: DigestRow = {
   user_id: "u1",
   email: "m@example.com",
   full_name: "Max Basner",
+  marketing_unsub_token: "tok-1",
   credit_balance: 200,
   credits_expiring_amount: 0,
   credits_expiring_at: null,

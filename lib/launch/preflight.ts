@@ -115,6 +115,9 @@ export const REQUIRED_RPCS = [
   // marketing email's unsubscribe link into a 500 — a compliance failure, not
   // just a broken feature.
   "unsubscribe_by_token",
+  // 0062. One-click unsubscribe from the weekly digest (marketing); sets
+  // profiles.marketing_opt_in = false. Same compliance reasoning as above.
+  "unsubscribe_marketing_by_token",
   "weekly_digest_data",
 ] as const;
 

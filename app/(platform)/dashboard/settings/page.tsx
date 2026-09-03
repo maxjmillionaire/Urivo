@@ -17,7 +17,8 @@ export default async function SettingsPage() {
 
   const isEmailUser = user.app_metadata?.provider === "email";
   const currentEmail = profile?.email ?? user.email ?? "";
-  const marketingOptIn = (profile as { marketing_opt_in?: boolean } | null)?.marketing_opt_in ?? true;
+  // Opt-in, not opt-out: a missing value reads as "not consented" (migration 0061).
+  const marketingOptIn = (profile as { marketing_opt_in?: boolean } | null)?.marketing_opt_in ?? false;
 
   return (
     <>
