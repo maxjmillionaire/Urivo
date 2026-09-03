@@ -6,21 +6,6 @@ import { getFinanceSnapshot, modeledTiers, costPerActionReport } from "@/lib/fin
 import { EUR_PER_USD, USD_PER_EUR } from "@/lib/finance/cost-model";
 import { PLANS } from "@/lib/plans";
 
-/*
- * Built from PLANS, never typed out.
- *
- * This line previously read "Founder €29 / Pro €149" as a literal — the same
- * drift the landing FAQ once carried: a price written in prose that nothing
- * compares against what customers are actually charged. Founding is a lifetime
- * discount off the standard monthly price, so both numbers come from the one
- * source that Stripe is also driven from.
- */
-function foundingPrices(): string {
-  return Object.values(PLANS)
-    .filter((p) => typeof p.price.founding === "number")
-    .map((p) => `${p.name} €${p.price.founding}`)
-    .join(" / ");
-}
 import { getPlatformSettings, getFoundingStatus } from "@/lib/platform/settings";
 import {
   getFirstSaleFunnel,
@@ -254,7 +239,7 @@ export default async function FinanceDashboardPage() {
         {/* Founding members — the first 50 (private tracker, no public counter) */}
         <Section
           title="Founding members"
-          subtitle={`The first ${founding.cap} signups lock a lifetime price (${foundingPrices()}). Private — no public counter.`}
+          subtitle={`The Founding 50 has ended — Urivo launches at standard pricing (Founder €${PLANS.core.price.regular} / Pro €${PLANS.pro.price.regular}). These are the legacy founding signups. Private — no public counter.`}
         >
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Tile label="Claimed" value={`${founding.claimed} / ${founding.cap}`} accent />
