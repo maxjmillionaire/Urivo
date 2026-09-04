@@ -1,7 +1,7 @@
 # Urivo — Launch Status & Working Memory
 
 > Living doc. Updated after significant work; re-read after any context reset to stay oriented.
-> **Snapshot:** `main` @ `15f45a6` · last updated 2026-09-03.
+> **Snapshot:** `main` @ `66546df` · last updated 2026-09-04. This doc now lives on `main`.
 
 ---
 
@@ -58,7 +58,7 @@
 
 ## 10. Open branches (not merged)
 - `claude/urivo-codebase-review-w34tu3` (old, superseded).
-- Everything else merged. Feature branches after merge are stale.
+- This doc (`claude/launch-status`) is now MERGED to main (PR #14). Everything else merged; feature branches after merge are stale.
 
 ## 11. Working conventions
 - Branch per change → PR → verify CI green + scope → merge to `main` (never push to main directly).
