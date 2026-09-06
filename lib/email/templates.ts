@@ -38,6 +38,23 @@ interface Block {
   stats?: { label: string; value: string }[];
   /** Optional one-click unsubscribe link, shown in the footer of marketing email. */
   unsubscribeUrl?: string;
+  /**
+   * Store brand for a shopper-facing email (order confirmations). When set, the
+   * header leads with the store's name instead of Urivo and the footer reads
+   * "Powered by Urivo" — the shopper bought from the merchant, not from us. The
+   * caller passes a display-safe name; `plain()` strips markup as a backstop.
+   */
+  brand?: string;
+}
+
+/**
+ * Strip angle brackets so merchant-supplied text (a store name, a product
+ * title) can't inject markup into the email a shopper receives. Safe for both
+ * the HTML and plain-text parts — it removes, it does not entity-encode, so the
+ * two renderings never disagree.
+ */
+function plain(s: string): string {
+  return s.replace(/[<>]/g, "").trim();
 }
 
 /** Bulletproof stat grid: one label/value row per stat, hairline-separated. */
@@ -55,7 +72,8 @@ function statsBlock(stats: { label: string; value: string }[]): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 24px;border:1px solid ${LINE};border-radius:14px;overflow:hidden;background:${SURFACE_MUTED};">${rows}</table>`;
 }
 
-function layout({ preheader, heading, paragraphs, cta, footnote, stats, unsubscribeUrl }: Block): string {
+function layout({ preheader, heading, paragraphs, cta, footnote, stats, unsubscribeUrl, brand }: Block): string {
+  const brandName = brand ? plain(brand) : "";
   const [lead, ...rest] = paragraphs;
   const leadHtml = lead
     ? `<p style="margin:0 0 20px;font-family:${FONT};font-size:16px;line-height:1.7;color:${INK};font-weight:500;">${lead}</p>`
@@ -82,8 +100,20 @@ function layout({ preheader, heading, paragraphs, cta, footnote, stats, unsubscr
     ? `<p style="margin:28px 0 0;padding-top:22px;border-top:1px solid ${LINE};font-family:${FONT};font-size:13px;line-height:1.65;color:${MUTED};">${footnote}</p>`
     : "";
 
-  // Header: navy logo tile + "Urivo" wordmark on white, then a thin gold rule.
-  const header = `
+  const rule = `<tr><td style="height:1px;background:linear-gradient(90deg,rgba(212,175,55,0.6) 0%,rgba(212,175,55,0) 62%);line-height:1px;font-size:0;">&nbsp;</td></tr>`;
+
+  /*
+   * Header. A Urivo email leads with the navy logo tile + "Urivo" wordmark. A
+   * shopper-facing email (brand set) leads with the STORE'S name instead — the
+   * buyer is hearing from the merchant, and Urivo is only the rails underneath.
+   */
+  const header = brandName
+    ? `
+    <tr><td class="u-head" style="background:${SURFACE};padding:34px 48px 30px;">
+      <span style="font-family:${FONT};font-size:20px;font-weight:600;letter-spacing:-0.3px;color:${SLATE};">${brandName}</span>
+    </td></tr>
+    ${rule}`
+    : `
     <tr><td class="u-head" style="background:${SURFACE};padding:34px 48px 30px;">
       <table role="presentation" cellpadding="0" cellspacing="0"><tr>
         <td style="vertical-align:middle;padding-right:13px;">
@@ -94,7 +124,7 @@ function layout({ preheader, heading, paragraphs, cta, footnote, stats, unsubscr
         </td>
       </tr></table>
     </td></tr>
-    <tr><td style="height:1px;background:linear-gradient(90deg,rgba(212,175,55,0.6) 0%,rgba(212,175,55,0) 62%);line-height:1px;font-size:0;">&nbsp;</td></tr>`;
+    ${rule}`;
 
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>Urivo</title>
@@ -115,7 +145,7 @@ function layout({ preheader, heading, paragraphs, cta, footnote, stats, unsubscr
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" class="u-card" style="max-width:600px;width:100%;background:${SURFACE};border:1px solid ${LINE};border-radius:20px;overflow:hidden;box-shadow:0 20px 48px -24px rgba(15,23,42,0.18);">
         ${header}
         <tr><td class="u-pad" style="padding:40px 48px 40px;">
-          <p style="margin:0 0 14px;font-family:${FONT};font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:${MUTED};">Urivo</p>
+          <p style="margin:0 0 14px;font-family:${FONT};font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:${MUTED};">${brandName ? "Order confirmation" : "Urivo"}</p>
           <h1 class="u-h1" style="margin:0 0 22px;font-family:${FONT};font-weight:600;font-size:28px;line-height:1.25;color:${INK};letter-spacing:-0.4px;">${heading}</h1>
           ${leadHtml}
           ${statsHtml}
@@ -125,26 +155,34 @@ function layout({ preheader, heading, paragraphs, cta, footnote, stats, unsubscr
         </td></tr>
         <tr><td class="u-foot" style="background:${SURFACE_MUTED};border-top:1px solid ${LINE};padding:26px 48px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-            <td style="font-family:${FONT};font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:${MUTED};">The AI Commerce<br>Operating System</td>
-            <td align="right" style="font-family:${FONT};font-size:15px;font-weight:600;letter-spacing:-0.2px;color:${SLATE};">Urivo</td>
+            <td style="font-family:${FONT};font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:${MUTED};">${brandName ? "Powered by<br>Urivo" : "The AI Commerce<br>Operating System"}</td>
+            <td align="right" style="font-family:${FONT};font-size:15px;font-weight:600;letter-spacing:-0.2px;color:${SLATE};">${brandName || "Urivo"}</td>
           </tr></table>
           ${unsubscribeUrl
             ? `<p style="margin:16px 0 0;font-family:${FONT};font-size:12px;line-height:1.6;color:${MUTED};">You receive these weekly updates because you opted in. <a href="${unsubscribeUrl}" style="color:${MUTED};text-decoration:underline;">Unsubscribe</a> — or manage email preferences in your Urivo settings.</p>`
             : ""}
         </td></tr>
       </table>
-      <p style="margin:22px 0 0;font-family:${FONT};font-size:11px;letter-spacing:0.2px;color:${MUTED};">Sent with intention · Urivo</p>
+      <p style="margin:22px 0 0;font-family:${FONT};font-size:11px;letter-spacing:0.2px;color:${MUTED};">${brandName ? "Powered by Urivo" : "Sent with intention · Urivo"}</p>
     </td></tr>
   </table>
 </body></html>`;
 }
 
-function toText({ heading, paragraphs, cta, footnote, unsubscribeUrl }: Block): string {
-  const parts = [heading, "", ...paragraphs];
+function toText({ heading, paragraphs, stats, cta, footnote, unsubscribeUrl, brand }: Block): string {
+  const [lead, ...rest] = paragraphs;
+  const parts = [heading, "", ...(lead ? [lead] : [])];
+  // The stat grid is the order summary in a receipt — the plain-text part is
+  // useless without it, so render it wherever it appears in the HTML: after the
+  // lead line, before the body copy.
+  if (stats && stats.length > 0) {
+    parts.push("", ...stats.map((s) => `${s.label}: ${s.value}`));
+  }
+  if (rest.length > 0) parts.push("", ...rest);
   if (cta) parts.push("", `${cta.label}: ${cta.url}`);
   if (footnote) parts.push("", footnote);
   if (unsubscribeUrl) parts.push("", `Unsubscribe from these weekly updates: ${unsubscribeUrl}`);
-  parts.push("", "— Urivo");
+  parts.push("", brand ? `${plain(brand)} — powered by Urivo` : "— Urivo");
   return parts.join("\n");
 }
 
@@ -221,6 +259,51 @@ export function newOrderEmail(storeName: string, amount: string, isFirst: boolea
     heading: `New order — ${amount}`,
     paragraphs: [`${storeName} just received a new order for ${amount}. It's ready to fulfil in your dashboard.`],
     cta: { label: "View the order", url: `${APP_URL()}/dashboard` },
+  });
+}
+
+export interface OrderConfirmationLine {
+  title: string;
+  quantity: number;
+  /** Line total, already formatted with the store's currency (e.g. "€40"). */
+  lineTotal: string;
+}
+
+/**
+ * The shopper's receipt — sent the instant a storefront order is paid.
+ *
+ * This is the merchant's email to their own customer: it leads with the store's
+ * brand (via Urivo's verified sending domain), lists what was bought, and tells
+ * the buyer a shipping update follows. A store that takes money and then says
+ * nothing is not a store; this is the difference between a checkout form and a
+ * real one. Amounts arrive pre-formatted — the template stays currency-agnostic
+ * and the money math lives with the order, not the layout.
+ */
+export function orderConfirmationEmail(input: {
+  storeName: string;
+  customerName?: string | null;
+  /** Order total, already formatted with the store's currency. */
+  amountTotal: string;
+  lines: OrderConfirmationLine[];
+}): RenderedEmail {
+  const store = plain(input.storeName) || "Your order";
+  const customer = input.customerName ? plain(input.customerName) : "";
+  const stats = [
+    ...input.lines.map((l) => ({
+      label: `${l.quantity} × ${plain(l.title) || "Item"}`,
+      value: l.lineTotal,
+    })),
+    { label: "Total", value: input.amountTotal },
+  ];
+  return build(`Your ${store} order is confirmed`, {
+    preheader: `${store} received your order — ${input.amountTotal}.`,
+    heading: customer ? `Thank you, ${customer}.` : "Thank you for your order.",
+    brand: store,
+    paragraphs: [
+      `${store} has received your order and is getting it ready. Here's what you bought:`,
+      "You'll get another email with tracking the moment it ships. Questions about your order? Just reply to this email — it goes straight to the store.",
+    ],
+    stats,
   });
 }
 
