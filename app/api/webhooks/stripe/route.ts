@@ -5,7 +5,8 @@ import { stripe, isStripeConfigured } from "@/lib/commerce/stripe";
 import { recordPaidOrder, type OrderLineInput } from "@/lib/commerce/orders";
 import { notify } from "@/lib/notifications/service";
 import { sendEmail } from "@/lib/email/service";
-import { newOrderEmail } from "@/lib/email/templates";
+import { newOrderEmail, orderConfirmationEmail } from "@/lib/email/templates";
+import { campaignFrom } from "@/lib/marketing/campaign";
 import {
   linkSubscription,
   syncSubscription,
@@ -172,8 +173,13 @@ async function fulfilOrder(event: Stripe.Event, session: Stripe.Checkout.Session
     lines,
   });
 
-  // A genuinely new order (not a replayed webhook) → tell the merchant.
-  if (orderId) await notifyMerchantOfOrder(storeId, session);
+  // A genuinely new order (not a replayed webhook) → tell the merchant, then
+  // send the shopper their receipt. Both are best-effort and independent: an
+  // email failure on either side must never unwind a recorded sale.
+  if (orderId) {
+    await notifyMerchantOfOrder(storeId, session);
+    await notifyShopperOfOrder(storeId, session, lines);
+  }
 }
 
 /**
@@ -218,6 +224,65 @@ async function notifyMerchantOfOrder(storeId: string, session: Stripe.Checkout.S
     }
   } catch (err) {
     logger.warn("notifyMerchantOfOrder failed", { storeId, err: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+/**
+ * The shopper's receipt. A real store confirms an order the moment it's paid, so
+ * the buyer gets a branded confirmation — from the store's name, on Urivo's
+ * verified sending domain, with replies routed to the merchant. Best-effort: a
+ * mail failure here must never unwind a recorded sale.
+ */
+async function notifyShopperOfOrder(
+  storeId: string,
+  session: Stripe.Checkout.Session,
+  lines: OrderLineInput[],
+) {
+  try {
+    const shopperEmail = session.customer_details?.email ?? session.customer_email ?? null;
+    if (!shopperEmail) return; // no address to confirm to (unlikely, but never assume)
+
+    const admin = supabaseAdmin();
+    const { data: store } = await admin
+      .from("stores")
+      .select("user_id, store_name")
+      .eq("id", storeId)
+      .maybeSingle();
+    const storeName = store?.store_name ?? "Your order";
+
+    // Reply-to the merchant so a shopper's reply reaches the store, not Urivo.
+    let replyTo: string | undefined;
+    if (store?.user_id) {
+      const { data: owner } = await admin.from("profiles").select("email").eq("id", store.user_id).maybeSingle();
+      replyTo = owner?.email ?? undefined;
+    }
+
+    const currency = (session.currency ?? "eur").toUpperCase();
+    const symbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : `${currency} `;
+    const money = (cents: number) => `${symbol}${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
+
+    const emailLines = lines.map((l) => ({
+      title: l.title,
+      quantity: l.quantity,
+      lineTotal: money(l.unitAmount * l.quantity),
+    }));
+    const totalCents = session.amount_total ?? lines.reduce((sum, l) => sum + l.unitAmount * l.quantity, 0);
+
+    await sendEmail({
+      to: shopperEmail,
+      email: orderConfirmationEmail({
+        storeName,
+        customerName: session.customer_details?.name ?? null,
+        amountTotal: money(totalCents),
+        lines: emailLines,
+      }),
+      // Store's brand on Urivo's verified domain — the one From that stays
+      // deliverable (spec 6.9 / campaign sender pattern).
+      from: campaignFrom(storeName),
+      replyTo,
+    });
+  } catch (err) {
+    logger.warn("notifyShopperOfOrder failed", { storeId, err: err instanceof Error ? err.message : String(err) });
   }
 }
 
