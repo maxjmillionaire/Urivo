@@ -1,7 +1,7 @@
 # Urivo — Launch Status & Working Memory
 
 > Living doc. Updated after significant work; re-read after any context reset to stay oriented.
-> **Snapshot:** `main` @ `66546df` · last updated 2026-09-04. This doc now lives on `main`.
+> **Snapshot:** `main` @ `072036e` · last updated 2026-09-06. This doc lives on `main`.
 
 ---
 
@@ -10,6 +10,8 @@
 - **Founding 50 KILLED** (PR #13, on main): no €29/€149 anywhere; `getFoundingOffer()` permanently closed; a legacy `price_type="founding"` resolves to standard.
 - **Credit packs** exist as the expansion lever: Boost 20/€19, Studio 60/€49, Scale 150/€99 (priced above subscription on purpose).
 - **Post-proof plan:** A/B test €69 vs €49 on new cohorts (judge on conversion×first-sale×retention, grandfather early users). Do NOT raise on "feels amazing" — raise when "price is no longer the bottleneck." Entry digit matters less than expansion/NDR.
+- **Launch FOMO (DECIDED, honest version):** €49 is framed as genuine EARLY-ADOPTER pricing that WILL rise to €69 once case studies exist; early joiners grandfathered at €49 forever. The lack of case studies is the reason to buy now ("before the case studies, price goes up — lock in €49"). Urgency is real because the raise + lock-in are real. FORBIDDEN: fake countdown timers, "spots left" counters, resetting urgency, fabricated testimonials/metrics — that's the Founding-50 theater we killed. No code needed until the raise (then: €49→€69 with grandfathering of existing subs).
+- **Transaction/GMV take rate — REJECTED (for now).** A naked 1% skim on merchant sales contradicts a *tested* product principle (`plans.test.ts`: capped tiers are NOT a take rate; checkout must never read volume; never punish success). Urivo also isn't in the funds flow (Stripe Connect DIRECT charges → merchant's own account), so a skim needs Connect re-plumbing (`application_fee`) + erodes the "your store, your money" promise, for ~€0 at launch GMV. Upside from winners already comes via capped tiers + credit packs. IF ever pursued: a future opt-in "Urivo Payments" value layer (processing/fraud/tax/chargebacks), never a retrofit tax on today's plans.
 - **Creators:** honor GITO (35% first-month, one-time, margin-safe). No NEW *recurring* creator commissions. One-time only, on the higher base.
 - **70% Month-2 contribution-margin floor** is the hard rule (guardrail lives in `lib/finance/simulator.ts` → `MONTH2_MARGIN_FLOOR_PCT`). Investor share = 3% (`investorShare = 0.03`).
 
@@ -25,6 +27,7 @@
 - Finance corrections: investor 3%, GITO 35% (0060), Month-2 margin floor.
 - Legal pages finalized + marketing consent (0061/0062/0063) — placeholders gone, opt-in default, weekly digest gated on consent + one-click unsubscribe.
 - **Next Action V1** (Home = "what should I do next?"): deterministic activation ladder + one gated performance rec (mobile conversion, honest sample/coverage gates); Opportunities folded in as ≤2 "worth watching"; greeting simplified; AskBar receded.
+- **Shopper order confirmation** (PR #16, 072036e): storefront checkout now emails the BUYER a store-branded receipt on paid order (was silent — only the merchant was notified). Sent as "«Store» via Urivo" on the verified domain, reply-to the merchant. Store-branded email layout added (brand leads, "Powered by Urivo" footer); itemised summary in HTML + text.
 
 ## 4. Migrations
 - **Applied in prod (confirmed by founder):** 0055–0063. `main` is at 0063. Nothing unapplied.
@@ -33,6 +36,8 @@
 - **Anthropic key: LIVE in prod.** **Higgsfield image key: NOT set** → product images don't generate yet (stores look half-built). Gemini fallback exists if `GOOGLE_AI_API_KEY` set.
 - This sandbox CANNOT reach `urivo.ai` (egress blocked) — founder runs live smoke tests / Stripe dashboard config.
 - Railway deploys `main`. Health: `GET /api/health` (deep mode needs `CRON_SECRET`).
+- **Email = TWO systems.** (1) Urivo→merchant (welcome/digest/dunning/new-order): BUILT on Resend (`lib/email/service.ts`), from `Urivo <hello@urivo.ai>`. (2) Store→shopper: order confirmation now BUILT (PR #16); shipping/tracking email NOT built (waits on AutoDS fulfillment data). Store emails send "«Store» via Urivo" on the verified urivo.ai domain (no per-merchant domain verification needed at launch); custom-domain sending is a later upgrade via Resend domains API. €20 Resend Pro (~50k/mo) covers both at launch scale. Needs `RESEND_API_KEY` + urivo.ai verified in Resend.
+- **Startup cost stack (founder decided: launch with ALL, no deferrals):** domain ~$160 one-time, then monthly Higgsfield €59 + AutoDS €39.90 + Railway €20 + Resend €20 + Claude €20 (+ ~€30 Anthropic credit buffer). ≈ €336 month 1, ≈ €159/mo steady. **Critical first domino = buy domain** (unblocks AutoDS application + email sending + DNS). Founder's real launch floor is well under the €500 he was waiting on from a third party (Clinton).
 
 ## 6. Launch blockers (honest, ranked)
 **Tier 1 — blocks credible launch:**
@@ -41,7 +46,7 @@
 3. Legal pages deployed ✅ (done, on main).
 
 **Tier 2 — product-promise holes:**
-4. **Sourcing/fulfillment (AutoDS) is dark** — merchants can't get real products. Decide: wire it, or state "bring your own products."
+4. **Sourcing/fulfillment (AutoDS) is dark** — DECIDED: wire it (founder wants full all-in-one stack, no deferrals). **AutoDS API reality (verified 2026-09):** approval-gated + one-time activation fee (unpublished, "varies by use case") + NO free trial + auth/docs only released AFTER approval → cannot build until approved. It DOES support the needed ops (product import, automated orders, sourcing, product data) and the "users authorize your platform to manage their own accounts" model. **Architecture DECIDED:** each merchant authorizes their OWN AutoDS account under Urivo (invisible to them) — NOT one shared account (that fronts everyone's COGS on founder's card, single point of failure, breaks ToS). **Action:** apply at autods.com/api AFTER domain bought (form needs Site URL); message drafted in session. Critical path = external approval + fee + timeline, not code.
 5. **Retention Loop B (win-back)** not built (see §7).
 
 **Tier 3 — better, not blocking:** analytics (PostHog off), CAPI, Next Action V2 (contextual handoffs, Evolution Lab absorb, nav simplification), withdrawal-consent flow + executed DPAs.
@@ -66,7 +71,9 @@
 - Commit trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` + `Claude-Session: …`. PR body ends with the Claude Code line + session URL.
 
 ## 12. Next actions (when founder returns)
-1. Set Higgsfield/Gemini image key; run the first real end-to-end sale.
-2. Enable Stripe Smart Retries (Loop A config).
-3. Decide the AutoDS sourcing story.
-4. Then: Loop B win-back build, or Next Action V2.
+1. **Buy the domain (urivo.ai)** — the first domino; unblocks AutoDS application, store email sending, DNS.
+2. **Submit AutoDS API application** at autods.com/api (drafted message; needs Site URL) → get activation fee + timeline + model confirmation. Then I wire the integration (product import + order forwarding), which also unblocks the shipping/tracking email.
+3. Set Higgsfield/Gemini image key; run the first real end-to-end sale.
+4. Enable Stripe Smart Retries (Loop A config).
+5. Ship the €49 early-adopter FOMO framing on the pricing page (honest version — see §1).
+6. Then: Loop B win-back build, or Next Action V2.
