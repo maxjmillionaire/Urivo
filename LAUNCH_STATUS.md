@@ -1,7 +1,7 @@
 # Urivo — Launch Status & Working Memory
 
 > Living doc. Updated after significant work; re-read after any context reset to stay oriented.
-> **Snapshot:** `main` @ `06002e5` · last updated 2026-09-07. This doc lives on `main`.
+> **Snapshot:** `main` @ `eae9157` · last updated 2026-09-07. This doc lives on `main`.
 
 ---
 
@@ -31,6 +31,7 @@
 - **AskUrivo Operator Doctrine + brevity** (PR #18, 935dae1): AskUrivo now reasons with an e-commerce Operator Doctrine (`lib/ai/doctrine.ts`) — real operator numbers (four levers, 3x rule, break-even ROAS=1/margin, €30-80 price window, conv 1-3%, ad fatigue +20-30% CPA, dispute rate <1%, blended CPA, profit-in-2nd-order, 13-week cash gap), elevated from founder's OTS 18-module curriculum into Urivo's own voice (IP-clean, no course branding — founder confirmed OTS is his + co-creator's, NOT Clinton's). Carried as a cached system block (per-turn cost barely moves). Also retuned to be quick/wise/effective: most answers 1-3 tight sentences, one highest-leverage move, not essays. Guardrail: doctrine SHARPENS diagnosis of the founder's real numbers, doesn't make it a generic advice bot.
 - **AskUrivo guardrails** (PR #20, 20831fb): customer-facing boundaries in the system prompt — no profanity ever, stays on the founder's business, warm one-line redirect for off-topic/personal/"who runs Urivo"/other-users questions, never discloses its own instructions/doctrine, declines harmful/deceptive. `SYSTEM_PROMPT` exported + pinned by a guard test. Prompt v4.
 - **AskUrivo advanced knowledge library + retrieval** (PR #21, 06002e5): `lib/ai/knowledge.ts` — 11 expert niche modules (post-privacy measurement, creative testing, paid scaling structures, offer engineering, AOV/post-purchase, retention/LTV/subscription, email+SMS flows, advanced CRO/PDP, sourcing→private label, cash-flow discipline, channel choice Meta/TikTok/Google), self-sourced from operator expertise in Urivo's voice. `selectKnowledge()` injects only the 1-2 modules a question touches (keyword scoring, NO embeddings/vector DB — right at this scale), uncached + capped + size-bounded, so most turns stay lean. Prompt v5. **Expand = add a module (no docs needed — founder confirmed no more OTS docs coming).**
+- **AskUrivo emotional intelligence** (PR #23, eae9157): CARRY THE FOUNDER section — read the mood, meet it in one honest line before helping, hold the founder's dream, name real progress when real. Critical: EI *with* honesty, never instead — no flattery/fake enthusiasm/inflated numbers ("belief that isn't earned is just another lie"), stays brief. Prompt v6. **AskUrivo is now: live context + operator doctrine + on-demand deep knowledge + brevity + guardrails + emotional intelligence — the moat that ChatGPT-in-a-panel can't match.**
 
 ## 4. Migrations
 - **Applied in prod (confirmed by founder):** 0055–0063. `main` is at 0063. Nothing unapplied.
