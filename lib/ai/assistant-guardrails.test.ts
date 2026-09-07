@@ -38,4 +38,12 @@ describe("Ask Urivo guardrails — the customer-facing boundaries", () => {
   it("declines harmful or deceptive requests and offers the honest version", () => {
     expect(prompt).toContain("decline anything harmful");
   });
+
+  it("is emotionally intelligent — carries the founder's dream, honestly", () => {
+    expect(prompt).toContain("carry the founder");
+    expect(prompt).toContain("hold their dream with them");
+    // Emotional intelligence must never become flattery — honesty stays.
+    expect(prompt).toContain("never flatter");
+    expect(prompt).toContain("warmth and honesty are not opposites");
+  });
 });
