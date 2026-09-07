@@ -19,6 +19,7 @@ import {
 import { AIEditPlanSchema, type AIEditPlan } from "./edit-plan";
 import { renderContext, type AssistantContext } from "./context";
 import { OPERATOR_DOCTRINE } from "./doctrine";
+import { selectKnowledge, renderKnowledge } from "./knowledge";
 import type { TokenUsage } from "@/lib/finance/cost-model";
 
 /*
@@ -40,7 +41,7 @@ import type { TokenUsage } from "@/lib/finance/cost-model";
  */
 
 export const ASSISTANT_MODEL = modelFor("assistant");
-export const ASSISTANT_PROMPT_VERSION = "v4";
+export const ASSISTANT_PROMPT_VERSION = "v5";
 
 /*
  * Output ceiling. Raised from 700 — five sentences could not answer "give me a
@@ -216,6 +217,16 @@ export async function* streamAssistant(
     };
   });
 
+  /*
+   * Deep knowledge, only when the question calls for it. The latest user turn
+   * selects at most a module or two from the advanced library, injected UNCACHED
+   * (it varies by question) between the always-on doctrine and the business
+   * snapshot. Most turns match nothing and carry no extra weight — the doctrine
+   * alone answers, which is correct.
+   */
+  const latestQuestion = [...bounded].reverse().find((m) => m.role === "user")?.content ?? "";
+  const knowledge = renderKnowledge(selectKnowledge(latestQuestion));
+
   const stream = client.messages.stream({
     model: ASSISTANT_MODEL,
     max_tokens: MAX_TOKENS,
@@ -225,11 +236,12 @@ export async function* streamAssistant(
     tools: [PROPOSE_EDIT_TOOL],
     system: [
       // The prompt and the doctrine are stable across every turn, so both are
-      // cached; the business snapshot changes and is not. Two cached blocks, so
-      // the persona and the e-commerce knowledge can each evolve without
-      // invalidating the other's cache.
+      // cached; the retrieved knowledge and the business snapshot change and are
+      // not. Two cached blocks, so the persona and the e-commerce knowledge can
+      // each evolve without invalidating the other's cache.
       { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
       { type: "text", text: OPERATOR_DOCTRINE, cache_control: { type: "ephemeral" } },
+      ...(knowledge ? [{ type: "text" as const, text: knowledge }] : []),
       { type: "text", text: renderContext(context) },
     ],
     messages: turns,
