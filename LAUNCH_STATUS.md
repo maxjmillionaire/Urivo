@@ -1,7 +1,7 @@
 # Urivo — Launch Status & Working Memory
 
 > Living doc. Updated after significant work; re-read after any context reset to stay oriented.
-> **Snapshot:** `main` @ `072036e` · last updated 2026-09-06. This doc lives on `main`.
+> **Snapshot:** `main` @ `935dae1` · last updated 2026-09-07. This doc lives on `main`.
 
 ---
 
@@ -28,6 +28,8 @@
 - Legal pages finalized + marketing consent (0061/0062/0063) — placeholders gone, opt-in default, weekly digest gated on consent + one-click unsubscribe.
 - **Next Action V1** (Home = "what should I do next?"): deterministic activation ladder + one gated performance rec (mobile conversion, honest sample/coverage gates); Opportunities folded in as ≤2 "worth watching"; greeting simplified; AskBar receded.
 - **Shopper order confirmation** (PR #16, 072036e): storefront checkout now emails the BUYER a store-branded receipt on paid order (was silent — only the merchant was notified). Sent as "«Store» via Urivo" on the verified domain, reply-to the merchant. Store-branded email layout added (brand leads, "Powered by Urivo" footer); itemised summary in HTML + text.
+- **AskUrivo Operator Doctrine + brevity** (PR #18, 935dae1): AskUrivo now reasons with an e-commerce Operator Doctrine (`lib/ai/doctrine.ts`) — real operator numbers (four levers, 3x rule, break-even ROAS=1/margin, €30-80 price window, conv 1-3%, ad fatigue +20-30% CPA, dispute rate <1%, blended CPA, profit-in-2nd-order, 13-week cash gap), elevated from founder's OTS 18-module curriculum into Urivo's own voice (IP-clean, no course branding — founder confirmed OTS is his + co-creator's, NOT Clinton's). Carried as a cached system block (per-turn cost barely moves). Also retuned to be quick/wise/effective: most answers 1-3 tight sentences, one highest-leverage move, not essays. Guardrail: doctrine SHARPENS diagnosis of the founder's real numbers, doesn't make it a generic advice bot.
+  - **NEXT (expand):** deep/niche ecom knowledge → build a RETRIEVAL layer (`lib/ai/knowledge/`, chunk+retrieve relevant per query) so depth grows without bloating every turn. Founder will send more OTS docs to seed it. Core principles fold into the doctrine; niche depth goes in retrieval.
 
 ## 4. Migrations
 - **Applied in prod (confirmed by founder):** 0055–0063. `main` is at 0063. Nothing unapplied.
