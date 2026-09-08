@@ -1,7 +1,7 @@
 # Urivo — Launch Status & Working Memory
 
 > Living doc. Updated after significant work; re-read after any context reset to stay oriented.
-> **Snapshot:** `main` @ `eae9157` · last updated 2026-09-07. This doc lives on `main`.
+> **Snapshot:** `main` @ `e6c27e4` · last updated 2026-09-08. This doc lives on `main`.
 
 ---
 
@@ -58,6 +58,7 @@
 ## 7. Retention loops
 - **Loop A (involuntary churn / dunning): ALREADY BUILT in code.** `paymentFailedEmail` fires on the `past_due` transition (`subscription.ts`), CTA → billing → Stripe portal; past_due keeps store live. **Remaining = Stripe dashboard config:** enable Smart Retries, avoid double-emailing with Stripe's own dunning, verify portal allows card update.
 - **Loop B (voluntary win-back, 30/60/90 on paused stores): NOT built.** Reuses Resend + cron + Pause&Reactivate + consent/unsubscribe (0062). Task #5 in the list. Scope ready when founder says go.
+- **"Update emails" / lifecycle engine (founder idea 2026-09-08): NOT built.** Founder wants proactive engagement emails "on a random schedule, like ChatGPT sometimes emails you." REFRAME (agreed direction): NOT literal random spam — that's illegal (marketing → must be `marketing_opt_in`-gated + one-click unsubscribe, infra exists in 0062) and off-brand (philosophy bans notification spam) and torches Resend deliverability. Right shape = STATE/BEHAVIOR-TRIGGERED lifecycle emails (milestone, inactivity gap, genuinely useful update) with a FREQUENCY CAP (≤1 per N days) + send-time JITTER so it *feels* spontaneous but every send is earned/consented/capped. Same system as the weekly digest (built) + Loop B (planned) — build one lifecycle engine they all plug into. Code is NOT blocked by Resend (email service no-ops safely without the key); only actual *sending* waits on the prod Resend key. Not a launch blocker. Build when founder says go; arm pre-Resend so it's ready on key-flip.
 
 ## 8. Credits / out-of-credits
 - Fully built already: `out-of-credits.tsx` moment + packs + `/api/credits/checkout` + 402 enforcement across all AI actions. No free-credit drip (deliberate). Do NOT rebuild.
