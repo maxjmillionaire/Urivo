@@ -1,7 +1,28 @@
 # Urivo — Launch Status & Working Memory
 
 > Living doc. Updated after significant work; re-read after any context reset to stay oriented.
-> **Snapshot:** `main` @ `e6c27e4` · last updated 2026-09-08. This doc lives on `main`.
+> **Snapshot:** `main` @ `800a89b` · last updated 2026-09-08. This doc lives on `main`.
+
+---
+
+## 0. LAUNCH CHECKLIST (single source of truth)
+
+Mostly founder config, not code. **Ordering: domain is the keystone; do it first, then the rest in parallel.**
+
+| # | Item | Who | Config / Build | Unblocks | Cost |
+|---|------|-----|----------------|----------|------|
+| 1 | **Buy the domain** (urivo.ai) | Founder | config | EVERYTHING — Resend sender, AutoDS application, store URLs, DNS | ~$160/yr (check cheaper registrar; standard .ai ~$70-100) |
+| 2 | **Higgsfield key** in prod env | Founder sets → Claude verifies | config + verify | product images generate (stores stop looking half-built); Gemini fallback if `GOOGLE_AI_API_KEY` | €59/mo |
+| 3 | **Resend**: set `RESEND_API_KEY` + verify `urivo.ai` domain (SPF/DKIM DNS) | Founder | config | ALL emails actually send (order confirmation, digest, dunning). Code no-ops safely until then | €20/mo |
+| 4 | **Stripe live setup** (dashboard) | Founder | config | live payments + Loop A dunning. Enable Smart Retries; confirm live keys + `STRIPE_WEBHOOK_SECRET` + Connect; verify portal allows card update; avoid double-dunning | % per txn, no upfront |
+| 5 | **AutoDS**: apply at autods.com/api (needs Site URL) → approval + fee → creds | Founder applies → **Claude builds** | config THEN build | real sourcing/fulfillment (true all-in-one). Gated on AutoDS approval timeline — apply day domain clears | €39.90/mo + unpublished activation fee |
+| 6 | **CAPI** (server-side ad tracking) | **Claude (later)** | **BUILD, not a toggle** | better ad measurement/optimization | free to connect, = engineering + consent update |
+
+**Two flags:** (a) **AutoDS** is config *then a build* — apply first, it runs on their clock; I wire it once approved. (b) **CAPI is NOT launch-critical and NOT a setting** — it's a post-launch engineering build for when paid traffic is scaling. Keep it OFF the launch critical path.
+
+**Minimum to take a real first sale:** domain + Stripe live + (Higgsfield for images, Resend for the receipt). AutoDS makes it fully all-in-one (founder's call: launch with it) but waits on their approval. CAPI waits until live + advertising.
+
+**Claude's handoffs:** verify Higgsfield end-to-end · build AutoDS once approved · build CAPI post-launch · build the lifecycle-email engine on request (see §7).
 
 ---
 
