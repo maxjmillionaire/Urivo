@@ -150,6 +150,59 @@ export const KNOWLEDGE_MODULES: KnowledgeModule[] = [
     content:
       "Match the channel to intent and to the creative you can actually make. Meta is the all-round starting point for a new product — broad reach, strong for impulse and problem-aware buyers, entirely creative-led. TikTok is entertainment-first: UGC that does not look like an ad, cheaper reach, a younger audience and great for visually demonstrable products, but expect faster fatigue and a higher creative appetite. Google Search harvests existing demand — run brand terms and high-intent keywords once demand exists, and use Performance Max for scale only with guardrails. Start where your creative is strongest and the buyer already is; add a second channel only after the first is reliably profitable.",
   },
+  {
+    id: "returns-refunds",
+    title: "Returns & refunds",
+    tags: [
+      "return", "returns", "refund", "refunds", "return rate", "exchange",
+      "restocking", "money back", "money-back", "rma", "send it back",
+    ],
+    content:
+      "Returns are an operations and trust problem, not a loss to hide from. Publish a clear, honest returns policy and actually honor it — a fast, clean refund often keeps the customer. Know the economics: when return shipping plus restocking costs more than the item, a 'keep it, here is your refund' beats paying to get it back. In the EU, buyers have a statutory 14-day right of withdrawal your policy cannot remove, so build it in. Attack the return RATE at the source, because most returns are preventable: accurate sizing charts, real photos and video, and honest delivery and expectation-setting on the product page cut returns more than any policy tweak. Track return reasons and fix the top one (wrong size, not as described, arrived late). Offer exchange or store credit before cash where it fits — it keeps the revenue. A frictionless return experience is itself a retention lever: people buy more confidently from a store they trust to take it back.",
+  },
+  {
+    id: "customer-service",
+    title: "Customer service that scales",
+    tags: [
+      "customer service", "support", "ticket", "tickets", "complaint",
+      "complaints", "reply", "response time", "angry customer", "wismo",
+      "where is my order", "help desk",
+    ],
+    content:
+      "Support is not a cost centre — it is margin and retention. Answer within one business day, every day; speed prevents chargebacks and saves the sale. Build saved replies for the twenty questions you get most so quality holds as volume grows. Then remove the CAUSES: most tickets are a missing sentence on the product page, and 'where is my order' means your tracking emails are not doing their job — fix the source and the ticket disappears. Track why people contact you and treat each recurring reason as a fixable design problem, not a person to placate. Tone: calm, human, on the customer's side — a refund offered early is cheaper than a dispute lost late, and an angry customer handled fast often becomes a repeat one. As you grow, hire support FIRST (before creative or strategy), against the replies you already documented — it buys back the founder's best hours.",
+  },
+  {
+    id: "disputes-chargebacks",
+    title: "Chargebacks & disputes",
+    tags: [
+      "chargeback", "chargebacks", "dispute", "disputes", "fraud",
+      "representment", "stripe dispute", "friendly fraud", "reserve",
+    ],
+    content:
+      "Keep the dispute rate under 1 percent — above it, processors raise reserves, freeze funds or close the account, which can end the business in a day. Most disputes are confusion, not fraud, so prevent them: a recognisable billing descriptor (the store name the buyer expects on their statement), delivery timeframes set clearly before purchase, fast support, and refunds you actually honor. When a dispute lands, respond inside the deadline every time with hard evidence — tracking number, delivery confirmation, the product page, and the full customer message history. A refund offered early is almost always cheaper than a dispute lost late plus its fee. Watch fraud signals — mismatched billing and shipping, rushed high-value orders, many cards from one address — and add verification on the risky ones. Treat the dispute rate as a number you check weekly and stop scaling on the moment it climbs.",
+  },
+  {
+    id: "operations-fulfillment",
+    title: "Operations & fulfillment",
+    tags: [
+      "fulfillment", "fulfilment", "shipping", "tracking", "delivery", "3pl",
+      "warehouse", "stockout", "stock", "reorder", "logistics", "operations",
+      "dispatch", "inventory",
+    ],
+    content:
+      "Operations is the invisible product — the customer experiences your fulfillment, not your ambition, and a late parcel undoes good marketing instantly. Map the order journey (placed, confirmed, dispatched, tracked, delivered, followed up) and send an automatic message at every stage; silence between stages is where anxiety and disputes are born. Set delivery expectations by publishing a range and quoting the slower end — early is delight, late is a refund request — and never promise a date the supplier has not confirmed. Prevent stockouts with a reorder point of lead-time-in-days times daily sales, plus a safety buffer, and alert before you hit it: running out during a winning campaign wastes the ad spend that earned it. Move to a third-party warehouse (3PL) once packing orders is the reason you stopped marketing — roughly ten-plus orders a day. Measure order-to-dispatch and dispatch-to-delivery times, and cut the slowest step.",
+  },
+  {
+    id: "legal-compliance",
+    title: "Legal, tax & compliance (operator basics)",
+    tags: [
+      "legal", "compliance", "vat", "tax", "taxes", "gdpr", "privacy", "terms",
+      "policy", "policies", "consumer rights", "withdrawal", "invoice",
+      "regulation", "import", "duties", "customs",
+    ],
+    content:
+      "This is operator guidance, not legal or tax advice — confirm specifics with a professional for your market, because rules differ by country and change. The essentials: operate as a registered business and understand your tax position before revenue arrives. Selling into the EU carries VAT obligations, and the OSS scheme simplifies cross-border returns of that VAT; thresholds differ by country. Publish and actually follow four policies — terms, privacy, refund, shipping — because contradicting your own policy is how disputes are lost. Consumer law grants rights your terms cannot remove, such as a statutory cancellation window; know the country you sell INTO, not just the one you live in. GDPR applies to any EU customer data (consent, storage, deletion), and the real risk is losing your processor, not only fines. Never use another brand's name, logo or photography, and make no health or income claims you cannot substantiate — copied creative and false claims get accounts banned. Check the processor's prohibited categories before launch, and keep records monthly rather than reconstructing them yearly.",
+  },
 ];
 
 /** Format a "PLAIN header, then card" reference to inject into the turn. */

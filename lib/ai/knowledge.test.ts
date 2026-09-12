@@ -53,6 +53,14 @@ describe("selectKnowledge — reaches the right module", () => {
     expect(pick("how do I find a good sourcing agent and vet the supplier?")).toContain("sourcing-margin");
   });
 
+  it("routes the back-office / hidden-operations questions too", () => {
+    expect(pick("how should I handle returns and refunds?")).toContain("returns-refunds");
+    expect(pick("how should I handle support tickets and WISMO emails?")).toContain("customer-service");
+    expect(pick("how do I fight a chargeback dispute?")).toContain("disputes-chargebacks");
+    expect(pick("when should I use a 3PL and how do I avoid a stockout?")).toContain("operations-fulfillment");
+    expect(pick("do I need to charge VAT selling to the EU?")).toContain("legal-compliance");
+  });
+
   it("returns nothing for a question no module covers (doctrine alone answers)", () => {
     expect(selectKnowledge("hi there")).toEqual([]);
     expect(selectKnowledge("what should my brand name be?")).toEqual([]);
