@@ -72,4 +72,4 @@ specifications/     the product specifications (the source of truth)
 
 ## Author
 
-Max-Joel Basner
+buildwithmb

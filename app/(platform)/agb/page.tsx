@@ -29,7 +29,7 @@ export default function Terms() {
       <p>
         These terms govern the use of the Urivo platform, a SaaS application for the
         AI-assisted creation and management of online storefronts, provided by
-        buildwithmb (Max-Joel Basner), Mörikestraße 79, 73092 Heiningen, Germany
+        buildwithmb, Mörikestraße 79, 73092 Heiningen, Germany
         (&ldquo;we&rdquo;, &ldquo;us&rdquo;). Our full contact details are in the{" "}
         <a href="/impressum">Legal Notice</a>.
       </p>
@@ -72,10 +72,9 @@ export default function Terms() {
         <strong>Right of withdrawal.</strong> You have the right to withdraw from this
         contract within 14 days without giving any reason. The withdrawal period is 14
         days from the day of the conclusion of the contract. To exercise your right of
-        withdrawal, you must inform us — buildwithmb, Max-Joel Basner, Mörikestraße 79,
+        withdrawal, you must inform us — buildwithmb, Mörikestraße 79,
         73092 Heiningen, Germany, email{" "}
-        <a href="mailto:urivosupport@gmail.com">urivosupport@gmail.com</a>, phone{" "}
-        <a href="tel:+4915679817171">+49 15679 817171</a> — of your decision to
+        <a href="mailto:urivosupport@gmail.com">urivosupport@gmail.com</a> — of your decision to
         withdraw from this contract by an unequivocal statement (for example, a letter
         sent by post or an email). You may use the model withdrawal form below, but it
         is not obligatory. To meet the withdrawal deadline, it is sufficient for you to
@@ -98,7 +97,7 @@ export default function Terms() {
         you wish to withdraw from the contract.)
       </p>
       <p>
-        — To buildwithmb, Max-Joel Basner, Mörikestraße 79, 73092 Heiningen, Germany,
+        — To buildwithmb, Mörikestraße 79, 73092 Heiningen, Germany,
         urivosupport@gmail.com:
         <br />— I/We (*) hereby give notice that I/We (*) withdraw from my/our (*)
         contract for the provision of the following service: Urivo subscription
@@ -159,7 +158,7 @@ export default function Terms() {
 
       <h2>10. Contact</h2>
       <p>
-        buildwithmb, Max-Joel Basner — email{" "}
+        buildwithmb — email{" "}
         <a href="mailto:urivosupport@gmail.com">urivosupport@gmail.com</a>. Full details
         are in the <a href="/impressum">Legal Notice</a>.
       </p>

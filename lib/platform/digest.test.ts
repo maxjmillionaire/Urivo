@@ -10,7 +10,7 @@ import { composeContent, type DigestRow } from "./digest";
 const base: DigestRow = {
   user_id: "u1",
   email: "m@example.com",
-  full_name: "Max Basner",
+  full_name: "Alex Muster",
   marketing_unsub_token: "tok-1",
   credit_balance: 200,
   credits_expiring_amount: 0,
@@ -42,7 +42,7 @@ describe("composeContent — nudge priority", () => {
     expect(c.headline).toContain("3 sales this week");
     expect(c.headline).toContain("€89.90");
     // Uses the first name only.
-    expect(c.name).toBe("Max");
+    expect(c.name).toBe("Alex");
   });
 
   it("no live store is the top blocker when there are no sales", () => {
