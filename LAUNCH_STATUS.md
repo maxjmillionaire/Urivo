@@ -1,7 +1,7 @@
 # Urivo — Launch Status & Working Memory
 
 > Living doc. Updated after significant work; re-read after any context reset to stay oriented.
-> **Snapshot:** `main` @ `800a89b` · last updated 2026-09-08. This doc lives on `main`.
+> **Snapshot:** `main` @ `63a92c0` · last updated 2026-09-12. This doc lives on `main`.
 
 ---
 
@@ -103,3 +103,16 @@ Mostly founder config, not code. **Ordering: domain is the keystone; do it first
 4. Enable Stripe Smart Retries (Loop A config).
 5. Ship the €49 early-adopter FOMO framing on the pricing page (honest version — see §1).
 6. Then: Loop B win-back build, or Next Action V2.
+
+## 13. North Star — valuation & exit (strategy)
+- **Founder's numbers:** €100M = the north star ("generational" — breaks family poverty cycle). €30–50M = a fully acceptable, life-changing exit he'd take. RULE: **build to the €100M standard, stay pragmatic to sell at €30–50M.** The realization changes the *sell* threshold, not the *build* standard (same work makes it worth €30M or €100M).
+- **Exit math:** price ≈ ARR × multiple (commerce-SaaS ~3–8×, set by story quality). **€30–50M ≈ ~€4–8M ARR ≈ ~4,000–8,000 paying merchants** @ ~€80/mo blended (fewer if Pro/packs skew ARPU up).
+- **What sets the multiple (the real work — much already being engineered):** (1) growth rate, (2) **NRR > 100%** (expansion via upgrades/packs/volume tiers — the retention loops), (3) low churn, (4) 70%+ gross margin (the M2 margin floor), (5) efficient acquisition (LTV:CAC > 3, CAC payback < 12mo — founder's arena).
+- **Platform premium (all-in-one > point tool):** an integrated commerce OS sells at higher multiples AND bigger absolute numbers than a single tool like AutoDS (€92M) — via higher ARPU, stickiness, expansion, bigger TAM, deeper moat, more strategic value. CONDITION: premium comes from *integration + usage*, NOT feature count; a shallow 15-tool suite is worth less than one great point tool. Early = nail a sharp wedge, prove retention, THEN expand into the OS (don't build everything before merchant #1).
+- **Diligence-clean (deal-killers — fix EARLY):**
+  - **CAP TABLE: resolve the Clinton "% of MRR" claim, clean and in writing, long before any exit.** An unresolved/contested equity or revenue-share claim is the single biggest value-destroyer at diligence. Highest-value non-engineering cleanup; cheap to do now.
+  - Clean books (separate accounts, bookkeeping from day one).
+  - IP clearly owned by the company (OTS content, the code).
+  - Low concentration (not one channel / supplier / product).
+  - Not founder-dependent (documented, systemized — OTS Module 18: "build it as if a stranger will open the books and take the keys").
+- **Milestone ladder (aggressive 2–3 yr):** now → launch + first sale · Y1 → ~500–1,000 merchants (~€0.5–1M ARR = the CLAUDE.md goal = rung 1) + nail retention · Y2 → ~€2–4M ARR, prove NRR > 100% · Y3 → ~€4–8M ARR growing + diligence-clean → the €30–50M conversation. Same discipline, run longer/bigger, = the €100M ceiling.
