@@ -265,7 +265,7 @@ function LoginForm() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className={inputClass}
-                  placeholder="Max Basner"
+                  placeholder="Alex Muster"
                 />
               </div>
             )}

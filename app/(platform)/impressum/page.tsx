@@ -27,8 +27,6 @@ export default function LegalNotice() {
       <h2>Contact</h2>
       <p>
         Email: <a href="mailto:urivosupport@gmail.com">urivosupport@gmail.com</a>
-        <br />
-        Phone: <a href="tel:+4915679817171">+49 15679 817171</a>
       </p>
 
       <h2>Responsible for content pursuant to § 18 (2) MStV</h2>

@@ -44,8 +44,6 @@ export default function Privacy() {
         Mörikestraße 79, 73092 Heiningen, Germany
         <br />
         Email: <a href="mailto:urivosupport@gmail.com">urivosupport@gmail.com</a>
-        <br />
-        Phone: <a href="tel:+4915679817171">+49 15679 817171</a>
       </p>
 
       <h2>What data we process, and on what legal basis</h2>

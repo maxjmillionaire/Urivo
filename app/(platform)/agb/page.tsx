@@ -74,8 +74,7 @@ export default function Terms() {
         days from the day of the conclusion of the contract. To exercise your right of
         withdrawal, you must inform us — buildwithmb, Max-Joel Basner, Mörikestraße 79,
         73092 Heiningen, Germany, email{" "}
-        <a href="mailto:urivosupport@gmail.com">urivosupport@gmail.com</a>, phone{" "}
-        <a href="tel:+4915679817171">+49 15679 817171</a> — of your decision to
+        <a href="mailto:urivosupport@gmail.com">urivosupport@gmail.com</a> — of your decision to
         withdraw from this contract by an unequivocal statement (for example, a letter
         sent by post or an email). You may use the model withdrawal form below, but it
         is not obligatory. To meet the withdrawal deadline, it is sufficient for you to
