@@ -39,8 +39,6 @@ export default function Privacy() {
       <p>
         buildwithmb
         <br />
-        Max-Joel Basner
-        <br />
         Mörikestraße 79, 73092 Heiningen, Germany
         <br />
         Email: <a href="mailto:urivosupport@gmail.com">urivosupport@gmail.com</a>
